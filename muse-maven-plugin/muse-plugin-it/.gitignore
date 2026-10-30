@@ -1,0 +1,40 @@
+# Maven
+/target/
+/pom.xml.tag
+/pom.xml.releaseBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Kotlin
+*.class
+*.kotlin_metadata
+*.kotlin_module
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test outputs
+/surefire-reports/
+/failsafe-reports/
+
+# Integration test artifacts
+/it/
+/local-repo/
+/invoker-reports/

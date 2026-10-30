@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <http:listener-config name="HTTP_Listener_config"
+                          doc:name="HTTP Listener config"
+                          basePath="/service">
+        <http:listener-connection host="0.0.0.0"
+                                  port="8081"
+                                  connectionIdleTimeout="45000"
+                                  readTimeout="35000"
+                                  usePersistentConnections="false"/>
+    </http:listener-config>
+
+    <http:request-config name="HTTP_Request_config"
+                         doc:name="HTTP Request config"
+                         basePath="/v2"
+                         responseTimeout="45000"
+                         followRedirects="false"
+                         enableCookies="false"
+                         sendCorrelationId="NEVER"
+                         sendBodyMode="NEVER"
+                         requestStreamingMode="NEVER">
+        <http:request-connection host="api.example.test"
+                                 port="8443"
+                                 protocol="HTTPS"
+                                 connectionIdleTimeout="12000"
+                                 usePersistentConnections="false"
+                                 maxConnections="4"/>
+        <http:default-headers>
+            <http:default-header key="Accept" value="application/json"/>
+        </http:default-headers>
+        <http:default-query-params>
+            <http:query-param key="locale" value="en"/>
+        </http:default-query-params>
+    </http:request-config>
+
+    <flow name="http-provider-flow">
+        <http:listener config-ref="HTTP_Listener_config"
+                       path="/api/proxy/{id}"
+                       allowedMethods="POST"
+                       responseStreamingMode="ALWAYS">
+            <http:response statusCode="#[vars.status default 201]" reasonPhrase="#[vars.reason default 'Created']">
+                <http:headers>#[vars.responseHeaders]</http:headers>
+                <http:body>#[payload]</http:body>
+            </http:response>
+            <http:error-response statusCode="#[vars.status default 500]" reasonPhrase="#[error.description]">
+                <http:headers>#[vars.errorHeaders]</http:headers>
+                <http:body>#[error.description]</http:body>
+            </http:error-response>
+        </http:listener>
+        <http:request config-ref="HTTP_Request_config"
+                      path="/orders/{id}"
+                      method="POST"
+                      responseTimeout="2000"
+                      followRedirects="true"
+                      sendBodyMode="ALWAYS"
+                      requestStreamingMode="ALWAYS"
+                      sendCorrelationId="ALWAYS"
+                      correlationId="#[correlationId]">
+            <http:body>#[payload]</http:body>
+            <http:headers>#[vars.headers]</http:headers>
+            <http:query-params>#[vars.queryParams]</http:query-params>
+            <http:uri-params>#[vars.uriParams]</http:uri-params>
+        </http:request>
+    </flow>
+</mule>

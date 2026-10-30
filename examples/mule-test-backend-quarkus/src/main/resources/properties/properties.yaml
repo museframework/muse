@@ -1,0 +1,3 @@
+app:
+  wait:
+    period: "5000"

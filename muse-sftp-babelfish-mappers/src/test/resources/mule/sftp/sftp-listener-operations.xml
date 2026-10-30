@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+
+    <sftp:config name="Sftp_Config" doc:name="SFTP Config">
+        <sftp:connection host="sftp.example.com"
+                         port="2222"
+                         username="muse"
+                         password="secret"
+                         workingDir="/data"
+                         knownHostsFile="/etc/muse/known_hosts"
+                         connectionTimeout="15"
+                         connectionTimeoutUnit="SECONDS"
+                         responseTimeout="45"
+                         responseTimeoutUnit="SECONDS"/>
+    </sftp:config>
+
+    <flow name="sftp-provider-flow">
+        <sftp:listener config-ref="Sftp_Config"
+                       directory="inbox"
+                       recursive="false"
+                       watermarkEnabled="true"
+                       autoDelete="false"
+                       moveToDirectory="archive"
+                       overwrite="true"
+                       applyPostActionWhenFailed="false"
+                       timeBetweenSizeCheck="10"
+                       timeBetweenSizeCheckUnit="MILLISECONDS">
+            <scheduling-strategy>
+                <fixed-frequency frequency="2000"/>
+            </scheduling-strategy>
+            <sftp:matcher filenamePattern="*.csv" maxSize="100"/>
+        </sftp:listener>
+
+        <sftp:read config-ref="Sftp_Config" path="inbox/input.csv"/>
+
+        <sftp:write config-ref="Sftp_Config"
+                    path="outbox/output.csv"
+                    mode="APPEND"
+                    createParentDirectories="true">
+            <sftp:content>#[payload]</sftp:content>
+        </sftp:write>
+
+        <sftp:list config-ref="Sftp_Config"
+                   directoryPath="inbox"
+                   recursive="true">
+            <sftp:matcher filenamePattern="*.csv" maxSize="100"/>
+        </sftp:list>
+
+        <sftp:copy config-ref="Sftp_Config"
+                   sourcePath="inbox/input.csv"
+                   targetPath="copies"
+                   createParentDirectories="true"
+                   overwrite="true"
+                   renameTo="copied.csv"/>
+
+        <sftp:move config-ref="Sftp_Config"
+                   sourcePath="inbox/staging.csv"
+                   targetPath="moved"
+                   createParentDirectories="false"
+                   overwrite="false"/>
+
+        <sftp:delete config-ref="Sftp_Config" path="inbox/obsolete.csv"/>
+
+        <sftp:rename config-ref="Sftp_Config"
+                     path="inbox/old-name.csv"
+                     to="new-name.csv"
+                     overwrite="true"/>
+
+        <sftp:create-directory config-ref="Sftp_Config" directoryPath="inbox/created"/>
+    </flow>
+</mule>

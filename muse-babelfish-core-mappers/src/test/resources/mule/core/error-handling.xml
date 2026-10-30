@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <flow name="error-flow" doc:id="error-001">
+        <choice doc:name="Check payload">
+            <when expression="#[payload == &quot;fail&quot;]">
+                <raise-error type="MULE:EXPRESSION" description="Intentional failure" doc:name="Raise error"/>
+            </when>
+            <otherwise>
+                <set-payload value="&quot;Success&quot;" doc:name="Set success"/>
+            </otherwise>
+        </choice>
+        <error-handler>
+            <on-error-continue type="MULE:EXPRESSION" doc:name="Handle expression error">
+                <set-payload value="&quot;Error handled&quot;" doc:name="Set error payload"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+</mule>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+  <flow name="flow-c" doc:name="Flow C">
+    <set-payload value="Hello from Flow C!" doc:name="Set Payload"/>
+    <logger message="#[payload]" level="INFO" doc:name="Log Response"/>
+  </flow>
+</mule>

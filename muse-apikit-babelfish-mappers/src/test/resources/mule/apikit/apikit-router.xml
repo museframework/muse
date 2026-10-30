@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <apikit:config name="orders-api"
+                   raml="api/orders.raml"
+                   doc:name="Orders API"
+                   doc:id="apikit-config-001"/>
+
+    <sub-flow name="orders-router">
+        <apikit:router config-ref="orders-api"
+                       doc:name="Orders Router"
+                       doc:id="apikit-router-001"/>
+    </sub-flow>
+</mule>

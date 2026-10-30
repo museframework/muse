@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+          http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+          http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+          http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <http:request-config name="BackendConfig" doc:name="Backend API Config" basePath="/api">
+        <http:request-connection host="api.example.com" port="443"/>
+    </http:request-config>
+
+    <!-- Main sub-flow: orchestrates processing with flow-ref chain -->
+    <sub-flow name="order-processing-impl" doc:id="order-proc-001">
+        <logger level="INFO" doc:name="Start Logger" message="START order-processing-impl"/>
+        <set-variable variableName="payloadBackup" value="#[payload]" doc:name="Backup Payload"/>
+        <flow-ref name="order-processing-step1" doc:name="Step 1: Create Span" target="step1Result"/>
+        <ee:transform doc:name="Extract Message ID">
+            <ee:message/>
+            <ee:variables>
+                <ee:set-variable variableName="messageId"><![CDATA[%dw 2.0
+output application/java
+---
+vars.step1Result.data.messageId]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <choice doc:name="Route by Source System">
+            <when expression="#[vars.sourceSystem == 'system-a']">
+                <flow-ref name="order-processing-update-target-a" doc:name="Update Target A"/>
+            </when>
+            <when expression="#[vars.sourceSystem == 'system-b']">
+                <flow-ref name="order-processing-update-target-b" doc:name="Update Target B"/>
+            </when>
+        </choice>
+        <flow-ref name="order-processing-step3" doc:name="Step 3: Finalize Span"/>
+        <logger level="INFO" doc:name="End Logger" message="END order-processing-impl"/>
+    </sub-flow>
+
+    <!-- Sub-flow: try with error handler + nested choice + flow-ref -->
+    <sub-flow name="order-processing-update-target-a" doc:id="update-target-a-001">
+        <try doc:name="Try Update Target A">
+            <choice doc:name="Check Conditions">
+                <when expression="#[vars.sourceSystem == 'system-a' and vars.payloadBackup.TargetId != null]">
+                    <flow-ref name="order-processing-patch-target-a" doc:name="PATCH Target A"/>
+                </when>
+                <when expression="#[vars.sourceSystem == 'system-a' and vars.payloadBackup.TargetId == null]">
+                    <flow-ref name="order-processing-post-target-a" doc:name="POST Target A"/>
+                </when>
+            </choice>
+            <error-handler>
+                <on-error-continue doc:name="On Non-Retryable Error" type="APP:NON_RETRYABLE_ERROR">
+                    <logger level="ERROR" doc:name="Error Logger" message="Update Target A failed"/>
+                    <flow-ref name="order-processing-step3" doc:name="Finalize Span on Error"/>
+                    <raise-error type="APP:NON_RETRYABLE_ERROR" doc:name="Re-raise Error" description="Update Target A raised an error"/>
+                </on-error-continue>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <!-- Sub-flow: try with error handler + on-error-propagate -->
+    <sub-flow name="order-processing-update-target-b" doc:id="update-target-b-001">
+        <try doc:name="Try Update Target B">
+            <flow-ref name="order-processing-post-target-b" doc:name="POST Target B"/>
+            <flow-ref name="order-processing-patch-target-b" doc:name="PATCH Target B"/>
+            <error-handler>
+                <on-error-continue doc:name="On Non-Retryable Error" type="APP:NON_RETRYABLE_ERROR">
+                    <logger level="ERROR" doc:name="Error Logger" message="Update Target B failed"/>
+                    <flow-ref name="order-processing-step3" doc:name="Finalize Span on Error"/>
+                    <flow-ref name="order-processing-patch-target-b" doc:name="PATCH Target B on Error"/>
+                    <raise-error type="APP:NON_RETRYABLE_ERROR" doc:name="Re-raise Error" description="Update Target B raised an error"/>
+                </on-error-continue>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <!-- Leaf sub-flow: HTTP request via flow-ref -->
+    <sub-flow name="order-processing-step1" doc:id="step1-001">
+        <ee:transform doc:name="Prepare Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{body: {correlationId: correlationId, message: "Processing order"}}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <flow-ref name="backend-create-span" doc:name="Create Span"/>
+    </sub-flow>
+
+    <!-- Leaf sub-flow: HTTP request with try + on-error-propagate -->
+    <sub-flow name="order-processing-post-target-b" doc:id="post-target-b-001">
+        <ee:transform doc:name="Prepare POST Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{body: vars.payloadBackup ++ {MessageId: vars.messageId}}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <try doc:name="Try POST">
+            <flow-ref name="backend-create-order" doc:name="Create Order"/>
+            <error-handler>
+                <on-error-propagate doc:name="On Bad Request" type="HTTP:BAD_REQUEST">
+                    <logger level="ERROR" doc:name="Error Logger" message="Bad request to backend"/>
+                    <raise-error type="APP:NON_RETRYABLE_ERROR" doc:name="Re-raise" description="POST to backend raised an error"/>
+                </on-error-propagate>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <!-- Leaf sub-flows: simple flow-ref passthrough (representing external calls) -->
+    <sub-flow name="order-processing-step3" doc:id="step3-001">
+        <ee:transform doc:name="Prepare Finalize Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{body: {errorText: error.description}, uriParams: {id: vars.messageId}}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <flow-ref name="backend-finalize-span" doc:name="Finalize Span"/>
+    </sub-flow>
+
+    <sub-flow name="order-processing-patch-target-a" doc:id="patch-target-a-001">
+        <ee:transform doc:name="Prepare PATCH Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{body: vars.payloadBackup, uriParams: {targetId: vars.payloadBackup.TargetId}}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <try doc:name="Try PATCH">
+            <flow-ref name="backend-update-order" doc:name="Update Order"/>
+            <error-handler>
+                <on-error-propagate doc:name="On Bad Request" type="HTTP:BAD_REQUEST">
+                    <logger level="ERROR" doc:name="Error Logger" message="Bad request to backend"/>
+                    <raise-error type="APP:NON_RETRYABLE_ERROR" doc:name="Re-raise" description="PATCH to backend raised an error"/>
+                </on-error-propagate>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <sub-flow name="order-processing-post-target-a" doc:id="post-target-a-001">
+        <ee:transform doc:name="Prepare POST Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{body: vars.payloadBackup}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <try doc:name="Try POST">
+            <flow-ref name="backend-create-order" doc:name="Create Order"/>
+            <error-handler>
+                <on-error-propagate doc:name="On Bad Request" type="HTTP:BAD_REQUEST">
+                    <logger level="ERROR" doc:name="Error Logger" message="Bad request to backend"/>
+                    <raise-error type="APP:NON_RETRYABLE_ERROR" doc:name="Re-raise" description="POST to backend raised an error"/>
+                </on-error-propagate>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <sub-flow name="order-processing-patch-target-b" doc:id="patch-target-b-001">
+        <ee:transform doc:name="Prepare PATCH Request">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{body: vars.payloadBackup, uriParams: {targetId: vars.payloadBackup.TargetId}}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <try doc:name="Try PATCH">
+            <flow-ref name="backend-update-order" doc:name="Update Order"/>
+            <error-handler>
+                <on-error-propagate doc:name="On Bad Request" type="HTTP:BAD_REQUEST">
+                    <logger level="ERROR" doc:name="Error Logger" message="Bad request to backend"/>
+                    <raise-error type="APP:NON_RETRYABLE_ERROR" doc:name="Re-raise" description="PATCH to backend raised an error"/>
+                </on-error-propagate>
+            </error-handler>
+        </try>
+    </sub-flow>
+
+    <!-- External call stubs (would be HTTP requests in real app, here as flow-ref targets) -->
+    <sub-flow name="backend-create-span" doc:id="backend-span-001">
+        <http:request config-ref="BackendConfig" path="/spans" method="POST" doc:name="Create Span"/>
+    </sub-flow>
+
+    <sub-flow name="backend-create-order" doc:id="backend-order-001">
+        <http:request config-ref="BackendConfig" path="/orders" method="POST" doc:name="Create Order"/>
+    </sub-flow>
+
+    <sub-flow name="backend-update-order" doc:id="backend-update-001">
+        <http:request config-ref="BackendConfig" path="/orders" method="PATCH" doc:name="Update Order"/>
+    </sub-flow>
+
+    <sub-flow name="backend-finalize-span" doc:id="backend-finalize-001">
+        <http:request config-ref="BackendConfig" path="/spans" method="PUT" doc:name="Finalize Span"/>
+    </sub-flow>
+
+</mule>

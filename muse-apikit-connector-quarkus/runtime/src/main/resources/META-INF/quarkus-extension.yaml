@@ -1,0 +1,14 @@
+name: "Muse APIKit Connector"
+metadata:
+  keywords:
+    - "muse"
+    - "apikit"
+    - "connector"
+  guide: "https://github.com/museframework/muse"
+  categories:
+    - "integration"
+    - "web"
+  status: "preview"
+  built-with-quarkus-core: "3.21.0"
+  extension-dependencies:
+    - "dev.museframework.connectors:muse-quarkus"

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <flow name="packaged-outbound-backend-flow" doc:id="packaged-outbound-backend-flow">
+        <http:listener config-ref="packaged-listener" path="/e2e/backend" allowedMethods="POST" doc:name="Loopback backend listener"/>
+        <set-payload value="Outbound response" doc:name="Set backend response"/>
+    </flow>
+
+    <flow name="packaged-outbound-proxy-flow" doc:id="packaged-outbound-proxy-flow">
+        <http:listener config-ref="packaged-listener" path="/e2e/proxy" allowedMethods="POST" doc:name="Outbound proxy listener"/>
+        <http:request config-ref="packaged-loopback" path="/e2e/backend" method="POST" doc:name="Invoke loopback backend"/>
+    </flow>
+
+    <flow name="packaged-stream-backend-flow" doc:id="packaged-stream-backend-flow">
+        <http:listener config-ref="packaged-listener" path="/e2e/stream-backend" allowedMethods="POST" doc:name="Streaming loopback backend"/>
+    </flow>
+
+    <flow name="packaged-stream-proxy-flow" doc:id="packaged-stream-proxy-flow">
+        <http:listener config-ref="packaged-listener" path="/e2e/stream-proxy" allowedMethods="POST" doc:name="Streaming proxy listener"/>
+        <http:request config-ref="packaged-loopback" path="/e2e/stream-backend" method="POST" doc:name="Stream through loopback backend"/>
+    </flow>
+
+    <flow name="packaged-stream-failure-flow" doc:id="packaged-stream-failure-flow">
+        <http:listener config-ref="packaged-listener" path="/e2e/stream-failure" allowedMethods="POST" doc:name="Streaming failure listener"/>
+        <http:request config-ref="packaged-loopback" path="/e2e/missing-stream-backend" method="POST" doc:name="Invoke missing streaming backend"/>
+    </flow>
+</mule>

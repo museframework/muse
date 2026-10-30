@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd">
+
+    <sftp:config name="generated-sftp" doc:name="Generated SFTP">
+        <sftp:connection host="127.0.0.1"
+                         port="18822"
+                         username="muse"
+                         password="secret"
+                         hostKeyChecking="INSECURE"
+                         connectionTimeout="5"
+                         connectionTimeoutUnit="SECONDS"
+                         responseTimeout="5"
+                         responseTimeoutUnit="SECONDS"/>
+    </sftp:config>
+
+    <flow name="generated-sftp-round-trip" doc:id="generated-sftp-round-trip">
+        <http:listener config-ref="packaged-listener" path="/e2e/sftp-generated" allowedMethods="POST" doc:name="Generated SFTP listener"/>
+        <sftp:write config-ref="generated-sftp"
+                    path="/outbound/generated-request.bin"
+                    createParentDirectories="true"
+                    doc:name="Write generated request">
+            <sftp:content><![CDATA[#[payload]]]></sftp:content>
+        </sftp:write>
+        <sftp:read config-ref="generated-sftp" path="/outbound/generated-request.bin" doc:name="Read generated request"/>
+    </flow>
+</mule>

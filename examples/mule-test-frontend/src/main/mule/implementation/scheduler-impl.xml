@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+  <sub-flow name="scheduler-impl-subflow" doc:id="c56db3cd-6105-4649-bac4-280180441226" >
+    <logger level="INFO" message="START" />
+    <http:request config-ref="HTTP_Request_config" path="/api/resources" doc:name="HTTP Request"/>
+    <logger level="INFO" doc:name="Logger" doc:id="f77d3c91-2360-4874-92a2-ec71a75a332e" message='#["Waited: " ++ payload.data.execution_time as String ++ " ms."]'/>
+    <logger level="INFO" doc:name="Logger" doc:id="999bec04-7f6a-4f36-b8c5-632978cfd219" message="END"/>
+  </sub-flow>
+</mule>

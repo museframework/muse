@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:file="http://www.mulesoft.org/schema/mule/file"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+
+    <file:config name="generated-files" doc:name="Generated files">
+        <file:connection workingDir="generated"/>
+    </file:config>
+
+    <flow name="generated-file-flow" doc:id="generated-file-flow">
+        <file:listener config-ref="generated-files"
+                       directory="incoming"
+                       moveToDirectory="archive"
+                       renameTo="processed.txt"
+                       overwrite="true"
+                       doc:name="Generated file listener">
+            <scheduling-strategy>
+                <fixed-frequency frequency="25"/>
+            </scheduling-strategy>
+        </file:listener>
+        <file:write config-ref="generated-files"
+                    path="output/copied.txt"
+                    createParentDirectories="true"
+                    doc:name="Generated file write">
+            <file:content><![CDATA[#[payload]]]></file:content>
+        </file:write>
+    </flow>
+</mule>

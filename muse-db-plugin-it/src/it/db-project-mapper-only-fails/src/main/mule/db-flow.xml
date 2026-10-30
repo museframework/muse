@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:db="http://www.mulesoft.org/schema/mule/db"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+  <db:config name="Database_Config" doc:name="Database Config">
+    <db:generic-connection url="jdbc:h2:mem:db-plugin-realm"
+                           driverClassName="org.h2.Driver"
+                           user="sa"/>
+  </db:config>
+
+  <flow name="db-select-flow" doc:name="Database Select">
+    <db:select config-ref="Database_Config" doc:name="Database Select">
+      <db:sql>SELECT 1 AS value</db:sql>
+    </db:select>
+    <set-payload value="selected" doc:name="Set Response"/>
+  </flow>
+</mule>

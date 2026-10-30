@@ -1,0 +1,26 @@
+#%RAML 1.0
+title: <YOUR_TITLE>
+version: v1
+
+/api:
+  /resources:
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+              type: object
+              properties:
+                data:
+                  type: object
+                  properties:
+                    execution_time: integer
+    post:
+      body:
+        application/octet-stream:
+          type: file
+      responses:
+        200:
+          body:
+            application/octet-stream:
+              type: file

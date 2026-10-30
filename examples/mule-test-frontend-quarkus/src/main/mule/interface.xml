@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:http="http://www.mulesoft.org/schema/mule/http" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <flow name="scheduler-flow" doc:id="scheduler-flow-001">
+        <scheduler doc:name="scheduler" doc:id="scheduler-001">
+            <scheduling-strategy>
+                <fixed-frequency frequency="${app.scheduler.frequency_ms}" />
+            </scheduling-strategy>
+        </scheduler>
+        <flow-ref name="scheduler-impl-subflow" doc:name="scheduler-impl-subflow" doc:id="flow-ref-001" />
+    </flow>
+
+    <flow name="streaming-proxy-flow" doc:id="streaming-proxy-flow-001">
+        <http:listener config-ref="HTTP_Streaming_Listener_config" path="/streaming/echo" allowedMethods="POST" doc:name="Streaming listener"/>
+        <http:request config-ref="HTTP_Request_config" path="/api/resources" method="POST" doc:name="Streaming backend request"/>
+    </flow>
+</mule>

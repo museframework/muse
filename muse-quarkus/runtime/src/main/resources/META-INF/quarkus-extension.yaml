@@ -1,0 +1,14 @@
+name: "Muse"
+metadata:
+  keywords:
+    - "integration"
+    - "muse"
+    - "flow"
+    - "pipeline"
+  guide: "https://github.com/museframework/muse"
+  categories:
+    - "integration"
+  status: "preview"
+  built-with-quarkus-core: "3.21.0"
+  extension-dependencies:
+    - "io.quarkus:quarkus-arc"

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Listener that matches CSV names and archives them after the flow. -->
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:file="http://www.mulesoft.org/schema/mule/file"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+
+    <file:config name="File_Config" doc:name="File Config">
+        <file:connection workingDir="/tmp/muse-file"/>
+    </file:config>
+
+    <flow name="archive-csv-flow">
+        <file:listener config-ref="File_Config"
+                       directory="input"
+                       moveToDirectory="output">
+            <scheduling-strategy>
+                <fixed-frequency/>
+            </scheduling-strategy>
+            <file:matcher filenamePattern="*.csv"/>
+        </file:listener>
+    </flow>
+</mule>

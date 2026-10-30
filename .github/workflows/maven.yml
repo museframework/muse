@@ -1,0 +1,476 @@
+name: Maven CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+concurrency:
+  group: maven-ci-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verification-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      owners: ${{ steps.discover.outputs.owners }}
+      build_exclusions: ${{ steps.discover.outputs.build_exclusions }}
+      verify_exclusions: ${{ steps.discover.outputs.verify_exclusions }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Discover verification owners with strict family pairs
+      id: discover
+      run: |
+        set -euo pipefail
+        python3 scripts/verification-owners.py . --format json --require-family-pairs > owners.json
+        python3 - <<'PY'
+        import json
+        from pathlib import Path
+
+        owners = json.loads(Path("owners.json").read_text())["include"]
+        if not owners:
+            raise SystemExit("empty verification owner discovery")
+
+        packaged_kinds = {"platform", "packaged", "composition"}
+        packaged_exclusions = [
+            f"!{owner['module']}"
+            for owner in owners
+            if owner["kind"] in packaged_kinds
+        ]
+        build_exclusions = [*packaged_exclusions, "!muse-architecture-tests"]
+        verify_exclusions = [
+            *packaged_exclusions,
+            "!muse-http-connector-api",
+            "!muse-http-connector",
+            "!muse-http-connector-spring",
+            "!muse-http-babelfish-mappers",
+        ]
+
+        def emit(name: str, value: str) -> None:
+            print(f"{name}={value}")
+
+        with open("github_output.txt", "w", encoding="utf-8") as handle:
+            handle.write(f"owners={json.dumps(owners, separators=(',', ':'))}\n")
+            handle.write(f"build_exclusions={','.join(build_exclusions)}\n")
+            handle.write(f"verify_exclusions={','.join(verify_exclusions)}\n")
+        PY
+        cat github_output.txt >> "$GITHUB_OUTPUT"
+
+    - name: Upload verification owner inventory
+      uses: actions/upload-artifact@v4
+      with:
+        name: verification-owners-inventory
+        path: owners.json
+        if-no-files-found: error
+        retention-days: 7
+
+  build:
+    needs: verification-inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build project artifacts without tests
+      run: >-
+        mvn clean install --batch-mode -DskipTests
+        -pl '${{ needs.verification-inventory.outputs.build_exclusions }}'
+
+    - name: Verify non-HTTP test owners
+      run: >-
+        mvn verify --batch-mode
+        -pl '${{ needs.verification-inventory.outputs.verify_exclusions }}'
+
+    - name: Assert unit test discovery
+      run: |
+        ./scripts/assert-test-reports.sh surefire-reports \
+          muse-maven-plugin/muse-plugin-core \
+          muse-dsl \
+          muse-apikit-connector-api \
+          muse-apikit-connector \
+          muse-sftp-connector-api \
+          muse-sftp-connector \
+          muse-sftp-babelfish-mappers \
+          muse-file-connector-api \
+          muse-file-connector \
+          muse-file-babelfish-mappers \
+          muse-architecture-tests \
+          muse-babelfish \
+          muse-babelfish-core-mappers \
+          muse-apikit-babelfish-mappers \
+          muse-engine
+
+    - name: Assert integration test discovery
+      run: |
+        ./scripts/assert-test-reports.sh failsafe-reports \
+          muse-babelfish \
+          muse-babelfish-core-mappers \
+          muse-apikit-babelfish-mappers \
+          muse-sftp-babelfish-mappers \
+          muse-engine \
+          muse-spring-boot \
+          muse-sftp-connector \
+          muse-file-connector
+
+    - name: Upload Surefire test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: surefire-test-results
+        path: '**/target/surefire-reports/*.xml'
+        if-no-files-found: error
+        retention-days: 7
+
+    - name: Upload Failsafe test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: failsafe-test-results
+        path: '**/target/failsafe-reports/*.xml'
+        if-no-files-found: error
+        retention-days: 7
+
+  published-core-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        muse_version: ['0.1.0']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Bootstrap shared Muse artifacts
+      run: >-
+        mvn clean install --batch-mode -DskipTests
+        -pl muse-bom,muse-dsl,muse-engine-api,muse-engine-scala,muse-engine,muse-spring-boot,muse-babelfish
+        -am
+
+    - name: Run HTTP reactor with Muse version ${{ matrix.muse_version }}
+      run: >-
+        mvn verify --batch-mode
+        -f muse-http/pom.xml
+        -Dmuse.version=${{ matrix.muse_version }}
+
+    - name: Assert HTTP contract unit test discovery
+      run: |
+        ./scripts/assert-test-reports.sh surefire-reports \
+          muse-http-connector-api \
+          muse-http-connector \
+          muse-http-babelfish-mappers
+
+    - name: Assert HTTP contract integration test discovery
+      run: |
+        ./scripts/assert-test-reports.sh failsafe-reports \
+          muse-http-connector-api \
+          muse-http-connector \
+          muse-http-connector-spring \
+          muse-http-babelfish-mappers
+
+    - name: Assert nonexistent Muse version fails before HTTP compilation
+      if: ${{ matrix.muse_version == '0.1.0' }}
+      run: |
+        set -o pipefail
+        failure_log=$(mktemp)
+        trap 'rm -f "$failure_log"' EXIT
+
+        if mvn compile --batch-mode \
+          -f muse-http/pom.xml \
+          -Dmuse.version=0.0.0-does-not-exist \
+          2>&1 | tee "$failure_log"; then
+          echo "Expected dependency resolution failure" >&2
+          exit 1
+        fi
+
+        if ! grep -q "Non-resolvable import POM" "$failure_log"; then
+          echo "Expected failure while resolving the Muse BOM" >&2
+          exit 1
+        fi
+
+        if grep -q -- "--- kotlin:" "$failure_log"; then
+          echo "HTTP Kotlin compilation started before dependency resolution failed" >&2
+          exit 1
+        fi
+
+    - name: Upload HTTP contract unit test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: http-contract-surefire-results-core-${{ matrix.core-version }}
+        path: |
+          muse-http-connector-api/target/surefire-reports/*.xml
+          muse-http-connector/target/surefire-reports/*.xml
+          muse-http-babelfish-mappers/target/surefire-reports/*.xml
+        if-no-files-found: error
+        retention-days: 7
+
+    - name: Upload HTTP contract integration test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: http-contract-failsafe-results-core-${{ matrix.core-version }}
+        path: |
+          muse-http-connector-api/target/failsafe-reports/*.xml
+          muse-http-connector/target/failsafe-reports/*.xml
+          muse-http-connector-spring/target/failsafe-reports/*.xml
+          muse-http-babelfish-mappers/target/failsafe-reports/*.xml
+        if-no-files-found: error
+        retention-days: 7
+
+  connector-verification:
+    needs: verification-inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        owner: ${{ fromJson(needs.verification-inventory.outputs.owners) }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Run discovered verification owner
+      run: >
+        python3 scripts/run-verification-owner.py
+        "${{ matrix.owner.module }}"
+        --repository "${{ runner.temp }}/muse-repo-${{ matrix.owner.artifact_id }}"
+        --scratch "${{ runner.temp }}/muse-scratch-${{ matrix.owner.artifact_id }}"
+        --result-json "${{ matrix.owner.module }}/target/verification/verification-run-${{ matrix.owner.artifact_id }}.json"
+
+    - name: Upload owner verification result
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: verification-result-${{ matrix.owner.artifact_id }}
+        path: ${{ matrix.owner.module }}/target/verification/verification-run-${{ matrix.owner.artifact_id }}.json
+        if-no-files-found: error
+        retention-days: 7
+
+    - name: Upload owner reports and diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: verification-reports-${{ matrix.owner.artifact_id }}
+        path: |
+          ${{ matrix.owner.module }}/target/verification/**
+          ${{ matrix.owner.module }}/target/failsafe-reports/
+          ${{ matrix.owner.module }}/target/invoker-reports/
+        if-no-files-found: error
+        retention-days: 7
+
+  core-translation-compile-it:
+    needs: [verification-inventory, connector-verification]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download owner inventory
+      uses: actions/download-artifact@v4
+      with:
+        name: verification-owners-inventory
+        path: verification-inventory
+
+    - name: Download owner verification results
+      uses: actions/download-artifact@v4
+      with:
+        pattern: verification-result-*
+        merge-multiple: true
+        path: verification-results
+
+    - name: Require platform owner compilation/E2E gate
+      run: >-
+        python3 scripts/check-verification-aggregate.py
+        --inventory verification-inventory/owners.json
+        --results-root verification-results
+        --upstream-result ${{ needs.connector-verification.result }}
+        --kind platform
+
+  packaged-e2e:
+    needs: [verification-inventory, connector-verification]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download owner inventory
+      uses: actions/download-artifact@v4
+      with:
+        name: verification-owners-inventory
+        path: verification-inventory
+
+    - name: Download owner verification results
+      uses: actions/download-artifact@v4
+      with:
+        pattern: verification-result-*
+        merge-multiple: true
+        path: verification-results
+
+    - name: Require platform, packaged, and composition owners
+      run: >-
+        python3 scripts/check-verification-aggregate.py
+        --inventory verification-inventory/owners.json
+        --results-root verification-results
+        --upstream-result ${{ needs.connector-verification.result }}
+        --kind platform
+        --kind packaged
+        --kind composition
+
+  plugin-invoker-it:
+    needs: [verification-inventory, connector-verification]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download owner inventory
+      uses: actions/download-artifact@v4
+      with:
+        name: verification-owners-inventory
+        path: verification-inventory
+
+    - name: Download owner verification results
+      uses: actions/download-artifact@v4
+      with:
+        pattern: verification-result-*
+        merge-multiple: true
+        path: verification-results
+
+    - name: Require plugin-realm owners
+      run: >-
+        python3 scripts/check-verification-aggregate.py
+        --inventory verification-inventory/owners.json
+        --results-root verification-results
+        --upstream-result ${{ needs.connector-verification.result }}
+        --kind plugin-realm
+
+  example-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Install reactor artifacts required by the example applications
+      run: >-
+        mvn clean install --batch-mode -DskipTests
+        -Dkotlin.daemon.enabled=false
+        -Pspring-examples
+        -pl examples/test-muse-spring-boot
+        -am
+
+    - name: Install Quarkus extensions
+      run: |
+        mvn -f muse-quarkus/pom.xml install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false
+        mvn -f muse-http-connector-quarkus/pom.xml install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false
+        mvn install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false -pl :muse-apikit-connector -am
+        mvn -f muse-apikit-connector-quarkus/pom.xml install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false
+
+    - name: Run Spring Boot example E2E tests
+      run: >-
+        mvn verify --batch-mode
+        -Dkotlin.daemon.enabled=false
+        -Pe2e -Pspring-examples
+        -pl examples/test-muse-spring-boot
+
+    - name: Assert Spring Boot example E2E coverage
+      run: >-
+        python3 scripts/assert-e2e-reports.py
+        examples/test-muse-spring-boot
+        examples/test-muse-spring-boot/target/failsafe-reports
+
+    - name: Run Quarkus example integration and E2E tests
+      run: >-
+        mvn -f examples/test-muse-quarkus/pom.xml verify --batch-mode
+        -Dkotlin.daemon.enabled=false
+
+    - name: Assert Quarkus example E2E coverage
+      run: >-
+        python3 scripts/assert-e2e-reports.py
+        examples/test-muse-quarkus
+        examples/test-muse-quarkus/target/failsafe-reports
+
+    - name: Run standalone Quarkus application E2E tests
+      run: >-
+        mvn -f test-musek-quarkus/pom.xml test --batch-mode
+        -Dkotlin.daemon.enabled=false
+
+    - name: Assert standalone Quarkus E2E coverage
+      run: >-
+        python3 scripts/assert-e2e-reports.py
+        test-musek-quarkus
+        test-musek-quarkus/target/surefire-reports
+
+  native-image:
+    runs-on: ubuntu-latest
+    needs: build
+    if: false  # TEMPORARILY DISABLED
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up GraalVM 21
+      uses: graalvm/setup-graalvm@v1
+      with:
+        java-version: '21'
+        distribution: 'graalvm-community'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: Build native image
+      run: |
+        cd examples/test-muse-spring-boot-native
+        mvn clean package -Pnative --batch-mode
+
+    - name: Upload native executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-executable
+        path: examples/test-muse-spring-boot-native/target/*-runner
+        retention-days: 7

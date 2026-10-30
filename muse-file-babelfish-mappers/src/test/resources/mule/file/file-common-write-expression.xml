@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Write with a DataWeave path expression and APPEND mode. -->
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:file="http://www.mulesoft.org/schema/mule/file"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+
+    <file:config name="File_Config" doc:name="File Config">
+        <file:connection workingDir="/tmp/muse-file"/>
+    </file:config>
+
+    <flow name="write-expression-flow">
+        <file:write config-ref="File_Config"
+                    path="#['output_' ++ dw::Core::now() as String {format: 'yy_MM_dd'} ++ '.csv']"
+                    mode="APPEND">
+            <file:content>#[payload]</file:content>
+        </file:write>
+    </flow>
+</mule>

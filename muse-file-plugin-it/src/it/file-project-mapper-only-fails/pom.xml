@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.museframework.it</groupId>
+    <artifactId>file-project-mapper-only-fails</artifactId>
+    <version>0.1.0</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <skipPublishing>true</skipPublishing>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>dev.museframework</groupId>
+            <artifactId>muse-dsl</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework</groupId>
+            <artifactId>muse-babelfish</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework</groupId>
+            <artifactId>muse-file-connector-api</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework</groupId>
+            <artifactId>muse-file-babelfish-mappers</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>dev.museframework.maven</groupId>
+                <artifactId>muse-maven-plugin</artifactId>
+                <version>0.1.0</version>
+                <executions>
+                    <execution>
+                        <id>muse-generate</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <packageName>dev.museframework.it.fileprojectonly</packageName>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

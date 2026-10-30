@@ -1,0 +1,632 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         child.project.url.inherit.append.path="false"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.museframework</groupId>
+    <artifactId>muse-bom</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+    <name>Muse BOM</name>
+    <description>Muse Bill of Materials — centralizes all dependency versions</description>
+    <url>https://github.com/museframework/muse</url>
+
+    <licenses>
+        <license>
+            <name>Sustainable Use License</name>
+            <url>https://github.com/museframework/muse/blob/main/LICENSE.md</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>gbartoloni</id>
+            <name>Giacomo Bartoloni</name>
+            <email>gbartoloni@proton.me</email>
+            <organization>Muse Framework</organization>
+            <organizationUrl>https://github.com/museframework</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm child.scm.connection.inherit.append.path="false"
+         child.scm.developerConnection.inherit.append.path="false"
+         child.scm.url.inherit.append.path="false">
+        <connection>scm:git:https://github.com/museframework/muse.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/museframework/muse.git</developerConnection>
+        <url>https://github.com/museframework/muse/tree/main</url>
+    </scm>
+
+    <properties>
+        <!-- Muse -->
+        <muse.version>0.1.0</muse.version>
+
+        <!-- Kotlin -->
+        <kotlin.version>2.3.20</kotlin.version>
+        <kotlinx-coroutines.version>1.10.2</kotlinx-coroutines.version>
+        <kotlinx-collections-immutable.version>0.4.0</kotlinx-collections-immutable.version>
+
+        <!-- Testing -->
+        <junit-jupiter.version>6.0.3</junit-jupiter.version>
+        <junit-platform.version>6.0.3</junit-platform.version>
+        <mockk.version>1.14.9</mockk.version>
+        <kotest.version>5.9.1</kotest.version>
+        <assertj.version>3.27.3</assertj.version>
+        <archunit.version>1.3.0</archunit.version>
+        <testcontainers.version>2.0.5</testcontainers.version>
+
+        <!-- Logging -->
+        <slf4j.version>2.0.17</slf4j.version>
+
+        <!-- DataWeave -->
+        <dataweave.version>2.12.2</dataweave.version>
+
+        <!-- Jackson -->
+        <jackson.version>2.18.2</jackson.version>
+
+        <!-- Scala -->
+        <scala.version>2.12.18</scala.version>
+
+        <!-- Spring Boot -->
+        <spring-boot.version>4.0.3</spring-boot.version>
+
+        <!-- Other libraries -->
+        <jdom2.version>2.0.6.1</jdom2.version>
+        <snakeyaml.version>2.2</snakeyaml.version>
+        <wiremock.version>3.13.0</wiremock.version>
+        <commons-io.version>2.17.0</commons-io.version>
+        <quartz.version>2.5.0</quartz.version>
+        <sshd.version>2.19.0</sshd.version>
+        <postgresql.version>42.7.13</postgresql.version>
+
+        <!-- Maven plugins -->
+        <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
+        <scala-maven-plugin.version>4.8.1</scala-maven-plugin.version>
+        <exec-maven-plugin.version>1.6.0</exec-maven-plugin.version>
+        <maven-plugin-plugin.version>3.9.0</maven-plugin-plugin.version>
+        <maven-invoker-plugin.version>3.8.1</maven-invoker-plugin.version>
+        <maven-plugin-api.version>3.9.6</maven-plugin-api.version>
+        <mojo-executor.version>2.4.0</mojo-executor.version>
+        <groovy.version>4.0.26</groovy.version>
+        <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
+        <skipPublishing>false</skipPublishing>
+        <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
+        <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+        <dokka-maven-plugin.version>2.2.0</dokka-maven-plugin.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- ============================================================ -->
+            <!-- Spring Boot BOM (import first — manages Spring + many libs)  -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- Kotlin                                                       -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-stdlib</artifactId>
+                <version>${kotlin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-stdlib-jdk8</artifactId>
+                <version>${kotlin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-reflect</artifactId>
+                <version>${kotlin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-test</artifactId>
+                <version>${kotlin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-test-junit5</artifactId>
+                <version>${kotlin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-allopen</artifactId>
+                <version>${kotlin.version}</version>
+            </dependency>
+
+            <!-- KotlinX -->
+            <dependency>
+                <groupId>org.jetbrains.kotlinx</groupId>
+                <artifactId>kotlinx-coroutines-core</artifactId>
+                <version>${kotlinx-coroutines.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlinx</groupId>
+                <artifactId>kotlinx-coroutines-test</artifactId>
+                <version>${kotlinx-coroutines.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlinx</groupId>
+                <artifactId>kotlinx-coroutines-reactor</artifactId>
+                <version>${kotlinx-coroutines.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlinx</groupId>
+                <artifactId>kotlinx-coroutines-slf4j</artifactId>
+                <version>${kotlinx-coroutines.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlinx</groupId>
+                <artifactId>kotlinx-collections-immutable-jvm</artifactId>
+                <version>${kotlinx-collections-immutable.version}</version>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- Testing                                                      -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit-jupiter.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.platform</groupId>
+                <artifactId>junit-platform-engine</artifactId>
+                <version>${junit-platform.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.platform</groupId>
+                <artifactId>junit-platform-suite-api</artifactId>
+                <version>${junit-platform.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.mockk</groupId>
+                <artifactId>mockk-jvm</artifactId>
+                <version>${mockk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.mockk</groupId>
+                <artifactId>mockk</artifactId>
+                <version>${mockk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.kotest</groupId>
+                <artifactId>kotest-property-jvm</artifactId>
+                <version>${kotest.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.kotest</groupId>
+                <artifactId>kotest-runner-junit5-jvm</artifactId>
+                <version>${kotest.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-core</artifactId>
+                <version>${assertj.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-postgresql</artifactId>
+                <version>${testcontainers.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- Logging                                                      -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- DataWeave                                                    -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>org.mule.weave</groupId>
+                <artifactId>runtime</artifactId>
+                <version>${dataweave.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mule.weave</groupId>
+                <artifactId>wlang</artifactId>
+                <version>${dataweave.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mule.weave</groupId>
+                <artifactId>core-modules</artifactId>
+                <version>${dataweave.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mule.weave</groupId>
+                <artifactId>java-module</artifactId>
+                <version>${dataweave.version}</version>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- Jackson                                                      -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.module</groupId>
+                <artifactId>jackson-module-kotlin</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- Scala                                                        -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala-library</artifactId>
+                <version>${scala.version}</version>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- Other libraries                                              -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>org.jdom</groupId>
+                <artifactId>jdom2</artifactId>
+                <version>${jdom2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.wiremock</groupId>
+                <artifactId>wiremock-standalone</artifactId>
+                <version>${wiremock.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons-io.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.quartz-scheduler</groupId>
+                <artifactId>quartz</artifactId>
+                <version>${quartz.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.sshd</groupId>
+                <artifactId>sshd-core</artifactId>
+                <version>${sshd.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.sshd</groupId>
+                <artifactId>sshd-common</artifactId>
+                <version>${sshd.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.sshd</groupId>
+                <artifactId>sshd-sftp</artifactId>
+                <version>${sshd.version}</version>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- Maven Plugin API                                             -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-plugin-api</artifactId>
+                <version>${maven-plugin-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven.plugin-tools</groupId>
+                <artifactId>maven-plugin-annotations</artifactId>
+                <version>${maven-plugin-plugin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-core</artifactId>
+                <version>${maven-plugin-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.twdata.maven</groupId>
+                <artifactId>mojo-executor</artifactId>
+                <version>${mojo-executor.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.groovy</groupId>
+                <artifactId>groovy</artifactId>
+                <version>${groovy.version}</version>
+            </dependency>
+
+            <!-- ============================================================ -->
+            <!-- Internal Muse modules                                       -->
+            <!-- ============================================================ -->
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-dsl</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-engine-api</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-engine-scala</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-engine</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-spring-boot</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-sftp-connector-api</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-sftp-connector-testkit</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-sftp-connector</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-sftp-babelfish-mappers</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-http-connector-api</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-http-connector-testkit</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-http-connector</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-http-connector-spring</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-db-connector-api</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-file-connector-api</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-db-connector</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-file-connector</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-file-babelfish-mappers</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-apikit-connector-api</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-apikit-connector</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-apikit-connector-spring</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-babelfish</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-babelfish-core-mappers</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-http-babelfish-mappers</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-apikit-babelfish-mappers</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-apikit-connector-quarkus</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-apikit-connector-quarkus-deployment</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-quarkus</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-quarkus-deployment</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-http-connector-quarkus</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework.connectors</groupId>
+                <artifactId>muse-http-connector-quarkus-deployment</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.museframework</groupId>
+                <artifactId>muse-db-babelfish-mappers</artifactId>
+                <version>${muse.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <repositories>
+        <repository>
+            <id>maven-central</id>
+            <url>https://repo1.maven.org/maven2/</url>
+        </repository>
+        <repository>
+            <id>mulesoft-public</id>
+            <url>https://repository.mulesoft.org/nexus/content/repositories/public/</url>
+        </repository>
+    </repositories>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>${central-publishing-maven-plugin.version}</version>
+                <extensions>true</extensions>
+                <inherited>false</inherited>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <skipPublishing>${skipPublishing}</skipPublishing>
+                    <autoPublish>false</autoPublish>
+                    <deploymentName>${project.artifactId}-${project.version}</deploymentName>
+                </configuration>
+            </plugin>
+        </plugins>
+
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-gpg-plugin</artifactId>
+                    <version>${maven-gpg-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>sign-artifacts</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>sign</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <gpgArguments>
+                            <arg>--pinentry-mode</arg>
+                            <arg>loopback</arg>
+                        </gpgArguments>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven-source-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.jetbrains.dokka</groupId>
+                    <artifactId>dokka-maven-plugin</artifactId>
+                    <version>${dokka-maven-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>attach-javadocs</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>javadocJar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.jetbrains.dokka</groupId>
+                        <artifactId>dokka-maven-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+</project>

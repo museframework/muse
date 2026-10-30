@@ -1,0 +1,3 @@
+app:
+  scheduler:
+    frequency_ms: "1000"

@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: muse-native-test
+  main:
+    banner-mode: off
+
+muse:
+  application:
+    name: Muse Native Test
+
+logging:
+  level:
+    root: INFO
+    dev.museframework: DEBUG

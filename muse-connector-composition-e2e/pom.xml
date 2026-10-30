@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>dev.museframework.test</groupId>
+        <artifactId>muse-packaged-test-parent</artifactId>
+        <version>0.1.0</version>
+        <relativePath>../muse-packaged-test-parent/pom.xml</relativePath>
+    </parent>
+
+    <groupId>dev.museframework</groupId>
+    <artifactId>muse-connector-composition-e2e</artifactId>
+    <version>0.1.0</version>
+    <name>Muse Connector Composition E2E Fixture</name>
+    <description>File, SFTP, and database composition acceptance</description>
+
+    <properties>
+        <muse.packaged.main-class>dev.museframework.e2e.composition.CompositionApplicationKt</muse.packaged.main-class>
+        <muse.verification.kind>composition</muse.verification.kind>
+        <muse.verification.family>composition</muse.verification.family>
+        <muse.verification.codegen>false</muse.verification.codegen>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>dev.museframework.connectors</groupId>
+            <artifactId>muse-spring-boot</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework.connectors</groupId>
+            <artifactId>muse-file-connector</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework.connectors</groupId>
+            <artifactId>muse-sftp-connector</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework.connectors</groupId>
+            <artifactId>muse-db-connector</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-reflect</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.museframework</groupId>
+            <artifactId>muse-sftp-connector-testkit</artifactId>
+            <version>0.1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework.test</groupId>
+            <artifactId>muse-packaged-e2e-testkit</artifactId>
+            <version>0.1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-test-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <packaged.e2e.jar>${project.build.directory}/${project.build.finalName}.jar</packaged.e2e.jar>
+                        <packaged.e2e.log>${project.build.directory}/packaged-e2e/application.log</packaged.e2e.log>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

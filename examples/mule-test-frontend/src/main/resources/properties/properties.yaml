@@ -1,0 +1,4 @@
+app:
+  scheduler:
+    frequency_ms: "50"
+server.port: 8081

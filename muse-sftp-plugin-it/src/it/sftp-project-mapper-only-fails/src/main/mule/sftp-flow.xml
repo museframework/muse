@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+  <sftp:config name="Sftp_Config" doc:name="SFTP Config">
+    <sftp:connection host="127.0.0.1"
+                     port="22"
+                     username="muse"
+                     password="secret"
+                     workingDir="/data"/>
+  </sftp:config>
+
+  <flow name="sftp-write-read-flow" doc:name="SFTP Write Read">
+    <set-payload value="round-trip" doc:name="Seed payload"/>
+    <sftp:write config-ref="Sftp_Config"
+                path="/outbound/request.bin"
+                createParentDirectories="true"
+                doc:name="Write">
+      <sftp:content><![CDATA[#[payload]]]></sftp:content>
+    </sftp:write>
+    <sftp:read config-ref="Sftp_Config" path="/outbound/request.bin" doc:name="Read"/>
+  </flow>
+</mule>

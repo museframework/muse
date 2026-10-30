@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <flow name="foreach-flow" doc:id="foreach-001">
+        <foreach collection="#[payload['items']]" batchSize="2" rootMessageVariableName="root"
+                 counterVariableName="iteration" doc:name="ForEach items">
+            <set-payload value="#[&quot;Processed: &quot; ++ payload]" doc:name="Process item"/>
+        </foreach>
+        <set-payload value="&quot;Processed: items completed&quot;" doc:name="Set final payload"/>
+    </flow>
+</mule>

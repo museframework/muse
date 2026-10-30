@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.museframework</groupId>
+    <artifactId>muse-examples</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+    <name>Muse Examples — Parent</name>
+
+    <properties>
+        <skipPublishing>true</skipPublishing>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <profiles>
+        <profile>
+            <id>spring-examples</id>
+            <modules>
+                <module>test-muse-spring-boot</module>
+                <module>test-muse-spring-boot-native</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>quarkus-examples</id>
+            <modules>
+                <module>test-muse-quarkus</module>
+                <module>mule-test-backend-quarkus</module>
+                <module>mule-test-frontend-quarkus</module>
+            </modules>
+        </profile>
+    </profiles>
+
+</project>

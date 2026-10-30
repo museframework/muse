@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core
+                          http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+    <flow name="choice-flow" doc:id="choice-001">
+        <choice doc:name="Route">
+            <when expression="#[payload.status == 'OK']">
+                <logger level="INFO" message="OK" doc:name="Log OK"/>
+            </when>
+            <when expression="#[payload.status == 'ERROR']">
+                <set-payload value="Error occurred" doc:name="Set error"/>
+            </when>
+            <otherwise>
+                <set-variable variableName="unknown" value="true" doc:name="Set unknown"/>
+                <logger level="WARN" message="Unknown" doc:name="Log unknown"/>
+            </otherwise>
+        </choice>
+    </flow>
+
+</mule>

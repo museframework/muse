@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+      xmlns:db="http://www.mulesoft.org/schema/mule/db"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <http:listener-config name="http-listener-config" doc:name="HTTP Listener Config">
+        <http:listener-connection host="0.0.0.0" port="8081"/>
+    </http:listener-config>
+
+    <apikit:config name="api-config" raml="api/openapi.yaml" doc:name="APIKit Config"/>
+
+    <db:config name="database-config" doc:name="Database Config">
+        <db:generic-connection url="jdbc:h2:mem:plugin-realm" driverClassName="org.h2.Driver"/>
+    </db:config>
+
+    <flow name="all-provider-flow">
+        <http:listener config-ref="http-listener-config" path="/api/*"/>
+        <apikit:router config-ref="api-config" doc:name="APIKit Router"/>
+        <db:select config-ref="database-config" doc:name="Database Select">
+            <db:sql>SELECT 1 AS value</db:sql>
+        </db:select>
+        <set-payload value="&quot;all providers&quot;" doc:name="Set response"/>
+    </flow>
+
+    <flow name="core-flow-control">
+        <foreach collection="#[[1,2]]" batchSize="2" rootMessageVariableName="root"
+                 counterVariableName="iteration">
+            <set-payload value="#[payload]"/>
+        </foreach>
+        <parallel-foreach collection="#[[1,2]]" maxConcurrency="2"
+                          target="parallelCount" targetValue="#[sizeOf(payload)]">
+            <set-payload value="#[payload]"/>
+        </parallel-foreach>
+        <scatter-gather maxConcurrency="2" target="scatterCount" targetValue="#[sizeOf(payload)]">
+            <route>
+                <set-payload value="left"/>
+            </route>
+            <route>
+                <set-payload value="right"/>
+            </route>
+        </scatter-gather>
+    </flow>
+</mule>

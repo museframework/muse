@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:file="http://www.mulesoft.org/schema/mule/file"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+                          http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+    <file:config name="csv-files"><file:connection workingDir="csv"/></file:config>
+
+    <flow name="csv-large">
+        <file:listener config-ref="csv-files" directory="commands/large" autoDelete="true">
+            <scheduling-strategy><fixed-frequency frequency="50"/></scheduling-strategy>
+        </file:listener>
+        <set-variable variableName="scenario" value="large"/>
+        <set-variable variableName="count" value="#[0]"/>
+        <set-variable variableName="sum" value="#[0]"/>
+        <file:read config-ref="csv-files" path="input/large.csv"
+                   outputMimeType="application/csv; streaming=true; header=true"/>
+        <flow-ref name="csv-row-consumer"/>
+        <file:write config-ref="csv-files" path="output/large.report">
+            <file:content>#["SUCCESS|" ++ (vars.count as String) ++ "|" ++ (vars.sum as String)]</file:content>
+        </file:write>
+        <error-handler>
+            <on-error-continue type="ANY" logException="false">
+                <file:write config-ref="csv-files" path="output/large.report">
+                    <file:content>#["FAILURE|" ++ (vars.count as String) ++ "|" ++ (vars.sum as String) ++ "|" ++ error.errorType.namespace ++ "|" ++ error.errorType.identifier]</file:content>
+                </file:write>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="csv-progressive">
+        <file:listener config-ref="csv-files" directory="commands/progressive" autoDelete="true">
+            <scheduling-strategy><fixed-frequency frequency="50"/></scheduling-strategy>
+        </file:listener>
+        <set-variable variableName="scenario" value="progressive"/>
+        <set-variable variableName="count" value="#[0]"/>
+        <set-variable variableName="sum" value="#[0]"/>
+        <file:read config-ref="csv-files" path="input/progressive.csv"
+                   outputMimeType="application/csv; streaming=true; header=true"/>
+        <flow-ref name="csv-row-consumer"/>
+        <file:write config-ref="csv-files" path="output/progressive.report">
+            <file:content>#["SUCCESS|" ++ (vars.count as String) ++ "|" ++ (vars.sum as String)]</file:content>
+        </file:write>
+        <error-handler>
+            <on-error-continue type="ANY" logException="false">
+                <file:write config-ref="csv-files" path="output/progressive.report">
+                    <file:content>#["FAILURE|" ++ (vars.count as String) ++ "|" ++ (vars.sum as String) ++ "|" ++ error.errorType.namespace ++ "|" ++ error.errorType.identifier]</file:content>
+                </file:write>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="csv-malformed">
+        <file:listener config-ref="csv-files" directory="commands/malformed" autoDelete="true">
+            <scheduling-strategy><fixed-frequency frequency="50"/></scheduling-strategy>
+        </file:listener>
+        <set-variable variableName="scenario" value="malformed"/>
+        <set-variable variableName="count" value="#[0]"/>
+        <set-variable variableName="sum" value="#[0]"/>
+        <file:read config-ref="csv-files" path="input/malformed.csv"
+                   outputMimeType="application/csv; streaming=true; header=true"/>
+        <flow-ref name="csv-row-consumer"/>
+        <file:write config-ref="csv-files" path="output/malformed.report">
+            <file:content>#["SUCCESS|" ++ (vars.count as String) ++ "|" ++ (vars.sum as String)]</file:content>
+        </file:write>
+        <error-handler>
+            <on-error-continue type="ANY" logException="false">
+                <file:write config-ref="csv-files" path="output/malformed.report">
+                    <file:content>#["FAILURE|" ++ (vars.count as String) ++ "|" ++ (vars.sum as String) ++ "|" ++ error.errorType.namespace ++ "|" ++ error.errorType.identifier]</file:content>
+                </file:write>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="csv-body-failure">
+        <file:listener config-ref="csv-files" directory="commands/body-failure" autoDelete="true">
+            <scheduling-strategy><fixed-frequency frequency="50"/></scheduling-strategy>
+        </file:listener>
+        <set-variable variableName="scenario" value="body-failure"/>
+        <set-variable variableName="count" value="#[0]"/>
+        <set-variable variableName="sum" value="#[0]"/>
+        <file:read config-ref="csv-files" path="input/body-failure.csv"
+                   outputMimeType="application/csv; streaming=true; header=true"/>
+        <flow-ref name="csv-row-consumer"/>
+        <file:write config-ref="csv-files" path="output/body-failure.report">
+            <file:content>#["SUCCESS|" ++ (vars.count as String) ++ "|" ++ (vars.sum as String)]</file:content>
+        </file:write>
+        <error-handler>
+            <on-error-continue type="ANY" logException="false">
+                <file:write config-ref="csv-files" path="output/body-failure.report">
+                    <file:content>#["FAILURE|" ++ (vars.count as String) ++ "|" ++ (vars.sum as String) ++ "|" ++ error.errorType.namespace ++ "|" ++ error.errorType.identifier]</file:content>
+                </file:write>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <sub-flow name="csv-row-consumer">
+        <foreach collection="#[payload map ((row) -> {id: row.id, value: row.value})]">
+            <choice>
+                <when expression='#[vars.scenario == "body-failure" and payload.id == "101"]'>
+                    <raise-error type="APP:BODY_FAILURE" description="Injected body failure at row 101"/>
+                </when>
+            </choice>
+            <set-variable variableName="sum" value="#[vars.sum + (payload.id as Number)]"/>
+            <set-variable variableName="count" value="#[vars.count + 1]"/>
+            <choice>
+                <when expression='#[vars.scenario == "progressive" and payload.id == "1"]'>
+                    <file:write config-ref="csv-files" path="output/first-row">
+                        <file:content>#[payload.id]</file:content>
+                    </file:write>
+                    <until-successful maxRetries="1200" millisBetweenRetries="25">
+                        <file:read config-ref="csv-files" path="release" outputMimeType="text/plain" target="gate"/>
+                    </until-successful>
+                </when>
+            </choice>
+        </foreach>
+    </sub-flow>
+</mule>

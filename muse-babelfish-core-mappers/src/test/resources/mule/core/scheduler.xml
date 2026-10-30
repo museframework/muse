@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <flow name="scheduler-flow">
+        <scheduler name="MyScheduler" id="scheduler-001">
+            <scheduling-strategy>
+                <fixed-frequency frequency="5000" startDelay="1000" timeUnit="MILLISECONDS"/>
+            </scheduling-strategy>
+        </scheduler>
+        <logger level="INFO" message="executed" doc:name="Log execution"/>
+    </flow>
+</mule>

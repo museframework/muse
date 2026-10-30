@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+      xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+          http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+          http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+          http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+          http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
+          http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+
+    <!-- Global configs: all 4 implemented config types -->
+    <http:listener-config name="HttpListenerConfig" doc:name="HTTP Listener Config">
+        <http:listener-connection host="0.0.0.0" port="8081"/>
+    </http:listener-config>
+
+    <http:request-config name="BackendApiConfig" doc:name="Backend API Config" basePath="/api">
+        <http:request-connection host="api.example.com" port="443"/>
+    </http:request-config>
+
+    <apikit:config name="ApiConfig" doc:name="API Kit Config" api="api-spec.raml"/>
+
+    <configuration-properties doc:name="App Properties" file="config.properties"/>
+
+
+    <!-- Flow 1: HTTP listener source + choice router + error handler ref -->
+    <flow name="main-flow" doc:id="main-flow-001">
+        <http:listener config-ref="HttpListenerConfig" path="/api/*" doc:name="HTTP Listener"/>
+        <set-variable variableName="correlationId" value="#[correlationId]" doc:name="Set Correlation ID"/>
+        <choice doc:name="Route by Path">
+            <when expression="#[attributes.requestPath == '/api/orders']">
+                <flow-ref name="process-orders" doc:name="Process Orders"/>
+            </when>
+            <otherwise>
+                <apikit:router config-ref="ApiConfig" doc:name="APIKit Router"/>
+            </otherwise>
+        </choice>
+        <error-handler>
+            <on-error-propagate type="APP:ERROR" doc:name="Error Propagate">
+                <logger level="ERROR" doc:name="Error Logger" message="Error occurred"/>
+            </on-error-propagate>
+            <on-error-continue type="APP:WARNING" doc:name="Warning Continue">
+                <set-payload value="recovered" doc:name="Set Recovered Payload"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <!-- Flow 2: Scheduler source -->
+    <flow name="scheduled-cleanup" doc:id="sched-cleanup-001">
+        <scheduler doc:name="Cleanup Scheduler">
+            <scheduling-strategy>
+                <fixed-frequency frequency="3600000"/>
+            </scheduling-strategy>
+        </scheduler>
+        <logger level="INFO" doc:name="Cleanup Logger" message="Cleanup running"/>
+        <remove-variable variableName="cleanup-temp" doc:name="Remove Temp"/>
+    </flow>
+
+    <!-- Sub-flow 1: Comprehensive + jms:publish (UNMAPPED) -->
+    <sub-flow name="process-orders" doc:id="process-orders-001">
+        <set-payload value="#[payload]" doc:name="Set Payload"/>
+        <scatter-gather doc:name="Parallel Fetch">
+            <route>
+                <http:request config-ref="BackendApiConfig" path="/orders" method="GET" doc:name="Fetch Orders"/>
+            </route>
+            <route>
+                <logger level="INFO" doc:name="Route Logger" message="Processing"/>
+            </route>
+        </scatter-gather>
+        <try doc:name="Try Transform">
+            <ee:transform doc:name="Transform Payload">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            <error-handler>
+                <on-error-continue doc:name="On Transform Error">
+                    <logger level="ERROR" doc:name="Error Logger" message="Transform failed"/>
+                    <raise-error type="APP:TRANSFORM_ERROR" doc:name="Raise Transform Error"/>
+                </on-error-continue>
+            </error-handler>
+        </try>
+        <foreach collection="#[payload.items]" doc:name="For Each Item">
+            <set-variable variableName="currentItem" value="#[payload]" doc:name="Set Current Item"/>
+        </foreach>
+        <!-- UNMAPPED: jms:publish is not implemented in Muse -->
+        <jms:publish config-ref="JmsConfig" destination="orders.queue" doc:name="Publish to JMS"/>
+        <async doc:name="Async Notification">
+            <logger level="INFO" doc:name="Async Logger" message="Async task"/>
+        </async>
+        <until-successful maxRetries="3" doc:name="Retry Confirmation">
+            <http:request config-ref="BackendApiConfig" path="/confirm" method="POST" doc:name="Confirm Order"/>
+        </until-successful>
+        <with-correlation-id value="#[vars.correlationId]" doc:name="With Correlation">
+            <flow-ref name="audit-log" doc:name="Audit Log"/>
+        </with-correlation-id>
+    </sub-flow>
+
+    <!-- Sub-flow 2: Simple sub-flow for flow-ref target -->
+    <sub-flow name="audit-log" doc:id="audit-log-001">
+        <logger level="INFO" doc:name="Audit Logger" message="Audit"/>
+    </sub-flow>
+
+</mule>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic shapes derived from aggregate SFTP usage patterns. No customer material. -->
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+
+    <sftp:config name="Exchange_Sftp" doc:name="Exchange SFTP">
+        <sftp:connection host="sftp.example.test"
+                         port="22"
+                         username="exchange"
+                         identityFile="/keys/client.pem"
+                         workingDir="/exchange"/>
+    </sftp:config>
+
+    <flow name="sftp-real-usage-shapes">
+        <sftp:list config-ref="Exchange_Sftp" directoryPath="/inbox" doc:name="List matching files">
+            <sftp:matcher directories="EXCLUDE"
+                          symLinks="EXCLUDE"
+                          filenamePattern="regex:orders-\d{4}\.csv"/>
+        </sftp:list>
+
+        <sftp:write config-ref="Exchange_Sftp"
+                    doc:name="Write error payload"
+                    path="#[vars.projectDirectory ++ '/errors/' ++ vars.fileName ++ '.json']"
+                    createParentDirectories="false">
+            <sftp:content><![CDATA[#[payload]]]></sftp:content>
+        </sftp:write>
+
+        <sftp:move config-ref="Exchange_Sftp"
+                   doc:name="Archive processed file"
+                   sourcePath="#[attributes.path]"
+                   targetPath="/archive"
+                   overwrite="true"
+                   renameTo="#[attributes.name ++ '.done']"/>
+    </flow>
+</mule>

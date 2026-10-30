@@ -1,0 +1,16 @@
+name: "Muse HTTP Connector"
+metadata:
+  keywords:
+    - "muse"
+    - "http"
+    - "connector"
+  guide: "https://github.com/museframework/muse"
+  categories:
+    - "integration"
+    - "web"
+  status: "preview"
+  built-with-quarkus-core: "3.21.0"
+  extension-dependencies:
+    - "io.quarkus:quarkus-vertx-http"
+    - "io.quarkus:quarkus-vertx"
+    - "dev.museframework.connectors:muse-quarkus"

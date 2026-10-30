@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+  <!-- Subflow for data processing -->
+  <sub-flow name="process-data-subflow" doc:name="Process Data Subflow">
+    <set-variable variableName="processingStep" value="1" doc:name="Set Step"/>
+    <set-payload value="Processed: #[payload]" doc:name="Set Processed Payload"/>
+    <logger message="Data processed at step #[vars.processingStep]" level="INFO" doc:name="Log Processing"/>
+  </sub-flow>
+  
+  <!-- Another subflow that processes differently -->
+  <sub-flow name="transform-data-subflow" doc:name="Transform Data Subflow">
+    <set-payload value="Transformed: #[payload]" doc:name="Set Transformed Payload"/>
+    <logger message="Data transformed" level="INFO" doc:name="Log Transformation"/>
+  </sub-flow>
+  
+  <!-- Flow that uses subflows internally -->
+  <flow name="processing-orchestrator-flow" doc:name="Processing Orchestrator">
+    <set-payload value="Orchestration started" doc:name="Set Orchestration Payload"/>
+    <flow-ref name="process-data-subflow" doc:name="Call Process Data"/>
+    <flow-ref name="transform-data-subflow" doc:name="Call Transform Data"/>
+    <logger message="Orchestration complete" level="INFO" doc:name="Log Completion"/>
+  </flow>
+</mule>

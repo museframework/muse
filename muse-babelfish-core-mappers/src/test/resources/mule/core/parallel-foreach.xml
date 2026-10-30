@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <flow name="parallel-foreach-flow" doc:id="parallel-foreach-flow">
+        <parallel-foreach collection="#[[1,2,3]]" timeout="500" maxConcurrency="2"
+                          target="count" targetValue="#[sizeOf(payload)]"
+                          doc:name="Parallel items" doc:id="parallel-foreach-router">
+            <set-payload value="#[payload * 2]" doc:name="Double item"/>
+        </parallel-foreach>
+    </flow>
+</mule>

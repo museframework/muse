@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core
+                          http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+    <sub-flow name="process-order-sub-flow" doc:id="sub-001">
+        <set-variable variableName="status" value="#[&quot;processing&quot;]" doc:name="Set status"/>
+        <logger level="DEBUG" message="Processing order" doc:name="Log processing"/>
+    </sub-flow>
+
+    <flow name="main-flow" doc:id="main-001">
+        <set-payload value="#[payload]" mimeType="application/json" doc:name="Set Payload"/>
+        <logger level="INFO" message="Started" doc:name="Log start"/>
+    </flow>
+
+</mule>

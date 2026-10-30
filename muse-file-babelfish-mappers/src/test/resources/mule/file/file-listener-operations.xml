@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:file="http://www.mulesoft.org/schema/mule/file"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+
+    <file:config name="File_Config" doc:name="File Config" timeBetweenSizeCheck="25">
+        <file:connection workingDir="/tmp/muse-file"
+                         timeBetweenSizeCheckUnit="MILLISECONDS"/>
+    </file:config>
+
+    <file:matcher name="smallFileMatcher" filenamePattern="*.txt" maxSize="100"/>
+
+    <flow name="file-provider-flow">
+        <file:listener config-ref="File_Config"
+                       directory="inbox"
+                       recursive="false"
+                       watermarkMode="MODIFIED_TIMESTAMP"
+                       autoDelete="false"
+                       moveToDirectory="archive"
+                       renameTo="processed.txt"
+                       applyPostActionWhenFailed="false"
+                       overwrite="true"
+                       outputMimeType="text/plain"
+                       outputEncoding="UTF-8"
+                       timeBetweenSizeCheck="10"
+                       timeBetweenSizeCheckUnit="MILLISECONDS">
+            <scheduling-strategy>
+                <fixed-frequency frequency="2000" startDelay="5000"/>
+            </scheduling-strategy>
+            <file:matcher directories="REQUIRE" updatedInTheLast="1" timeUnit="SECONDS"/>
+        </file:listener>
+
+        <file:read config-ref="File_Config"
+                   path="inbox/input.txt"
+                   lock="true"
+                   timeBetweenSizeCheck="5"
+                   timeBetweenSizeCheckUnit="MILLISECONDS"
+                   outputMimeType="text/plain"
+                   outputEncoding="UTF-8"/>
+
+        <file:write config-ref="File_Config"
+                    path="outbox/output.txt"
+                    mode="APPEND"
+                    createParentDirectories="true"
+                    lock="false">
+            <file:content>#[payload]</file:content>
+        </file:write>
+
+        <file:list config-ref="File_Config"
+                   directoryPath="inbox"
+                   recursive="true"
+                   matcher="smallFileMatcher"
+                   timeBetweenSizeCheck="15"
+                   timeBetweenSizeCheckUnit="MILLISECONDS">
+            <file:subset criteria="DATE_CREATED" limit="5" offset="6" order="ASCENDING"/>
+        </file:list>
+
+        <file:copy config-ref="File_Config"
+                   sourcePath="inbox/input.txt"
+                   targetPath="copies"
+                   createParentDirectories="true"
+                   overwrite="true"
+                   renameTo="copied.txt"/>
+
+        <file:move config-ref="File_Config"
+                   sourcePath="inbox/staging.txt"
+                   targetPath="moved"
+                   createParentDirectories="false"
+                   overwrite="false"/>
+
+        <file:delete config-ref="File_Config" path="inbox/obsolete.txt"/>
+
+        <file:rename config-ref="File_Config"
+                     path="inbox/old-name.txt"
+                     to="new-name.txt"
+                     overwrite="true"/>
+
+        <file:create-directory config-ref="File_Config" directoryPath="inbox/created"/>
+    </flow>
+</mule>

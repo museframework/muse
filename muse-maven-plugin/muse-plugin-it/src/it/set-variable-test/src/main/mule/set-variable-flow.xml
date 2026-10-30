@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+  <flow name="set-variable-flow" doc:name="Set Variable Test">
+    <set-variable variableName="testVar" value="Hello Variable" doc:name="Set Test Variable"/>
+    <set-variable variableName="counterVar" value="#[10 +5]" doc:name="Set Counter"/>
+    <logger message="#[vars.testVar ++ ' - ' ++ vars.counterVar]" level="INFO" doc:name="Log Variables"/>
+  </flow>
+</mule>

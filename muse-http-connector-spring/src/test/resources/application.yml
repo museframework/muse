@@ -1,0 +1,7 @@
+server:
+  port: 0
+  
+spring:
+  threads:
+    virtual:
+      enabled: true

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <flow name="scatter-gather-flow" doc:id="scatter-gather-flow">
+        <scatter-gather timeout="500" maxConcurrency="2" target="count" targetValue="#[sizeOf(payload)]"
+                        doc:name="Aggregate routes" doc:id="scatter-gather-router">
+            <route>
+                <set-payload value="left" doc:name="Left route"/>
+            </route>
+            <route>
+                <set-payload value="right" doc:name="Right route"/>
+            </route>
+        </scatter-gather>
+    </flow>
+</mule>

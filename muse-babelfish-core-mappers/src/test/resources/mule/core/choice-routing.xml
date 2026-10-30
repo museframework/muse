@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <flow name="routing-flow" doc:id="routing-001">
+        <choice doc:name="Choice">
+            <when expression="#[attributes.queryParams.&quot;type&quot; == &quot;A&quot;]">
+                <set-payload value="&quot;Route A&quot;" doc:name="Set Route A"/>
+            </when>
+            <when expression="#[attributes.queryParams.&quot;type&quot; == &quot;B&quot;]">
+                <set-payload value="&quot;Route B&quot;" doc:name="Set Route B"/>
+            </when>
+            <otherwise>
+                <set-payload value="&quot;Default Route&quot;" doc:name="Set Default"/>
+            </otherwise>
+        </choice>
+    </flow>
+</mule>

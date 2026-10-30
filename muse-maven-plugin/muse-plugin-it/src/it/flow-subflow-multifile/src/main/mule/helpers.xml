@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+  <!-- Subflow for input validation -->
+  <sub-flow name="validate-input-subflow" doc:name="Validate Input Subflow">
+    <set-variable variableName="validated" value="true" doc:name="Set Validated Flag"/>
+    <set-payload value="Validated: #[payload]" doc:name="Set Validated Payload"/>
+    <logger message="Input validated" level="INFO" doc:name="Log Validation"/>
+  </sub-flow>
+  
+  <!-- Subflow for output formatting -->
+  <sub-flow name="format-output-subflow" doc:name="Format Output Subflow">
+    <set-variable variableName="formatted" value="true" doc:name="Set Formatted Flag"/>
+    <set-payload value="Formatted: #[payload]" doc:name="Set Formatted Payload"/>
+    <logger message="Output formatted" level="INFO" doc:name="Log Formatting"/>
+  </sub-flow>
+  
+  <!-- Standalone flow that can be called via flow-ref -->
+  <flow name="standalone-helper-flow" doc:name="Standalone Helper Flow">
+    <set-payload value="Helper result" doc:name="Set Helper Result"/>
+    <logger message="Helper executed" level="INFO" doc:name="Log Helper"/>
+  </flow>
+</mule>

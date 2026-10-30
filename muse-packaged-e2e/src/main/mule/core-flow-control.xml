@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <flow name="core-foreach" doc:id="core-foreach">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/foreach" allowedMethods="POST"/>
+        <set-variable variableName="sum" value="#[0]"/>
+        <foreach collection="#[[1,2,3]]" rootMessageVariableName="root"
+                 counterVariableName="iteration">
+            <set-variable variableName="sum" value="#[vars.sum + payload]"/>
+        </foreach>
+        <set-payload value="#[vars.sum as String]"/>
+    </flow>
+
+    <flow name="core-foreach-batches" doc:id="core-foreach-batches">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/foreach-batches" allowedMethods="POST"/>
+        <set-variable variableName="trace" value=""/>
+        <foreach collection="#[[1,2,3,4,5]]" batchSize="2" rootMessageVariableName="root"
+                 counterVariableName="batch">
+            <set-variable variableName="trace"
+                          value="#[vars.trace ++ (sizeOf(payload) as String) ++ ':' ++ (vars.batch as String) ++ '|']"/>
+        </foreach>
+        <set-payload value="#[vars.trace]"/>
+    </flow>
+
+    <flow name="core-parallel-foreach" doc:id="core-parallel-foreach">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/parallel-foreach" allowedMethods="POST"/>
+        <parallel-foreach collection="#[[1,2,3]]" maxConcurrency="2"
+                          target="count" targetValue="#[sizeOf(payload)]">
+            <set-payload value="#[payload * 2]"/>
+        </parallel-foreach>
+        <set-payload value="#[payload ++ ':' ++ (vars.count as String)]"/>
+    </flow>
+
+    <flow name="core-scatter-gather" doc:id="core-scatter-gather">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/scatter-gather" allowedMethods="POST"/>
+        <scatter-gather maxConcurrency="2" target="count" targetValue="#[sizeOf(payload)]">
+            <route>
+                <set-payload value="left"/>
+            </route>
+            <route>
+                <set-payload value="right"/>
+            </route>
+        </scatter-gather>
+        <set-payload value="#[payload ++ ':' ++ (vars.count as String)]"/>
+    </flow>
+
+    <flow name="core-handler-steps" doc:id="core-handler-steps">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/handler-steps" allowedMethods="POST"/>
+        <raise-error type="APP:PRIMARY" description="original"/>
+        <error-handler>
+            <on-error-continue type="APP:PRIMARY">
+                <set-variable variableName="first" value="recovered"/>
+                <set-payload value="#[vars.first ++ ':' ++ error.description]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-try-flow-handler-boundary" doc:id="core-try-flow-handler-boundary">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/try-flow-handler-boundary" allowedMethods="POST"/>
+        <try>
+            <raise-error type="APP:TRY_BOUNDARY" description="handled by the flow"/>
+        </try>
+        <set-payload value="after-try-unreachable"/>
+        <error-handler>
+            <on-error-continue type="APP:TRY_BOUNDARY">
+                <set-payload value="flow-handler"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-choice-first-match" doc:id="core-choice-first-match">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/choice-first-match" allowedMethods="POST"/>
+        <choice>
+            <when expression="#[true]">
+                <set-payload value="first"/>
+            </when>
+            <when expression="#[true]">
+                <set-payload value="second"/>
+            </when>
+            <otherwise>
+                <set-payload value="otherwise"/>
+            </otherwise>
+        </choice>
+    </flow>
+
+    <flow name="core-choice-no-match" doc:id="core-choice-no-match">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/choice-no-match" allowedMethods="POST"/>
+        <set-variable variableName="marker" value="kept"/>
+        <choice>
+            <when expression="#[false]">
+                <set-variable variableName="marker" value="changed"/>
+            </when>
+        </choice>
+        <set-payload value="#[payload ++ ':' ++ vars.marker]"/>
+    </flow>
+
+    <flow name="core-choice-predicate-error" doc:id="core-choice-predicate-error">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/choice-predicate-error" allowedMethods="POST"/>
+        <choice>
+            <when expression="#[unknownReviewFunction()]">
+                <set-payload value="unreachable"/>
+            </when>
+            <otherwise>
+                <set-payload value="otherwise-unreachable"/>
+            </otherwise>
+        </choice>
+        <error-handler>
+            <on-error-continue type="MULE:EXPRESSION">
+                <set-payload value="#[error.errorType.identifier]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-foreach-middle-failure" doc:id="core-foreach-middle-failure">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/foreach-middle-failure" allowedMethods="POST"/>
+        <set-variable variableName="completed" value=""/>
+        <foreach collection="#[[1,2,3]]">
+            <choice>
+                <when expression="#[payload == 2]">
+                    <raise-error type="APP:MIDDLE" description="middle"/>
+                </when>
+                <otherwise>
+                    <set-variable variableName="completed" value="#[vars.completed ++ (payload as String)]"/>
+                </otherwise>
+            </choice>
+        </foreach>
+        <set-payload value="after-loop"/>
+        <error-handler>
+            <on-error-continue type="APP:MIDDLE">
+                <set-payload value="#[error.description ++ ':' ++ vars.completed]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-nested-foreach-choice" doc:id="core-nested-foreach-choice">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/nested-foreach-choice" allowedMethods="POST"/>
+        <set-variable variableName="trace" value=""/>
+        <foreach collection="#[[1,2]]">
+            <set-variable variableName="outer" value="#[payload as String]"/>
+            <foreach collection="#[[&quot;a&quot;,&quot;b&quot;]]">
+                <choice>
+                    <when expression="#[payload == &quot;a&quot;]">
+                        <set-variable variableName="trace" value="#[vars.trace ++ vars.outer ++ &quot;a&quot;]"/>
+                    </when>
+                    <otherwise>
+                        <set-variable variableName="trace" value="#[vars.trace ++ vars.outer ++ &quot;b&quot;]"/>
+                    </otherwise>
+                </choice>
+            </foreach>
+        </foreach>
+        <set-payload value="#[vars.trace]"/>
+    </flow>
+
+    <flow name="core-parallel-foreach-order" doc:id="core-parallel-foreach-order">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/parallel-foreach-order" allowedMethods="POST"/>
+        <parallel-foreach collection="#[[1,2,3]]" target="results">
+            <set-payload value="#[payload * 2]"/>
+        </parallel-foreach>
+        <set-payload value="#[((vars.results[0].payload.value) as String) ++ ',' ++ ((vars.results[1].payload.value) as String) ++ ',' ++ ((vars.results[2].payload.value) as String)]"/>
+    </flow>
+
+    <flow name="core-parallel-foreach-mixed" doc:id="core-parallel-foreach-mixed">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/parallel-foreach-mixed" allowedMethods="POST"/>
+        <parallel-foreach collection="#[[&quot;fail&quot;,&quot;slow&quot;,&quot;ok&quot;]]" timeout="100" maxConcurrency="3">
+            <choice>
+                <when expression="#[payload == &quot;fail&quot;]">
+                    <raise-error type="APP:CHILD" description="child failure"/>
+                </when>
+                <when expression="#[payload == &quot;slow&quot;]">
+                    <until-successful maxRetries="1" millisBetweenRetries="500">
+                        <raise-error type="APP:SLOW" description="slow child"/>
+                    </until-successful>
+                </when>
+                <otherwise>
+                    <set-payload value="ok"/>
+                </otherwise>
+            </choice>
+        </parallel-foreach>
+        <error-handler>
+            <on-error-continue type="MULE:COMPOSITE_ROUTING">
+                <set-payload value="#[error.errorType.identifier ++ ':' ++ error.errorMessage.failures.'0'.errorType.identifier ++ ':' ++ error.errorMessage.failures.'1'.errorType.identifier ++ ':' ++ error.errorMessage.results.'2'.payload.value]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-scatter-gather-order" doc:id="core-scatter-gather-order">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/scatter-gather-order" allowedMethods="POST"/>
+        <scatter-gather target="results">
+            <route>
+                <set-payload value="left"/>
+            </route>
+            <route>
+                <set-payload value="right"/>
+            </route>
+        </scatter-gather>
+        <set-payload value="#[vars.results[0].payload.value ++ ',' ++ vars.results[1].payload.value]"/>
+    </flow>
+
+    <flow name="core-scatter-gather-out-of-order" doc:id="core-scatter-gather-out-of-order">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/scatter-gather-out-of-order" allowedMethods="POST"/>
+        <scatter-gather target="results" maxConcurrency="2">
+            <route>
+                <try>
+                    <until-successful maxRetries="1" millisBetweenRetries="500">
+                        <raise-error type="APP:DELAY" description="delay left route"/>
+                    </until-successful>
+                    <error-handler>
+                        <on-error-continue type="MULE:RETRY_EXHAUSTED"/>
+                    </error-handler>
+                </try>
+                <set-payload value="left"/>
+            </route>
+            <route>
+                <set-payload value="right"/>
+            </route>
+        </scatter-gather>
+        <set-payload value="#[vars.results[0].payload.value ++ ',' ++ vars.results[1].payload.value]"/>
+    </flow>
+
+    <flow name="core-scatter-gather-timeout" doc:id="core-scatter-gather-timeout">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/scatter-gather-timeout" allowedMethods="POST"/>
+        <scatter-gather timeout="100" maxConcurrency="2">
+            <route>
+                <set-payload value="fast"/>
+            </route>
+            <route>
+                <until-successful maxRetries="1" millisBetweenRetries="500">
+                    <raise-error type="APP:SLOW" description="slow route"/>
+                </until-successful>
+            </route>
+        </scatter-gather>
+        <error-handler>
+            <on-error-continue type="MULE:TIMEOUT">
+                <set-payload value="#[error.errorType.identifier]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-scatter-parent-any" doc:id="core-scatter-parent-any">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/scatter-parent-any" allowedMethods="POST"/>
+        <scatter-gather>
+            <route>
+                <set-payload value="successful route"/>
+            </route>
+            <route>
+                <raise-error type="APP:ROUTE" description="route failure"/>
+            </route>
+        </scatter-gather>
+        <error-handler>
+            <on-error-continue type="MULE:ANY">
+                <set-payload value="#[error.errorType.identifier]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-flow-local-child" doc:id="core-flow-local-child">
+        <raise-error type="APP:CHILD" description="child"/>
+        <error-handler>
+            <on-error-continue type="APP:CHILD">
+                <set-variable variableName="childMarker" value="child"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-flow-local-continue" doc:id="core-flow-local-continue">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/flow-local-continue" allowedMethods="POST"/>
+        <flow-ref name="core-flow-local-child"/>
+        <raise-error type="APP:PARENT" description="parent"/>
+        <error-handler>
+            <on-error-continue type="APP:PARENT">
+                <set-payload value="#[vars.childMarker ++ ':' ++ error.description]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-flow-propagate-child" doc:id="core-flow-propagate-child">
+        <set-payload value="child-payload"/>
+        <set-variable variableName="childMarker" value="child"/>
+        <raise-error type="APP:CHILD" description="child"/>
+        <error-handler>
+            <on-error-propagate type="APP:CHILD">
+                <set-variable variableName="propagated" value="yes"/>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+
+    <flow name="core-flow-propagate" doc:id="core-flow-propagate">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/flow-propagate" allowedMethods="POST"/>
+        <flow-ref name="core-flow-propagate-child"/>
+        <error-handler>
+            <on-error-continue type="APP:CHILD">
+                <set-payload value="#[payload ++ ':' ++ vars.childMarker ++ ':' ++ vars.propagated ++ ':' ++ error.description]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-flow-target-failure-child" doc:id="core-flow-target-failure-child">
+        <raise-error type="APP:TARGET" description="target"/>
+    </flow>
+
+    <flow name="core-flow-target-failure" doc:id="core-flow-target-failure">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/flow-target-failure" allowedMethods="POST"/>
+        <set-variable variableName="captured" value="existing"/>
+        <flow-ref name="core-flow-target-failure-child" target="captured" targetValue="#[unknownReviewFunction()]"/>
+        <error-handler>
+            <on-error-continue type="APP:TARGET">
+                <set-payload value="#[error.description ++ ':' ++ vars.captured]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-nested-try-propagate" doc:id="core-nested-try-propagate">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/nested-try-propagate" allowedMethods="POST"/>
+        <try>
+            <raise-error type="APP:INNER" description="inner"/>
+            <error-handler>
+                <on-error-propagate type="APP:INNER">
+                    <set-payload value="mutated"/>
+                    <set-variable variableName="strategy" value="set"/>
+                </on-error-propagate>
+            </error-handler>
+        </try>
+        <error-handler>
+            <on-error-continue type="APP:INNER">
+                <set-payload value="#[payload ++ ':' ++ vars.strategy ++ ':' ++ error.description]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-conditional-handlers" doc:id="core-conditional-handlers">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/conditional-handlers" allowedMethods="POST"/>
+        <raise-error type="APP:PRIMARY" description="primary"/>
+        <error-handler>
+            <on-error-continue type="APP:PRIMARY" whenExpression="#[false]">
+                <set-payload value="first"/>
+            </on-error-continue>
+            <on-error-continue type="APP:PRIMARY" whenExpression="#[true]">
+                <set-payload value="second"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+    <flow name="core-secondary-handler-failure" doc:id="core-secondary-handler-failure">
+        <http:listener config-ref="packaged-listener" path="/e2e/core/secondary-handler-failure" allowedMethods="POST"/>
+        <try>
+            <raise-error type="APP:PRIMARY" description="primary"/>
+            <error-handler>
+                <on-error-continue type="APP:PRIMARY">
+                    <raise-error type="APP:SECONDARY" description="secondary"/>
+                </on-error-continue>
+            </error-handler>
+        </try>
+        <error-handler>
+            <on-error-continue type="MULE:ANY">
+                <set-payload value="#[error.errorType.identifier]"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+</mule>

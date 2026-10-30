@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Read a CSV file with a streaming output mime type. -->
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:file="http://www.mulesoft.org/schema/mule/file"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+
+    <file:config name="File_Config" doc:name="File Config">
+        <file:connection workingDir="/tmp/muse-file"/>
+    </file:config>
+
+    <flow name="read-csv-flow">
+        <file:read config-ref="File_Config"
+                   path="files/data.csv"
+                   outputMimeType="application/csv; streaming=true"/>
+    </flow>
+</mule>

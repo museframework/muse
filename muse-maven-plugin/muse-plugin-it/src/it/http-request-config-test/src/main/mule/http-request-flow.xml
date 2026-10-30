@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+  <http:request-config name="http-request-config" doc:name="HTTP Request Config">
+    <http:request-connection host="api.example.com" port="443" protocol="HTTPS"/>
+  </http:request-config>
+  
+  <flow name="http-request-flow" doc:name="HTTP Request Test">
+    <set-payload value="Request Body" doc:name="Set Request"/>
+    <logger message="#[payload]" level="INFO" doc:name="Log Request"/>
+  </flow>
+</mule>

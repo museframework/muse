@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core
+                          http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+    <flow name="error-handling-flow" doc:id="err-001">
+        <set-payload value="#[payload]" doc:name="Set Payload"/>
+        <error-handler>
+            <on-error-continue type="EXPRESSION">
+                <logger level="ERROR" message="Expression error" doc:name="Log error"/>
+            </on-error-continue>
+        </error-handler>
+    </flow>
+
+</mule>
