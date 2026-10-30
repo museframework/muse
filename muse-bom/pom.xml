@@ -91,7 +91,7 @@
         <maven-plugin-api.version>3.9.6</maven-plugin-api.version>
         <mojo-executor.version>2.4.0</mojo-executor.version>
         <groovy.version>4.0.26</groovy.version>
-        <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
+        <central-publishing-maven-plugin.version>0.12.0</central-publishing-maven-plugin.version>
         <skipPublishing>false</skipPublishing>
         <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
