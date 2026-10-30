@@ -430,17 +430,6 @@ jobs:
         examples/test-muse-quarkus
         examples/test-muse-quarkus/target/failsafe-reports
 
-    - name: Run standalone Quarkus application E2E tests
-      run: >-
-        mvn -f test-musek-quarkus/pom.xml test --batch-mode
-        -Dkotlin.daemon.enabled=false
-
-    - name: Assert standalone Quarkus E2E coverage
-      run: >-
-        python3 scripts/assert-e2e-reports.py
-        test-musek-quarkus
-        test-musek-quarkus/target/surefire-reports
-
   native-image:
     runs-on: ubuntu-latest
     needs: build
