@@ -50,12 +50,12 @@ jobs:
           from pathlib import Path
 
           path = Path("muse-apikit-babelfish-mappers/pom.xml")
-          before = "    <artifactId>muse-apikit-babelfish-mappers</artifactId>\\n\\n    <dependencies>"
+          before = "    <artifactId>muse-apikit-babelfish-mappers</artifactId>\n\n    <dependencies>"
           after = (
-              "    <artifactId>muse-apikit-babelfish-mappers</artifactId>\\n"
-              "    <name>Muse APIKit Babelfish Mappers</name>\\n"
-              "    <description>Babelfish translation provider for Mule APIKit components</description>\\n"
-              "\\n    <dependencies>"
+              "    <artifactId>muse-apikit-babelfish-mappers</artifactId>\n"
+              "    <name>Muse APIKit Babelfish Mappers</name>\n"
+              "    <description>Babelfish translation provider for Mule APIKit components</description>\n"
+              "\n    <dependencies>"
           )
           original = path.read_text(encoding="utf-8")
           if original.count(before) != 1:
