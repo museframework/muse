@@ -11,6 +11,8 @@
     </parent>
 
     <artifactId>muse-apikit-babelfish-mappers</artifactId>
+    <name>Muse APIKit Babelfish Mappers</name>
+    <description>Babelfish translation provider for Mule APIKit components</description>
 
     <dependencies>
         <dependency>
