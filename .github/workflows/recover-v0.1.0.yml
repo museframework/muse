@@ -41,6 +41,30 @@ jobs:
             exit 1
           fi
 
+      # Preserve original source and the published tag. Only correct Central metadata in the staged POM.
+      - name: Apply verified metadata-only correction to tagged POM
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("muse-apikit-babelfish-mappers/pom.xml")
+          before = "    <artifactId>muse-apikit-babelfish-mappers</artifactId>\\n\\n    <dependencies>"
+          after = (
+              "    <artifactId>muse-apikit-babelfish-mappers</artifactId>\\n"
+              "    <name>Muse APIKit Babelfish Mappers</name>\\n"
+              "    <description>Babelfish translation provider for Mule APIKit components</description>\\n"
+              "\\n    <dependencies>"
+          )
+          original = path.read_text(encoding="utf-8")
+          if original.count(before) != 1:
+              raise SystemExit("Unexpected tagged POM: refusing to change release metadata")
+          path.write_text(original.replace(before, after), encoding="utf-8")
+          PY
+          git diff --check
+          git diff -- muse-apikit-babelfish-mappers/pom.xml
+
       - name: Set up JDK 21 and signing
         uses: actions/setup-java@v4
         with:
