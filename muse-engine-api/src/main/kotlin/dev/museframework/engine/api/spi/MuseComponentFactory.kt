@@ -25,6 +25,11 @@ interface MuseComponentFactory {
         builder: ProcessorBuilder<T>,
     )
 
+    fun <T : Processor> registerProcessorBootstrapValidator(
+        type: KClass<T>,
+        validator: ProcessorBootstrapValidator<T>,
+    )
+
     fun <T : Router> registerRouter(
         type: KClass<T>,
         builder: RouterBuilder<T>,
@@ -58,6 +63,13 @@ fun interface ProcessorBuilder<T : Processor> {
         component: T,
         context: MuseContext,
     ): Any
+}
+
+fun interface ProcessorBootstrapValidator<T : Processor> {
+    fun validate(
+        component: T,
+        context: MuseContext,
+    )
 }
 
 fun interface SourceBuilder<T : Source> {

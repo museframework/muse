@@ -7,6 +7,7 @@ import dev.museframework.babelfish.model.RawElement
 import dev.museframework.babelfish.model.RawErrorHandler
 import dev.museframework.babelfish.model.RawFlow
 import dev.museframework.babelfish.model.SourceLocation
+import org.jdom2.CDATA
 import org.jdom2.Element
 import java.nio.file.Path
 
@@ -104,7 +105,7 @@ class MuleXmlParser {
             attrs = attrMap,
             children = el.children.map { toRaw(it, nsMap, locOf) },
             location = locOf(el),
-            textContent = el.textTrim.takeIf { it.isNotEmpty() },
+            textContent = if (el.content.any { it is CDATA }) el.text else el.textTrim.takeIf { it.isNotEmpty() },
         )
     }
 

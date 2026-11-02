@@ -30,7 +30,9 @@ import dev.museframework.engine.api.execution.policy.PolicyInvocation
 import dev.museframework.engine.api.execution.policy.PolicyOutcome
 import dev.museframework.engine.api.execution.policy.PolicyRouterDeclaration
 import dev.museframework.engine.api.spi.ConfigBuilder
+import dev.museframework.engine.api.spi.ApplicationResources
 import dev.museframework.engine.api.spi.ProcessorBuilder
+import dev.museframework.engine.api.spi.ProcessorBootstrapValidator
 import dev.museframework.engine.api.spi.RouterBuilder
 import dev.museframework.engine.api.spi.SourceBuilder
 import dev.museframework.engine.api.expression.MuseExpressionEvaluator
@@ -212,6 +214,9 @@ class ApikitConnectorRegistrarTest {
         override val flows: Map<String, MuseFlow> = emptyMap(),
     ) : MuseContext {
         override val properties: Properties = Properties()
+        override val resources: ApplicationResources = object : ApplicationResources {
+            override fun register(resource: AutoCloseable): Unit = error("APIKit registrar test does not own resources")
+        }
         override val expressionEvaluator: MuseExpressionEvaluator =
             object : MuseExpressionEvaluator {
                 override fun evaluate(
@@ -247,6 +252,11 @@ class ApikitConnectorRegistrarTest {
         override fun <T : Processor> registerProcessor(
             type: KClass<T>,
             builder: ProcessorBuilder<T>,
+        ) = Unit
+
+        override fun <T : Processor> registerProcessorBootstrapValidator(
+            type: KClass<T>,
+            validator: ProcessorBootstrapValidator<T>,
         ) = Unit
 
         override fun <T : Router> registerRouter(

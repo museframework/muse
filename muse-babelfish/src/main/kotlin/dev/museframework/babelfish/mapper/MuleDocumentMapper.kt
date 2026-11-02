@@ -62,7 +62,11 @@ class MuleDocumentMapper(
             } catch (e: UnmappedElementException) {
                 unmappedErrors.add(e)
             } catch (e: Exception) {
-                // resolved via ByName at runtime
+                val element = if (config.namespace.isEmpty()) config.tag else "${config.namespace}:${config.tag}"
+                throw IllegalArgumentException(
+                    "Failed to map configuration '$element' at ${config.location} in ${doc.sourceFile.fileName}: ${e.message}",
+                    e,
+                )
             }
         }
 

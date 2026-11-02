@@ -40,6 +40,24 @@
         <!-- Muse modules (test scope) -->
         <dependency>
             <groupId>dev.museframework</groupId>
+            <artifactId>muse-object-store-connector-api</artifactId>
+            <version>0.1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework.connectors</groupId>
+            <artifactId>muse-object-store-connector</artifactId>
+            <version>0.1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework</groupId>
+            <artifactId>muse-object-store-babelfish-mappers</artifactId>
+            <version>0.1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework</groupId>
             <artifactId>muse-dsl</artifactId>
             <scope>test</scope>
         </dependency>
