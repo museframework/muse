@@ -3,7 +3,9 @@ package dev.museframework.babelfish.parser
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
+import kotlin.io.path.writeText
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -12,7 +14,21 @@ import kotlin.test.assertTrue
 class MuleXmlParserTest {
     private val parser = MuleXmlParser()
 
+    @TempDir
+    lateinit var temporary: Path
+
     private fun fixture(name: String): Path = Path.of("src/test/resources/fixtures/$name")
+
+    @Test
+    fun `CDATA retains exact whitespace while ordinary element text keeps its trimmed behavior`() {
+        val expression = "\n  #[payload]  \n"
+        val path = temporary.resolve("cdata.xml").apply {
+            writeText("""<mule xmlns="http://www.mulesoft.org/schema/mule/core"><sub-flow name="text"><value><![CDATA[$expression]]></value><value>  ordinary  </value></sub-flow></mule>""")
+        }
+        val elements = parser.parse(path).subFlows.single().pipeline
+        assertEquals(expression, elements[0].textContent)
+        assertEquals("ordinary", elements[1].textContent)
+    }
 
     @Nested
     @DisplayName("line numbers")

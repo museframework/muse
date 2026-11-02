@@ -72,6 +72,10 @@
         <module>muse-db-connector-api</module>
         <module>muse-db-connector</module>
 
+        <module>muse-object-store-connector-api</module>
+        <module>muse-object-store-connector</module>
+        <module>muse-object-store-babelfish-mappers</module>
+
         <module>muse-file-connector-api</module>
         <module>muse-file-connector</module>
         <module>muse-file-babelfish-mappers</module>
@@ -91,6 +95,7 @@
         <module>muse-file-plugin-it</module>
         <module>muse-db-plugin-it</module>
         <module>muse-sftp-plugin-it</module>
+        <module>muse-object-store-plugin-it</module>
 
         <!-- Example projects -->
         <module>examples</module>
@@ -102,6 +107,7 @@
         <module>muse-sftp-packaged-e2e</module>
         <module>muse-db-packaged-e2e</module>
         <module>muse-file-packaged-e2e</module>
+        <module>muse-object-store-packaged-e2e</module>
         <module>muse-connector-composition-e2e</module>
 
         <!-- Architecture Tests -->

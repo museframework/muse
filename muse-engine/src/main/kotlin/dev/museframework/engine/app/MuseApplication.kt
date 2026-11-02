@@ -37,6 +37,7 @@ class MuseApplication internal constructor(
     private val channelMap = mutableMapOf<String, Channel<MuseEventEnvelope>>()
     private val sourceScope = CoroutineScope(dispatcher + SupervisorJob())
     private val requestScope = CoroutineScope(dispatcher + SupervisorJob())
+    private val lifecycleScope = CoroutineScope(dispatcher + SupervisorJob())
     private val sourceJobs = mutableListOf<Job>()
     private val consumerJobs = Collections.synchronizedList(mutableListOf<Job>())
     private val requestJobs = Collections.synchronizedList(mutableListOf<Job>())
@@ -48,32 +49,43 @@ class MuseApplication internal constructor(
     suspend fun init() {
         logger.info("MuseApplication.init() called")
         if (initialized) return
-        bindings.prepare()
-        initialized = true
-        printRegisteredFlows()
-        context.flows.values
-            .filterIsInstance<MuseFlow.Flow>()
-            .filter { it.initialState == FlowInitialState.STARTED }
-            .forEach { flow ->
-                flow.source?.let { source ->
-                    val museSource = factory.createSource(source, context, expressionEvaluator)
-                    val channel =
-                        Channel<MuseEventEnvelope>(Channel.BUFFERED) { envelope ->
-                            // A send that never becomes a request owns its claims no longer.
-                            releaseQuietly(
-                                envelope.executionResources,
-                                "an undelivered event must release its execution resources",
-                            )
-                        }
+        try {
+            bindings.prepare()
+            initialized = true
+            printRegisteredFlows()
+            context.flows.values
+                .filterIsInstance<MuseFlow.Flow>()
+                .filter { it.initialState == FlowInitialState.STARTED }
+                .forEach { flow ->
+                    flow.source?.let { source ->
+                        val museSource = factory.createSource(source, context, expressionEvaluator)
+                        val channel =
+                            Channel<MuseEventEnvelope>(Channel.BUFFERED) { envelope ->
+                                // A send that never becomes a request owns its claims no longer.
+                                releaseQuietly(
+                                    envelope.executionResources,
+                                    "an undelivered event must release its execution resources",
+                                )
+                            }
 
-                    channelMap[flow.name] = channel
-                    activeSources.add(museSource to flow)
+                        channelMap[flow.name] = channel
+                        activeSources.add(museSource to flow)
 
-                    val consumer = sourceScope.launch { launchConsumer(flow, museSource, channel) }
-                    consumerJobs += consumer
-                    consumer.invokeOnCompletion { consumerJobs.remove(consumer) }
+                        val consumer = sourceScope.launch { launchConsumer(flow, museSource, channel) }
+                        consumerJobs += consumer
+                        consumer.invokeOnCompletion { consumerJobs.remove(consumer) }
+                    }
+                }
+        } catch (failure: Throwable) {
+            withContext(NonCancellable) {
+                try {
+                    stop()
+                } catch (closeFailure: Throwable) {
+                    failure.addSuppressed(closeFailure)
                 }
             }
+            throw failure
+        }
     }
 
     suspend fun initIfNeeded() {
@@ -82,20 +94,35 @@ class MuseApplication internal constructor(
     }
 
     suspend fun start() {
-        activeSources.forEach { (museSource, flow) ->
-            val channel =
-                channelMap[flow.name]
-                    ?: throw IllegalStateException("Channel not found for flow '${flow.name}' — was init() called?")
-            val sourceJob =
-                sourceScope.launch {
-                    museSource.start(channel)
-                }
-            sourceJobs.add(sourceJob)
-        }
+        try {
+            context.resourceRegistry.start()
+            activeSources.forEach { (museSource, flow) ->
+                val channel =
+                    channelMap[flow.name]
+                        ?: throw IllegalStateException("Channel not found for flow '${flow.name}' — was init() called?")
+                val sourceJob =
+                    sourceScope.launch {
+                        try {
+                            museSource.start(channel)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Throwable) {
+                            logger.error("Source {} failed", museSource.docName, failure)
+                            lifecycleScope.launch { stop() }
+                        }
+                    }
+                sourceJobs.add(sourceJob)
+            }
 
-        sourceScope.launch {
-            sourceJobs.joinAll()
-            completionJob.complete()
+            sourceScope.launch {
+                sourceJobs.joinAll()
+                completionJob.complete()
+            }
+        } catch (failure: Throwable) {
+            withContext(NonCancellable) {
+                try { stop() } catch (closeFailure: Throwable) { failure.addSuppressed(closeFailure) }
+            }
+            throw failure
         }
     }
 
@@ -122,37 +149,46 @@ class MuseApplication internal constructor(
      */
     suspend fun stop() {
         if (!stopped.compareAndSet(false, true)) return
-        backgroundTasks.closeAdmission()
-        activeSources.forEach { (source, _) ->
-            runCatching { source.stop() }.onFailure { failure ->
-                logger.error("Failed to stop source {}", source.docName, failure)
+        withContext(NonCancellable) {
+            backgroundTasks.closeAdmission()
+            activeSources.forEach { (source, _) ->
+                runCatching { source.stop() }.onFailure { failure ->
+                    logger.error("Failed to stop source {}", source.docName, failure)
+                }
             }
-        }
-        channelMap.values.forEach { it.close() }
-        drainQueuedEnvelopes()
-        // Cancel and join the queue consumers before the first stable request snapshot: once no
-        // consumer can publish, nothing can enter the ledger behind the drain.
-        val consumers = synchronized(consumerJobs) { consumerJobs.toList() }
-        consumers.forEach { it.cancel() }
-        consumers.joinAll()
-        sourceScope.cancel()
+            channelMap.values.forEach { it.close() }
+            drainQueuedEnvelopes()
+            // Cancel and join the queue consumers before the first stable request snapshot: once no
+            // consumer can publish, nothing can enter the ledger behind the drain.
+            val consumers = synchronized(consumerJobs) { consumerJobs.toList() }
+            consumers.forEach { it.cancel() }
+            consumers.joinAll()
+            sourceScope.cancel()
 
-        withTimeoutOrNull(backgroundTasks.graceMillis) {
-            coroutineScope {
-                launch { pendingRequests().joinAll() }
-                launch { backgroundTasks.awaitSettled() }
+            withTimeoutOrNull(backgroundTasks.graceMillis) {
+                coroutineScope {
+                    launch { pendingRequests().joinAll() }
+                    launch { backgroundTasks.awaitSettled() }
+                }
             }
-        }
 
-        val unfinished = pendingRequests()
-        unfinished.forEach { it.cancel() }
-        unfinished.joinAll()
-        backgroundTasks.settleNow()
-        bindings.close()
-        activeSources.clear()
-        channelMap.clear()
-        sourceJobs.clear()
-        completionJob.complete()
+            val unfinished = pendingRequests()
+            unfinished.forEach { it.cancel() }
+            unfinished.joinAll()
+            backgroundTasks.settleNow()
+            try {
+                bindings.close()
+            } finally {
+                runCatching { context.resourceRegistry.close() }.onFailure { failure ->
+                    logger.error("Failed to close application resources", failure)
+                }
+            }
+            activeSources.clear()
+            channelMap.clear()
+            sourceJobs.clear()
+            completionJob.complete()
+            lifecycleScope.cancel()
+        }
     }
 
     /**

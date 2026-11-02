@@ -4,6 +4,7 @@ import dev.museframework.engine.api.expression.MuseExpressionEvaluator
 import dev.museframework.dsl.api.model.config.MuseConfiguration
 import dev.museframework.dsl.api.model.flow.MuseFlow
 import dev.museframework.engine.api.spi.MuseContext
+import dev.museframework.engine.api.spi.ApplicationResources
 import dev.museframework.engine.api.execution.ResolvedErrorHandler
 import dev.museframework.engine.factory.MuseComponentFactory
 import java.util.*
@@ -16,7 +17,10 @@ class MuseContext(
     override val factory: MuseComponentFactory,
     override val properties: Properties = Properties(),
     override val expressionEvaluator: MuseExpressionEvaluator,
+    override val configurationDeclarations: List<MuseConfiguration> = configs.values.toList(),
 ) : MuseContext {
+    internal val resourceRegistry = ApplicationResourceRegistry()
+    override val resources: ApplicationResources = resourceRegistry
     var globalErrorHandler: ResolvedErrorHandler? = globalErrorHandler
         internal set
     internal var policyBindings: dev.museframework.engine.execution.policy.PolicyBindings? = null

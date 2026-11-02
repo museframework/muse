@@ -68,7 +68,7 @@ class MuseExpressionEvaluatorImpl(
         if (exprCount == 0) return TypedValue.of(expression, TypedValue.MIME_TEXT)
 
         if (exprCount == 1) {
-            val singleMatch = SINGLE_EXPRESSION.matchEntire(expression)
+            val singleMatch = SINGLE_EXPRESSION.matchEntire(expression.trim())
             if (singleMatch != null) {
                 return dataWeaveExecutor.evaluate(singleMatch.groupValues[1], context)
             }

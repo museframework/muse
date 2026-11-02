@@ -9,6 +9,7 @@ import dev.museframework.engine.api.execution.PipelineElement
 import dev.museframework.engine.api.expression.MuseExpressionEvaluator
 import dev.museframework.engine.api.source.MuseSource
 import dev.museframework.engine.api.spi.ConfigBuilder
+import dev.museframework.engine.api.spi.ProcessorBootstrapValidator
 import dev.museframework.engine.api.execution.policy.PolicyRouterDeclaration
 import dev.museframework.engine.context.MuseContext
 import kotlin.reflect.KClass
@@ -24,6 +25,7 @@ class MuseComponentFactory : SpiMuseComponentFactory {
 
     internal fun frozenCopy(): MuseComponentFactory = MuseComponentFactory().also {
         it.processorBuilders.putAll(processorBuilders)
+        it.processorBootstrapValidators.putAll(processorBootstrapValidators)
         it.routerBuilders.putAll(routerBuilders)
         it.sourceBuilders.putAll(sourceBuilders)
         it.configHandlers.putAll(configHandlers)
@@ -37,6 +39,7 @@ class MuseComponentFactory : SpiMuseComponentFactory {
         (routerBuilders[component::class] as? RouterRegistration.Managed)?.declaration as? PolicyRouterDeclaration<Router>
 
     private val processorBuilders = mutableMapOf<KClass<out Processor>, ProcessorBuilder<*>>()
+    private val processorBootstrapValidators = mutableMapOf<KClass<out Processor>, ProcessorBootstrapValidator<*>>()
     private sealed interface RouterRegistration {
         class Legacy(val builder: RouterBuilder<*>) : RouterRegistration
         class Managed(val declaration: PolicyRouterDeclaration<*>) : RouterRegistration
@@ -72,6 +75,20 @@ class MuseComponentFactory : SpiMuseComponentFactory {
     ) {
         checkRegistrationOpen()
         processorBuilders[type] = builder
+    }
+
+    override fun <T : Processor> registerProcessorBootstrapValidator(
+        type: KClass<T>,
+        validator: ProcessorBootstrapValidator<T>,
+    ) {
+        checkRegistrationOpen()
+        processorBootstrapValidators[type] = validator
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    internal fun validateProcessorAtBootstrap(component: Processor, context: MuseContext) {
+        (processorBootstrapValidators[component::class] as? ProcessorBootstrapValidator<Processor>)
+            ?.validate(component, context)
     }
 
     override fun <T : Router> registerRouter(

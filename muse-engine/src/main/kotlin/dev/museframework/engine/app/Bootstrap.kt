@@ -56,33 +56,43 @@ fun bootstrap(
         factory = config.factory.frozenCopy(),
         properties = properties,
         expressionEvaluator = expressionEvaluator,
+        configurationDeclarations = config.configs.toList(),
     )
 
-    // Apply every declaration: documentation labels are not unique identifiers.
-    // Load property sources first, retaining declaration order within both groups.
-    val (propertySources, otherConfigs) = config.configs.partition { it.isPropertySource() }
-    (propertySources + otherConfigs).forEach { cfg ->
-        context.factory.applyConfig(cfg, context)
+    try {
+        // Apply every declaration: documentation labels are not unique identifiers.
+        // Load property sources first, retaining declaration order within both groups.
+        val (propertySources, otherConfigs) = config.configs.partition { it.isPropertySource() }
+        (propertySources + otherConfigs).forEach { cfg ->
+            context.factory.applyConfig(cfg, context)
+        }
+
+        val schedulerErrors =
+            flowMap.values
+                .filterIsInstance<MuseFlow.Flow>()
+                .filter { it.source is SchedulerConfig && it.pipeline.isEmpty() }
+                .map {
+                    ValidationError(
+                        "Scheduler flow '${it.name}' must contain at least one processor or router after the scheduler source",
+                    )
+                }
+
+        val errors = validateFlowRefs(flowMap) + schedulerErrors
+        if (errors.isNotEmpty()) {
+            throw MuseBootstrapException(errors)
+        }
+
+        val background = BackgroundTaskManager(config.background, dispatcher)
+        context.attachPolicyBindings(globalHandlerFlow, background)
+        return MuseApplication(context, dispatcher, background)
+    } catch (failure: Throwable) {
+        try {
+            context.resourceRegistry.close()
+        } catch (closeFailure: Throwable) {
+            failure.addSuppressed(closeFailure)
+        }
+        throw failure
     }
-
-    val schedulerErrors =
-        flowMap.values
-            .filterIsInstance<MuseFlow.Flow>()
-            .filter { it.source is SchedulerConfig && it.pipeline.isEmpty() }
-            .map {
-                ValidationError(
-                    "Scheduler flow '${it.name}' must contain at least one processor or router after the scheduler source",
-                )
-            }
-
-    val errors = validateFlowRefs(flowMap) + schedulerErrors
-    if (errors.isNotEmpty()) {
-        throw MuseBootstrapException(errors)
-    }
-
-    val background = BackgroundTaskManager(config.background, dispatcher)
-    context.attachPolicyBindings(globalHandlerFlow, background)
-    return MuseApplication(context, dispatcher, background)
 }
 
 /**

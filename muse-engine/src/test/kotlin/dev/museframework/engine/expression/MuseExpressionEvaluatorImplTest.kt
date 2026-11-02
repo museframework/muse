@@ -42,6 +42,25 @@ class MuseExpressionEvaluatorImplTest {
     }
 
     @Test
+    fun `should preserve value type when a CDATA expression has surrounding whitespace`() {
+        val expected: TypedValue<Any> = TypedValue.of(mapOf("name" to "John"), TypedValue.MIME_JSON)
+        every { dataWeaveExecutor.evaluate("payload.name", context) } returns expected
+
+        val result = evaluator.evaluate("\n  #[payload.name]  \n", event)
+
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun `should preserve null from a CDATA default expression with surrounding whitespace`() {
+        every { dataWeaveExecutor.evaluate("null", context) } returns null
+
+        val result = evaluator.evaluate("\n  #[null]  \n", event)
+
+        assertEquals(null, result)
+    }
+
+    @Test
     fun `should evaluate interpolated string and return text`() {
         every { dataWeaveExecutor.evaluate("payload.name", context) } returns
                 TypedValue.of("John", TypedValue.MIME_TEXT)

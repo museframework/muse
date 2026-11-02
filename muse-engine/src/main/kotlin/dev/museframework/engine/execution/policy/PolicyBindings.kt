@@ -104,6 +104,7 @@ internal class PolicyBindings(
     private fun discoverPipeline(elements: List<DeclarationElement>): Map<Int, List<PolicyCell>> =
         buildMap {
             elements.forEachIndexed { index, component ->
+                if (component is Processor) context.factory.validateProcessorAtBootstrap(component, context)
                 val declaration = (component as? Router)?.let { context.factory.policyDeclaration(it) }
                 if (declaration != null) {
                     val cell = PolicyCell(component as Router)

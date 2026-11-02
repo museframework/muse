@@ -1,0 +1,3 @@
+dev.museframework.connectors.objectstore.backend.TestObjectStoreBackendProvider
+dev.museframework.connectors.objectstore.backend.FirstDuplicateBackendProvider
+dev.museframework.connectors.objectstore.backend.SecondDuplicateBackendProvider

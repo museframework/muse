@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:os="http://www.mulesoft.org/schema/mule/os">
+    <os:object-store name="named"/>
+    <os:object-store name="transient" persistent="false"/>
+    <flow name="roundtrip">
+        <os:clear/>
+        <os:clear objectStore="named"/>
+        <os:store key="shared"/>
+        <os:store key="shared" objectStore="named"><os:value>named-value</os:value></os:store>
+        <os:contains key="shared" target="present"/>
+        <os:retrieve key="shared" target="saved"/>
+        <os:retrieve-all objectStore="named" target="all"/>
+        <os:retrieve-all-keys objectStore="named" target="keys"/>
+        <os:remove key="shared" objectStore="named"/>
+        <os:contains key="shared" objectStore="named" target="removed"/>
+        <os:retrieve key="shared" objectStore="named" target="fallback"><os:default-value>fallback</os:default-value></os:retrieve>
+        <os:clear objectStore="named"/>
+        <os:retrieve-all objectStore="named" target="cleared"/>
+    </flow>
+    <flow name="write">
+        <os:store key="persisted"/>
+        <os:store key="persisted" objectStore="named"><os:value>named-value</os:value></os:store>
+        <os:store key="persisted" objectStore="transient"/>
+    </flow>
+    <flow name="read">
+        <os:retrieve key="persisted" target="defaultValue"><os:default-value>missing</os:default-value></os:retrieve>
+        <os:retrieve key="persisted" objectStore="named" target="namedValue"><os:default-value>missing</os:default-value></os:retrieve>
+        <os:retrieve key="persisted" objectStore="transient" target="transientValue"><os:default-value>missing</os:default-value></os:retrieve>
+    </flow>
+    <flow name="duplicate">
+        <os:store key="persisted" failIfPresent="true"><os:value>replacement</os:value></os:store>
+    </flow>
+</mule>
