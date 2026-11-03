@@ -3,6 +3,35 @@
 The Muse Maven plugin translates supported Mule XML components into Kotlin and delegates application commands to the selected host runtime. Configure the plugin and its mapper-provider dependencies in the application project.
 
 
+## Minimal plugin wiring
+
+For a Spring Boot project, declare the Muse Maven plugin under `build/plugins` and add the mapper providers needed by the Mule XML as **plugin dependencies**. They must be visible to the plugin classloader. For example:
+
+```xml
+<plugin>
+    <groupId>dev.museframework.maven</groupId>
+    <artifactId>muse-maven-plugin</artifactId>
+    <version>0.1.0</version>
+    <configuration>
+        <runtime>spring-boot</runtime>
+    </configuration>
+    <dependencies>
+        <dependency>
+            <groupId>dev.museframework</groupId>
+            <artifactId>muse-http-babelfish-mappers</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.museframework</groupId>
+            <artifactId>muse-apikit-babelfish-mappers</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+    </dependencies>
+</plugin>
+```
+
+Also add the Muse Spring Boot host and the connector runtime adapters to the application's normal dependencies, and configure the Spring Boot and Kotlin Maven plugins. The [repository migration example POM](../examples/mule-test-backend/pom.xml) illustrates the distinction between plugin-realm mapper dependencies and application runtime dependencies. It also contains original Mule dependencies, so use it as a reference, not as a clean standalone starter.
+
 The Maven plugin resolves runtime-specific generation and commands through a
 runtime strategy. Set `muse.runtime` to `spring-boot` or `quarkus`; when it is
 omitted, the plugin detects the runtime from compile/runtime dependencies.
