@@ -7,23 +7,23 @@
   <h1>Muse</h1>
   <p><strong>Build integration flows. The Kotlin way.</strong></p>
   <p>
-    A Kotlin integration framework with a typed DSL, a coroutine-based execution
-    engine, connectors, and Babelfish translation from Mule XML to Kotlin source.
+    Typed Kotlin DSL, coroutine-powered execution, and Babelfish translation
+    from Mule XML to Kotlin source.
   </p>
 
   <p>
-    <a href="https://github.com/museframework/muse/actions/workflows/maven.yml"><img alt="Maven CI" src="https://img.shields.io/github/actions/workflow/status/museframework/muse/maven.yml?branch=main&amp;label=CI&amp;style=flat-square"></a>
+    <a href="#requirements">Requirements</a> ·
+    <a href="#build">Build</a> ·
+    <a href="ARCHITECTURE.md">Architecture</a> ·
+    <a href="#babelfish-verification">Babelfish</a>
+  </p>
+
+  <p>
+    <a href="https://github.com/museframework/muse/actions/workflows/maven.yml"><img alt="Maven CI" src="https://github.com/museframework/muse/actions/workflows/maven.yml/badge.svg?branch=main"></a>
     <a href="https://central.sonatype.com/artifact/dev.museframework/muse-bom"><img alt="Maven Central version" src="https://img.shields.io/maven-central/v/dev.museframework/muse-bom?label=Maven%20Central&amp;style=flat-square"></a>
     <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&amp;logoColor=white&amp;style=flat-square">
     <img alt="JDK 21" src="https://img.shields.io/badge/JDK-21-blue?style=flat-square">
     <a href="LICENSE.md"><img alt="Sustainable Use License" src="https://img.shields.io/badge/License-Sustainable%20Use-0D1926?style=flat-square"></a>
-  </p>
-
-  <p>
-    <a href="#requirements">Getting started</a> ·
-    <a href="ARCHITECTURE.md">Architecture</a> ·
-    <a href="#babelfish-verification">Babelfish</a> ·
-    <a href="LICENSE.md">License</a>
   </p>
 </div>
 
