@@ -21,13 +21,12 @@ A Spring application can add `dev.museframework.connectors:muse-apikit-connector
 
 ## Routing example
 
-This excerpt follows the [Quarkus test application's APIKit flow](../../examples/test-muse-quarkus/src/main/kotlin/dev/museframework/test/ApikitFlow.kt). The RAML specification must be on the application classpath:
+This excerpt follows the [Quarkus test application's APIKit flow](../../examples/test-muse-quarkus/src/main/kotlin/dev/museframework/test/ApikitFlow.kt). Place the declarations in a registered Muse configuration class, and include the RAML specification on the application classpath:
 
 ```kotlin
 import dev.museframework.apikit.api.dsl.apikit
 import dev.museframework.apikit.api.dsl.apikitConfig
 import dev.museframework.dsl.dsl.flow
-import dev.museframework.dsl.dsl.setPayload
 import dev.museframework.http.api.dsl.httpListener
 import dev.museframework.http.api.model.HttpMethod
 
