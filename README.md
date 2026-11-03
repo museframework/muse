@@ -276,3 +276,10 @@ committed.
 ## License
 
 Muse is distributed under the terms in [LICENSE.md](LICENSE.md).
+
+---
+
+<p align="center">
+  Built by <a href="https://github.com/giacomobartoloni">Giacomo Bartoloni</a>
+  · <a href="https://github.com/museframework">Muse Framework</a>
+</p>
