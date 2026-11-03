@@ -2,7 +2,7 @@
 
 This guide contains the project-specific test commands and verification ownership rules. The [repository guide](../../AGENTS.md) defines the general contributor conventions; [ADR-019](../adr/ADR-019-babelfish-provider-owned-testing.md) governs Babelfish provider test ownership.
 
-The root Maven reactor and the independent HTTP reactor have different entry points. Run the commands from the repository root unless a different working directory is shown.
+The root `pom.xml` aggregates the HTTP family via `muse-http/pom.xml`. The HTTP reactor is also independently invocable, which is useful for HTTP-owned verification. Run these commands from the repository root unless another working directory is shown.
 
 ## Babelfish verification
 
