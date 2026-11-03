@@ -1,9 +1,31 @@
-# Muse
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/muse-mark-dark.svg">
+    <img src="docs/assets/muse-mark.svg" alt="Muse logo" width="140">
+  </picture>
 
-Muse is a Kotlin integration framework inspired by MuleSoft. It provides a typed
-DSL for defining flows, a coroutine-based execution engine, HTTP, File, and
-APIKit connectors, Spring Boot integration, and Babelfish translation from Mule
-XML to Kotlin source.
+  <h1>Muse</h1>
+  <p><strong>Build integration flows. The Kotlin way.</strong></p>
+  <p>
+    A Kotlin integration framework with a typed DSL, a coroutine-based execution
+    engine, connectors, and Babelfish translation from Mule XML to Kotlin source.
+  </p>
+
+  <p>
+    <a href="https://github.com/museframework/muse/actions/workflows/maven.yml"><img alt="Maven CI" src="https://img.shields.io/github/actions/workflow/status/museframework/muse/maven.yml?branch=main&amp;label=CI&amp;style=flat-square"></a>
+    <a href="https://central.sonatype.com/artifact/dev.museframework/muse-bom"><img alt="Maven Central version" src="https://img.shields.io/maven-central/v/dev.museframework/muse-bom?label=Maven%20Central&amp;style=flat-square"></a>
+    <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&amp;logoColor=white&amp;style=flat-square">
+    <img alt="JDK 21" src="https://img.shields.io/badge/JDK-21-blue?style=flat-square">
+    <a href="LICENSE.md"><img alt="Sustainable Use License" src="https://img.shields.io/badge/License-Sustainable%20Use-0D1926?style=flat-square"></a>
+  </p>
+
+  <p>
+    <a href="#requirements">Getting started</a> ·
+    <a href="ARCHITECTURE.md">Architecture</a> ·
+    <a href="#babelfish-verification">Babelfish</a> ·
+    <a href="LICENSE.md">License</a>
+  </p>
+</div>
 
 ## Requirements
 
