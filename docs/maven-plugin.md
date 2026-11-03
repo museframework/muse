@@ -29,4 +29,25 @@ It expects the `muse-quarkus` runtime extension and, for HTTP applications, the
 exist, but the Maven migration strategy still rejects APIKit for this target.
 
 
-The migration source directory defaults to `src/main/mule`. In a configured project, `mvn muse:check` reports mapped and unmapped components; `mvn muse:run` regenerates Kotlin and starts the selected host. Mapping coverage is not proof of behavioral equivalence. Generated Kotlin under `target/generated-sources/muse` should be treated as disposable.
+## Mule XML migration: verified path and known limitations
+
+The migration input defaults to `src/main/mule`. After configuring the plugin, host, and mapper providers, the reviewed Spring Boot example used:
+
+```bash
+mvn muse:generate
+mvn compile
+mvn muse:run -Dmuse.skipGenerate=true
+```
+
+On 2026-11-03, direct generation wrote five files (four Kotlin sources and one resource), compilation succeeded and the Spring application started. The explicit `muse.skipGenerate` flag tells `muse:run` to use previously generated code. It does not repair delegation or translate unsupported components.
+
+The same example exposed two pre-existing problems:
+
+- `mvn muse:check compile` failed: 38 components checked, 17 nested elements reported unmapped. Some are child elements handled by their parent HTTP/transform mappers; review diagnostics individually before treating them as unsupported.
+- Plain `mvn muse:run` failed in delegated generation with HTTP/APIKit mapper errors. Missing provider context is a hypothesis, not an established cause.
+
+The running application returned HTTP `200` for its tested resource GET and binary POST routes. Its unknown-path GET returned `400` where the proposed acceptance contract expected `404`, and JSON POST returned `200` where `415` was expected. Those negative checks failed; no original Mule runtime baseline was captured, so behavioral parity is unproven.
+
+Generated Kotlin under `target/generated-sources/muse` is disposable. `muse:migrate` is a distinct goal that was inspected but not executed in this migration exercise: it can back up and rewrite the project POM and emit Kotlin under `src/main/kotlin`. Review its effect before using it on an existing project.
+
+See [the migration goal source](../muse-maven-plugin/muse-maven-plugin/src/main/kotlin/dev/museframework/plugin/maven/mojo/MuseMigrateMojo.kt) and [the runtime goal source](../muse-maven-plugin/muse-maven-plugin/src/main/kotlin/dev/museframework/plugin/maven/mojo/MuseRunMojo.kt) for current behavior.
