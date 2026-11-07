@@ -12,10 +12,10 @@
   </p>
 
   <p>
-    <a href="#requirements">Requirements</a> ·
+    <a href="#getting-started">Getting started</a> ·
+    <a href="#connectors-and-hosts">Connectors</a> ·
     <a href="#build">Build</a> ·
-    <a href="ARCHITECTURE.md">Architecture</a> ·
-    <a href="#babelfish-verification">Babelfish</a>
+    <a href="ARCHITECTURE.md">Architecture</a>
   </p>
 
   <p>
@@ -31,247 +31,116 @@
 
 - JDK 21
 - Maven 3.9+
-- Kotlin compilation uses the versions managed by `muse-bom`
+- Kotlin dependencies use versions managed by `muse-bom`
 
-## Build
+## Getting started
 
-Run the complete unit-test reactor:
+Muse flows use a typed Kotlin DSL. You can write Kotlin flows directly or use Babelfish to translate supported Mule XML components into Kotlin source.
 
-```bash
-mvn clean test -Dkotlin.daemon.enabled=false
+### Write a Kotlin flow
+
+This flow replaces the event payload with a string:
+
+```kotlin
+import dev.museframework.dsl.dsl.flow
+import dev.museframework.dsl.dsl.setPayload
+
+val flow = flow("set-payload-literal-flow") {
+    setPayload {
+        docName = "Set Payload"
+        value = "new-payload-value"
+    }
+}
 ```
 
-Run all normal integration tests:
+The [integration test](muse-engine/src/test/kotlin/dev/museframework/engine/integration/SetPayloadIT.kt) executes this definition and checks that the resulting payload is `new-payload-value`. A flow also needs a host and an event source to receive requests.
+
+### Run the Spring Boot example
+
+The [Spring Boot example](examples/test-muse-spring-boot/) has its own external Spring Boot Maven parent. It defines an HTTP listener at `/api/hello`. From the repository root:
 
 ```bash
-mvn clean verify -Dkotlin.daemon.enabled=false
+cd examples/test-muse-spring-boot
+mvn -B -ntp -Dkotlin.daemon.enabled=false -Pe2e verify
+mvn -B -ntp -Dkotlin.daemon.enabled=false spring-boot:run
 ```
+
+With the application running, send a request from another terminal:
+
+```bash
+curl -i http://localhost:8080/api/hello
+```
+
+Expected: HTTP `200`, `Content-Type: text/plain`, and the body `"hello world"` (including the quotation marks). The example also contains scheduled/background flows; network access may be used by those flows. A clean-cache, isolated-settings run of this example on JDK 21 and Maven 3.9.16 completed nine tests successfully on 2026-11-03, and the endpoint response above was observed. These commands were not rerun as part of this README edit.
+
+The [Quarkus example](examples/test-muse-quarkus/) also uses an external parent. It is available for source inspection, but its Muse Quarkus artifacts failed public dependency resolution in the isolated promotion check; it is not presented here as a verified standalone onboarding path.
+
+### Migrate Mule XML
+
+Configure the Muse Maven plugin, a runtime and the mapper providers required by your application. Put Mule XML in `src/main/mule` (the default input directory). In the reviewed Spring Boot migration example, the working path was:
+
+```bash
+mvn muse:generate
+mvn compile
+mvn muse:run -Dmuse.skipGenerate=true
+```
+
+This sequence generated Kotlin directly, compiled it and started the application. On that example, `mvn muse:check compile` reported 17 nested XML elements as unmapped even though direct generation and compilation succeeded. A plain `mvn muse:run` failed during delegated generation with mapper-resolution errors. The cause of that delegation failure has not been established; `-Dmuse.skipGenerate=true` skips the failing regeneration only after successful direct generation.
+
+This is a bounded workaround for the tested Spring application, not a guarantee for other Mule XML. Compare successful responses, errors and external effects with the original application before cutover. The reviewed example also returned unexpected statuses for two negative HTTP requests. The [Maven plugin guide](docs/maven-plugin.md) records those limits.
+
+In this XML-first workflow, keep editing the XML and application configuration. Files under `target/generated-sources/muse` are regenerated and should not be edited. Mapping coverage does not establish full MuleSoft compatibility. See [Maven plugin runtime targets](docs/maven-plugin.md) for the setup and runtime-specific limitations.
+
+## Connectors and hosts
+
+Connector families have a public API and a runtime implementation. Babelfish providers translate supported Mule XML components for each family.
+
+| Family | Purpose | Source |
+|---|---|---|
+| HTTP | Client requests and HTTP listeners | [HTTP guide](docs/connectors/http.md) |
+| File | Local file operations and polling | [File guide](docs/connectors/file.md) |
+| SFTP | Remote file operations and polling | [SFTP guide](docs/connectors/sftp.md) |
+| Database | JDBC operations and polling | [Database guide](docs/connectors/database.md) |
+| APIKit | API routing and request validation | [APIKit guide](docs/connectors/apikit.md) |
+
+Muse can run in Spring Boot or Quarkus applications. The [architecture guide](ARCHITECTURE.md) explains the separation between the DSL, engine, connectors and host adapters. The engine also integrates DataWeave through its Scala bridge.
+
+The APIKit Quarkus extension and application tests exist. The Maven plugin still rejects **Mule XML APIKit migration targeting Quarkus**. Support for a handwritten APIKit Quarkus application does not imply that the migration path is available.
 
 ## Modules
 
-Muse is organized by families, not by a full artifact inventory:
-
-| Family | Role |
-|---|---|
-| Core | DSL → Engine API → Engine (+ Scala bridge for DataWeave) |
-| Adapters | Spring Boot and Quarkus application integration |
-| Connectors | HTTP and APIKit (public API, runtime, framework adapters, Babelfish providers) |
-| Tooling | Babelfish, Maven plugin, packaged E2E |
-
-Dependency rules, lifecycle, and contributor guidance live in
-[ARCHITECTURE.md](ARCHITECTURE.md) and [AGENTS.md](AGENTS.md).
-
-## SFTP connector
-
-Add the public DSL and runtime artifacts:
-
-```xml
-<dependency>
-    <groupId>dev.museframework</groupId>
-    <artifactId>muse-sftp-connector-api</artifactId>
-</dependency>
-<dependency>
-    <groupId>dev.museframework.connectors</groupId>
-    <artifactId>muse-sftp-connector</artifactId>
-</dependency>
-```
-
-The runtime is discovered through `MuseComponentRegistrar`. Host-key checking
-is strict by default and reads `~/.ssh/known_hosts`; `INSECURE` must be selected
-explicitly and should only be used for disposable local test servers.
-
-```kotlin
-val warehouseSftp = sftpConnection {
-    name = "warehouse"
-    host = "sftp.example.com"
-    username = "muse"
-    password = System.getenv("SFTP_PASSWORD")
-    knownHostsFile = "/etc/muse/known_hosts"
-    workingDirectory = "/exchange"
-}
-
-val archiveFlow = flow("archive-orders") {
-    sftpWrite(warehouseSftp) {
-        path = "/outbound/orders.csv"
-        mode = SftpWriteMode.CREATE_NEW
-    }
-    sftpMove(warehouseSftp) {
-        sourcePath = "/outbound/orders.csv"
-        targetDirectory = "/archive"
-        renameTo = "orders-processed.csv"
-    }
-}
-```
-
-The DSL provides `sftpList`, `sftpRead`, `sftpWrite`, `sftpCopy`, `sftpMove`,
-`sftpDelete`, `sftpRename`, and `sftpCreateDirectory`. Read payloads are lazy,
-repeatable remote cursor providers managed by the engine resource registry.
-Paths and returned attributes are relative to `workingDirectory`; traversal
-outside it is rejected.
-Copy, move, and rename reject a symbolic link at the requested source path or
-in either path's parent directories before modifying remote entries. Overwrite
-can replace a final destination link.
-
-Use `sftpListener` as a flow source for polling. Its matcher combines glob,
-file-type, size, and modification-time criteria. Watermarking is enabled by
-default; optional post-processing can delete a processed file or move it to a
-different directory.
+The project is a multi-module Maven build. `muse-dsl` defines the model, `muse-engine-api` defines runtime contracts and `muse-engine` executes flows. Connector modules, host adapters and Babelfish providers have separate responsibilities described in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Maven plugin runtime targets
 
-The Maven plugin resolves runtime-specific generation and commands through a
-runtime strategy. Set `muse.runtime` to `spring-boot` or `quarkus`; when it is
-omitted, the plugin detects the runtime from compile/runtime dependencies.
+The plugin supports Spring Boot and Quarkus runtime selection through `muse.runtime`, with detection from project dependencies when the property is omitted. See [the Maven plugin guide](docs/maven-plugin.md) for commands, generated project structure and compatibility limits.
 
-| Runtime | Generated configuration | `muse:run` | `muse:build` | `muse:build-image` |
-|---|---|---|---|---|
-| Spring Boot | Spring component plus application entry point | `spring-boot:run` | `spring-boot:repackage` | `spring-boot:build-image` |
-| Quarkus | CDI bean; native builds use `MuseConfigProvider` | `quarkus:dev` | `quarkus:build` | `quarkus:image-build` |
+## SFTP connector
 
-`muse:migrate` defaults to Spring Boot when no runtime can be detected. Select
-Quarkus explicitly with:
+The [SFTP guide](docs/connectors/sftp.md) covers dependency coordinates, Kotlin DSL usage, strict host-key checking, streaming operations and listener polling.
+
+## Build
+
+From the repository root, run the core reactor's unit and normal integration test suites:
 
 ```bash
-mvn muse:migrate -Dmuse.runtime=quarkus
+mvn clean test -Dkotlin.daemon.enabled=false
+mvn clean verify -Dkotlin.daemon.enabled=false
 ```
 
-The Quarkus target generates a Quarkus POM, CDI configuration classes,
-`application.properties`, native profile, and Jib container-image dependency.
-It expects the `muse-quarkus` runtime extension and, for HTTP applications, the
-`muse-http-connector-quarkus` extension. APIKit migration currently fails
-explicitly for Quarkus because no APIKit Quarkus adapter exists.
+The HTTP family can be built through its own `muse-http/pom.xml` reactor; the root `pom.xml` also aggregates it. Contributor commands for HTTP, Babelfish, Maven Invoker, packaged E2E and optional suites are in the [verification guide](docs/development/verification.md).
 
 ## Babelfish verification
 
-Babelfish semantic tests belong to their provider modules:
+Babelfish providers own their semantic tests. [ADR-019](docs/adr/ADR-019-babelfish-provider-owned-testing.md) explains the test boundaries, and the [verification guide](docs/development/verification.md) gives the exact commands.
 
-- core: `muse-babelfish-core-mappers`;
-- HTTP: `muse-http-babelfish-mappers`;
-- APIKit: `muse-apikit-babelfish-mappers`;
-- SFTP: `muse-sftp-babelfish-mappers`;
-- Database: `muse-db-babelfish-mappers`;
-- File: `muse-file-babelfish-mappers`.
+## Documentation
 
-Maven Invoker suites verify provider composition in a real plugin realm.
-Core, HTTP, APIKit, and Database fixtures live in `muse-plugin-it`. File, SFTP,
-and Database family realms live in `muse-{file,sftp,db}-plugin-it`. Platform
-packaged acceptance lives in `muse-packaged-e2e`; family packaged acceptance in
-`muse-{db,file,sftp}-packaged-e2e`; bounded File→SFTP→Database composition in
-`muse-connector-composition-e2e`. See
-[ADR-019](docs/adr/ADR-019-babelfish-provider-owned-testing.md).
-
-Run provider-neutral, core, APIKit, SFTP, File, and Database verification:
-
-```bash
-mvn verify \
-  -Dkotlin.daemon.enabled=false \
-  -pl muse-babelfish,muse-babelfish-core-mappers,muse-apikit-babelfish-mappers,muse-sftp-babelfish-mappers,muse-file-babelfish-mappers,muse-db-babelfish-mappers \
-  -am
-```
-
-Run the HTTP provider in its owning reactor:
-
-```bash
-mvn -f muse-http/pom.xml verify \
-  -Dkotlin.daemon.enabled=false \
-  -pl :muse-http-babelfish-mappers \
-  -am
-```
-
-Run the core, HTTP, APIKit, and Database plugin fixtures:
-
-```bash
-mvn clean verify --batch-mode \
-  -DskipTests \
-  -Dkotlin.daemon.enabled=false \
-  -Pplugin-it \
-  -pl muse-maven-plugin/muse-plugin-it \
-  -am
-```
-
-Run a family provider realm (File shown; use `muse-sftp-plugin-it` or
-`muse-db-plugin-it` the same way):
-
-```bash
-mvn clean verify --batch-mode \
-  -DskipTests \
-  -Dkotlin.daemon.enabled=false \
-  -Pplugin-it \
-  -pl muse-file-plugin-it \
-  -am
-```
-
-## Packaged and composition acceptance
-
-`-Pe2e` runs both compilation `*IT` and `*E2ETest` suites. Install required
-artifacts, then verify one owner (platform shown; substitute family or
-composition artifactIds):
-
-```bash
-mvn clean install --batch-mode \
-  -DskipTests \
-  -Dkotlin.daemon.enabled=false \
-  -pl :muse-packaged-e2e \
-  -am
-
-mvn clean verify --batch-mode \
-  -Dkotlin.daemon.enabled=false \
-  -Pe2e \
-  -pl :muse-packaged-e2e
-```
-
-Discover all verification owners and run one through the generic preparer:
-
-```bash
-python3 scripts/verification-owners.py . --format json --require-family-pairs
-python3 scripts/run-verification-owner.py muse-packaged-e2e \
-  --repository /tmp/muse-repo-platform \
-  --scratch /tmp/muse-scratch-platform
-```
-
-## Optional suites
-
-Engine fuzz tests:
-
-```bash
-mvn clean verify --batch-mode \
-  -Dkotlin.daemon.enabled=false \
-  -Pfuzz \
-  -pl muse-engine \
-  -am
-```
-
-Spring HTTP fuzz tests:
-
-```bash
-mvn -f muse-http/pom.xml clean verify --batch-mode \
-  -Dkotlin.daemon.enabled=false \
-  -Pfuzz \
-  -pl :muse-http-connector-spring \
-  -am
-```
-
-Native-image verification requires GraalVM 21 and is intentionally opt-in:
-
-```bash
-mvn -f examples/test-muse-spring-boot-native/pom.xml \
-  clean package --batch-mode -Pnative
-```
-
-## Repository hygiene
-
-Before merging, inspect the complete diff and confirm that no generated output
-is tracked:
-
-```bash
-git diff --check
-git ls-files | grep -E '(^|/)(target|build|out)/'
-git status --short
-```
-
-The tracked-artifact command must produce no output. Generated Kotlin under
-`target/generated-sources/muse` is disposable and must never be edited or
-committed.
+- [Architecture](ARCHITECTURE.md) and [repository guide](AGENTS.md)
+- [HTTP](docs/connectors/http.md), [File](docs/connectors/file.md), [SFTP](docs/connectors/sftp.md), [Database](docs/connectors/database.md), and [APIKit](docs/connectors/apikit.md) guides
+- [HTTP listener](docs/http-listener-guide.md), [streaming](docs/streaming-guide.md), and [Maven plugin](docs/maven-plugin.md) guides
+- [Contributor verification](docs/development/verification.md)
+- [Architecture decisions](docs/adr/)
 
 ## License
 
