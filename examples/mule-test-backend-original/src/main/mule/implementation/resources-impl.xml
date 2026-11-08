@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+  <sub-flow name="resources-impl-subflow" doc:id="c56db3cd-6105-4649-bac4-280180441226" >
+    <logger level="INFO" message="START" />
+    <set-variable value="#[p('app.wait.period') as Number]" doc:name="Set Variable" doc:id="6f8fdc20-3398-4a8a-9e88-4734469da473" variableName="maxWaitPeriod"/>
+    <logger level="INFO" doc:name="Logger" doc:id="f77d3c91-2360-4874-92a2-ec71a75a332e" message='#["Max wait period: " ++ vars.maxWaitPeriod as String ++ " ms."]'/>
+    <set-variable value="#[randomInt(vars.maxWaitPeriod)]" doc:name="Set Variable" doc:id="6f8fdc20-3398-4a8a-9e88-4734469da473" variableName="waitPeriod"/>
+    <logger level="INFO" doc:name="Logger" doc:id="f77d3c91-2360-4874-92a2-ec71a75a332f" message='#["Waiting " ++ vars.waitPeriod as String ++ " ms."]'/>
+    <ee:transform doc:name="Transform Message" doc:id="87109ebc-0b56-4ac1-935e-4562f103a1ac" >
+      <ee:message >
+        <ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::Runtime
+
+output application/json
+---
+{} wait vars.waitPeriod]]></ee:set-payload>
+      </ee:message>
+    </ee:transform>
+    <ee:transform doc:name="Transform Message1" doc:id="962591ff-4dbe-4450-8863-6995c31aedf9" >
+      <ee:message >
+        <ee:set-payload ><![CDATA[%dw 2.0
+
+output application/json
+---
+{
+	data: {
+		execution_time: vars.waitPeriod
+	}
+}]]></ee:set-payload>
+      </ee:message>
+    </ee:transform>
+    <logger level="INFO" doc:name="Logger" doc:id="999bec04-7f6a-4f36-b8c5-632978cfd219" message="END"/>
+  </sub-flow>
+</mule>
