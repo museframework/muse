@@ -5,7 +5,7 @@
     <groupId>com.mycompany</groupId>
     <artifactId>mule-test-backend</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <packaging>mule-application</packaging>
+    <packaging>jar</packaging>
 
     <name>mule-test-backend</name>
 
@@ -34,12 +34,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-clean-plugin</artifactId>
                 <version>3.2.0</version>
-            </plugin>
-            <plugin>
-                <groupId>org.mule.tools.maven</groupId>
-                <artifactId>mule-maven-plugin</artifactId>
-                <version>${mule.maven.plugin.version}</version>
-                <extensions>true</extensions>
             </plugin>
             <plugin>
                 <groupId>dev.museframework.maven</groupId>
