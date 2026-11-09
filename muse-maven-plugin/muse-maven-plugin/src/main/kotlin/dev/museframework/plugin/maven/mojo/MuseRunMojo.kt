@@ -146,16 +146,28 @@ class MuseRunMojo : AbstractMojo() {
         }
 
         executeMojo(
-            plugin(
-                mojoExecution.plugin.groupId,
-                mojoExecution.plugin.artifactId,
-                mojoExecution.plugin.version,
-            ),
+            generationPlugin(),
             goal("generate"),
             configuration(*generateConfiguration.toTypedArray()),
             executionEnvironment(mavenProject, mavenSession, pluginManager),
         )
     }
+
+    /**
+     * Rebuilds the plugin handle for the nested `generate` invocation.
+     *
+     * Maven composes the delegated plugin realm from this handle, so it must
+     * carry the `<dependencies>` declared for this plugin. Dropping them would
+     * hide mapper providers from the nested execution even though the same
+     * providers are visible when `muse:generate` runs directly.
+     */
+    internal fun generationPlugin(): org.apache.maven.model.Plugin =
+        plugin(
+            mojoExecution.plugin.groupId,
+            mojoExecution.plugin.artifactId,
+            mojoExecution.plugin.version,
+            mojoExecution.plugin.dependencies.orEmpty(),
+        )
 
     private fun delegateToPlugin(cmd: RunCommand.DelegateMavenPlugin) {
         val pluginInProject =
@@ -167,7 +179,7 @@ class MuseRunMojo : AbstractMojo() {
             )
 
         executeMojo(
-            plugin(cmd.groupId, cmd.artifactId, pluginInProject.version),
+            plugin(cmd.groupId, cmd.artifactId, pluginInProject.version, pluginInProject.dependencies.orEmpty()),
             goal(cmd.goal),
             configuration(*cmd.configuration.map { (k, v) -> element(k, v) }.toTypedArray()),
             executionEnvironment(mavenProject, mavenSession, pluginManager),

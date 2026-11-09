@@ -47,8 +47,6 @@ class MuseCompatibilityChecker(
         "" to "on-error-propagate",
         "" to "scheduling-strategy",
         "" to "fixed-frequency",
-        "ee" to "message",
-        "ee" to "set-payload",
     )
 
     private val knownUnimplemented = setOf(
@@ -137,7 +135,9 @@ class MuseCompatibilityChecker(
                 depth = 0,
             )
         )
-        element.children.forEach { checkPipelineElement(it, 1, results, namespaces) }
+        element.children.forEach { child ->
+            checkPipelineElement(child, 1, results, namespaces, element, implemented)
+        }
     }
 
     private fun checkConfig(
@@ -168,8 +168,19 @@ class MuseCompatibilityChecker(
         depth: Int,
         results: MutableList<CheckResult>,
         namespaces: MutableSet<String>,
+        parent: RawElement? = null,
+        parentMapped: Boolean = false,
     ) {
         namespaces.add(element.namespace)
+
+        // Only a supported mapper may own XML configuration children. Keep traversing
+        // that subtree so unknown children are still reported as unsupported.
+        if (parentMapped && isMapperOwnedChild(parent, element)) {
+            element.children.forEach { child ->
+                checkPipelineElement(child, depth + 1, results, namespaces, element, true)
+            }
+            return
+        }
 
         val tagKey = if (element.namespace.isEmpty()) element.tag else "${element.namespace}:${element.tag}"
 
@@ -192,10 +203,25 @@ class MuseCompatibilityChecker(
                         depth = depth,
                     )
                 )
-                element.children.forEach { checkPipelineElement(it, depth + 1, results, namespaces) }
+                element.children.forEach { child ->
+                    checkPipelineElement(child, depth + 1, results, namespaces, element, implemented)
+                }
             }
         }
     }
+
+    private fun isMapperOwnedChild(parent: RawElement?, child: RawElement): Boolean =
+        when (parent?.namespace to parent?.tag) {
+            "http" to "listener" ->
+                child.namespace == "http" && (child.tag == "response" || child.tag == "error-response")
+            "http" to "response", "http" to "error-response" ->
+                child.namespace == "http" && (child.tag == "body" || child.tag == "headers")
+            "ee" to "transform" ->
+                child.namespace == "ee" && (child.tag == "message" || child.tag == "variables")
+            "ee" to "message" -> child.namespace == "ee" && child.tag == "set-payload"
+            "ee" to "variables" -> child.namespace == "ee" && child.tag == "set-variable"
+            else -> false
+        }
 
     private fun isStructuralTag(element: RawElement): Boolean =
         element.namespace to element.tag in structuralTags
