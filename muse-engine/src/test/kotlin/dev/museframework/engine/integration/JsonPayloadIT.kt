@@ -90,7 +90,7 @@ class JsonPayloadIT {
                 val root = generateSequence(failure as Throwable) { it.cause }.last()
                 println(
                     "DW_RESPONSE_PROBE|$label|ERROR=${failure.javaClass.name}:${failure.message?.take(160)}" +
-                        "|root=${root.javaClass.name}:${root.message?.replace('\\n', ' ')?.take(160)}",
+                        "|root=${root.javaClass.name}:${root.message?.replace('\n', ' ')?.take(160)}",
                 )
             }
         }
