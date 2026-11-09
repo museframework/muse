@@ -6,6 +6,7 @@ import dev.museframework.engine.api.streaming.MuseCursorStream
 import dev.museframework.engine.api.streaming.MuseCursorStreamProvider
 import dev.museframework.engine.api.streaming.RepeatableInMemoryCursorStreamProvider
 import dev.museframework.engine.api.streaming.StreamingResourceRegistry
+import dev.museframework.engine.api.streaming.StreamingProviders
 import dev.museframework.engine.api.streaming.StreamingStrategy
 import dev.museframework.http.api.config.HttpStreamingMode
 import dev.museframework.http.api.model.HttpMethod
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.IOException
+import java.io.InputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -375,6 +377,44 @@ class QuarkusHttpServerBehaviorIT {
         assertThrows(IOException::class.java) { executeHttp11("GET", "/stream/mid-failure") }
 
         assertEquals(1, provider.releasedCount.get())
+    }
+
+    @Test
+    fun `adapted InputStream failure releases underlying stream exactly once`() {
+        val closes = AtomicInteger()
+        val reads = AtomicInteger()
+        val input =
+            object : InputStream() {
+                override fun read(): Int =
+                    if (reads.incrementAndGet() == 1) 'a'.code
+                    else throw IOException("simulated serialized response read failure")
+
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    if (length == 0) return 0
+                    buffer[offset] = read().toByte()
+                    return 1
+                }
+
+                override fun close() {
+                    closes.incrementAndGet()
+                }
+            }
+        val provider = StreamingProviders.byteProvider(input, StreamingStrategy.NonRepeatable)
+        val lease = StreamingResourceRegistry.ownedClaim(provider)
+        server.register("/stream/adapted-input-failure", listOf(HttpMethod.GET)) {
+            HttpResponse(statusCode = 200, bodyProvider = provider, bodyLease = lease)
+        }
+
+        try {
+            assertThrows(IOException::class.java) {
+                executeHttp11("GET", "/stream/adapted-input-failure")
+            }
+            assertTrue(reads.get() >= 2, "The producer must fail while streaming")
+            assertClosed(provider)
+            assertEquals(1, closes.get(), "The retained lease must close the underlying InputStream once")
+        } finally {
+            lease.close()
+        }
     }
 
     @Test
