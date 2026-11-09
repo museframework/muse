@@ -2,6 +2,7 @@ package dev.museframework.engine.execution
 
 import dev.museframework.dsl.api.model.error.ErrorType
 import dev.museframework.dsl.api.model.flow.MuseFlow
+import dev.museframework.engine.api.error.MuseError
 import dev.museframework.engine.api.event.MuseEvent
 import dev.museframework.engine.api.event.TypedValue
 import dev.museframework.engine.api.execution.ExecutionContext
