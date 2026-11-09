@@ -10,8 +10,8 @@
                 <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
             </http:error-response>
         </http:listener>
-        <apikit:router config-ref="api-spec-config" /> 
-        <!-- [STUDIO:"APIkit Router"] <flow-ref doc:name="Flow Reference" doc:id="e134eacb-ff22-4ad5-bd0c-01daa2a04f2d" name="get:\api\resources:api-spec-config"/> [STUDIO] -->
+        <apikit:router config-ref="api-spec-config" />
+		<!-- [STUDIO:"APIkit Router"] <flow-ref doc:name="Flow Reference" doc:id="e134eacb-ff22-4ad5-bd0c-01daa2a04f2d" name="get:\api\resources:api-spec-config"/> [STUDIO] -->
     <error-handler>
             <on-error-propagate type="APIKIT:BAD_REQUEST">
                 <ee:transform doc:name="Transform Message">
