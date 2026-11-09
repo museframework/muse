@@ -402,7 +402,7 @@ jobs:
     - name: Install Quarkus extensions
       run: |
         mvn -f muse-quarkus/pom.xml install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false
-        mvn -f muse-http-connector-quarkus/pom.xml install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false
+        mvn -f muse-http-connector-quarkus/pom.xml install --batch-mode -Dkotlin.daemon.enabled=false
         mvn install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false -pl :muse-apikit-connector -am
         mvn -f muse-apikit-connector-quarkus/pom.xml install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false
 
