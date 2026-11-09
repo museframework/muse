@@ -36,6 +36,25 @@ import kotlin.test.assertSame
  */
 class ApikitRoutingPolicyTest {
     @Test
+    fun `rejects unsupported RAML request media type and dispatches supported binary body`() =
+        routing(
+            spec(resource("/users", HttpMethod.POST, contentTypes = listOf("application/octet-stream"))),
+            routedFlows = setOf("post:\\\\users:myApi"),
+        ) { routing ->
+            val unsupported = RecordingInvocation(
+                event("/users", HttpMethod.POST, headers = mapOf("content-type" to "application/json")),
+            )
+            assertFailure(routing.execute(unsupported), ApikitErrorType.UNSUPPORTED_MEDIA_TYPE)
+            assertEquals(null, unsupported.calledHandle)
+
+            val supported = RecordingInvocation(
+                event("/users", HttpMethod.POST, headers = mapOf("Content-Type" to "application/octet-stream")),
+            )
+            assertIs<PolicyOutcome.Success>(routing.execute(supported))
+            assertNotNull(supported.calledHandle)
+        }
+
+    @Test
     fun `matches a route and calls the prepared handle with the caller event`() =
         routing(spec(resource("/users", HttpMethod.GET))) { routing ->
             val invocation = RecordingInvocation(event("/users", HttpMethod.GET))
@@ -195,6 +214,7 @@ class ApikitRoutingPolicyTest {
         method: HttpMethod,
         requiredHeaders: List<ApiParameter> = emptyList(),
         requiredQueryParams: List<ApiParameter> = emptyList(),
+        contentTypes: List<String> = emptyList(),
     ): ApiResource =
         ApiResource(
             path = path,
@@ -204,6 +224,7 @@ class ApikitRoutingPolicyTest {
                         method = method,
                         requiredHeaders = requiredHeaders,
                         requiredQueryParams = requiredQueryParams,
+                        contentTypes = contentTypes,
                     ),
                 ),
         )
