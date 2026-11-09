@@ -352,6 +352,40 @@ class HttpListenerSourceContractIT {
         }
 
     @Test
+    fun `error response payload passthrough preserves JSON media type and bytes`() =
+        runTest {
+            val config = createDefaultConfig(
+                errorResponse = ErrorHttpResponseConfig(body = "#[payload]"),
+            )
+            val source = createSource(config)
+            source.start(channel)
+
+            every { mockExpressionEvaluator.evaluate("#[vars.httpStatus default 500]", any()) } returns TypedValue.of(404)
+            every { mockExpressionEvaluator.evaluate("#[payload]", any()) } returns
+                TypedValue.of(mapOf("message" to "wrong"), TypedValue.MIME_JAVA)
+
+            val responseDeferred = async { server.handle(createHttpRequest()) }
+            val envelope = channel.receive()
+            val originalJson = """{"message": "Resource not found"}"""
+            val errorEvent = MuseEvent(
+                payload = TypedValue.of(originalJson, TypedValue.MIME_JSON),
+                error = MuseError(
+                    description = "Not found",
+                    detailedDescription = "Not found",
+                    errorType = ErrorType.Mule.UNKNOWN,
+                    cause = NoSuchElementException("missing"),
+                ),
+            )
+            envelope.replyTo.complete(errorEvent)
+
+            val response = responseDeferred.await()
+            assertEquals(404, response.statusCode)
+            assertEquals("application/json", response.headers["Content-Type"])
+            assertEquals(originalJson, String(assertNotNull(response.body)))
+            verify(exactly = 0) { mockExpressionEvaluator.evaluate("#[payload]", any()) }
+        }
+
+    @Test
     fun `should return 504 Gateway Timeout when timeout is exceeded`() =
         runTest {
             val config = createDefaultConfig(timeoutMs = 100)
