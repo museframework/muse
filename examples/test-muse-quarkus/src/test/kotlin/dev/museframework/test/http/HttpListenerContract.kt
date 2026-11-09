@@ -39,6 +39,16 @@ abstract class HttpListenerContract {
     }
 
     @Test
+    fun `GET streams a DataWeave json response with real wire bytes`() {
+        given()
+            .`when`().get("/api/dataweave")
+            .then()
+            .statusCode(200)
+            .contentType(containsString("application/json"))
+            .body("message", equalTo("created"))
+    }
+
+    @Test
     fun `unsupported method is not routed`() {
         given()
             .`when`().put("/api/hello")
