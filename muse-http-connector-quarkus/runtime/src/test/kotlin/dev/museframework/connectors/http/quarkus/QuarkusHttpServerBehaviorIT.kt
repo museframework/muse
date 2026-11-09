@@ -418,6 +418,61 @@ class QuarkusHttpServerBehaviorIT {
     }
 
     @Test
+    fun `client disconnect releases the adapted InputStream without reading it eagerly`() {
+        val readStarted = CountDownLatch(1)
+        val releaseRead = CountDownLatch(1)
+        val streamClosed = CountDownLatch(1)
+        val closes = AtomicInteger()
+        val input =
+            object : InputStream() {
+                override fun read(): Int {
+                    readStarted.countDown()
+                    check(releaseRead.await(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    return -1
+                }
+
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+                    if (length == 0) 0 else read()
+
+                override fun close() {
+                    closes.incrementAndGet()
+                    streamClosed.countDown()
+                }
+            }
+        val provider = StreamingProviders.byteProvider(input, StreamingStrategy.NonRepeatable)
+        val lease = StreamingResourceRegistry.ownedClaim(provider)
+        val path = "/stream/adapted-client-disconnect"
+        server.register(path, listOf(HttpMethod.GET)) {
+            HttpResponse(statusCode = 200, bodyProvider = provider, bodyLease = lease)
+        }
+
+        val socket = java.net.Socket(LOOPBACK, transport.actualPort())
+        try {
+            socket.setSoLinger(true, 0) // force a reset while the response stream is still blocked
+            socket.getOutputStream().apply {
+                write(
+                    ("GET $path HTTP/1.1\r\n" +
+                        "Host: $LOOPBACK:" + transport.actualPort() + "\r\n" +
+                        "Connection: keep-alive\r\n\r\n").toByteArray(StandardCharsets.US_ASCII),
+                )
+                flush()
+            }
+            assertTrue(readStarted.await(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+                "The response must begin reading before the client disconnects")
+            assertFalse(provider.isClosed, "The source must not close an in-flight response")
+            socket.close()
+            releaseRead.countDown()
+            assertTrue(streamClosed.await(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+                "The response lease must release the adapted input after disconnect")
+            assertEquals(1, closes.get(), "The raw InputStream must close exactly once")
+        } finally {
+            releaseRead.countDown()
+            socket.close()
+            lease.close()
+        }
+    }
+
+    @Test
     fun `mid-stream failure closes the retained lease without releasing the provider directly`() {
         val provider = FailingProvider()
         val owner = StreamingResourceRegistry()
