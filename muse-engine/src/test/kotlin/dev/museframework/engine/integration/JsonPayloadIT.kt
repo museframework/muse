@@ -77,7 +77,7 @@ class JsonPayloadIT {
                 when (value) {
                     is ByteArray -> value.toString(Charsets.UTF_8)
                     else -> value?.toString() ?: "<null>"
-                }.replace("\\n", "\\n").take(250)
+                }.replace('\n', ' ').take(250)
             println(
                 "DW_RESPONSE_PROBE|$label|type=$javaType|mime=${typed?.mimeType}|charset=${typed?.charset}|value=$display",
             )
