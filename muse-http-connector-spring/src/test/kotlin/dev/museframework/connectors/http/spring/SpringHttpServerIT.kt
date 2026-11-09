@@ -378,8 +378,16 @@ class SpringHttpServerIT : HttpServerContract() {
         try {
             // The servlet may propagate a truncated-response exception or an HTTP error. In
             // either case the transport must finish releasing the failed response's lease.
+            val request =
+                java.net.http.HttpRequest.newBuilder(URI.create("http://localhost:$port$path"))
+                    .timeout(java.time.Duration.ofSeconds(10))
+                    .GET()
+                    .build()
             runCatching {
-                restTemplate.getForEntity("http://localhost:$port$path", String::class.java)
+                java.net.http.HttpClient.newHttpClient().send(
+                    request,
+                    java.net.http.HttpResponse.BodyHandlers.ofByteArray(),
+                )
             }
             assertTrue(streamClosed.await(5, TimeUnit.SECONDS), "The adapter must release the raw stream")
             assertTrue(reads.get() >= 2, "The serialized stream must actually fail during transfer")
