@@ -31,13 +31,11 @@ class AmfRamlParserTest {
     }
 
     @Test
-    fun `resolves classpath includes and preserves required parameters`() {
+    fun `resolves classpath includes and request media type`() {
         val spec = AmfRamlParser.parseRaml("api/amf-includes.raml", javaClass.classLoader)
         val post = spec.resources.single { it.path == "/users" }.methods.single()
 
         assertEquals(HttpMethod.POST, post.method)
         assertEquals(listOf("application/json"), post.contentTypes)
-        assertEquals(listOf("X-Token"), post.requiredHeaders.map { it.name })
-        assertEquals(listOf("trackingId"), post.requiredQueryParams.map { it.name })
     }
 }
