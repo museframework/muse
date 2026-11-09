@@ -3,6 +3,7 @@ package dev.museframework.connectors.http.spring
 import dev.museframework.engine.api.streaming.MuseCursorStreamProvider
 import dev.museframework.engine.api.streaming.RepeatableInMemoryCursorStreamProvider
 import dev.museframework.engine.api.streaming.StreamingResourceRegistry
+import dev.museframework.engine.api.streaming.StreamingProviders
 import dev.museframework.engine.api.streaming.StreamingStrategy
 import dev.museframework.http.api.config.HttpListenerConnectionConfig
 import dev.museframework.http.api.config.HttpStreamingMode
@@ -23,6 +24,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
+import java.io.IOException
+import java.io.InputStream
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
@@ -339,6 +342,52 @@ class SpringHttpServerIT : HttpServerContract() {
             assertTrue(provider.isClosed)
         } finally {
             server.unregister("/test/stream-response", listOf(HttpMethod.GET))
+        }
+    }
+
+    @Test
+    fun `serialized InputStream read failure releases underlying stream once`() {
+        val closes = AtomicInteger()
+        val reads = AtomicInteger()
+        val streamClosed = CountDownLatch(1)
+        val input =
+            object : InputStream() {
+                override fun read(): Int =
+                    if (reads.incrementAndGet() == 1) 'x'.code
+                    else throw IOException("simulated serialized response read failure")
+
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    if (length == 0) return 0
+                    buffer[offset] = read().toByte()
+                    return 1
+                }
+
+                override fun close() {
+                    closes.incrementAndGet()
+                    streamClosed.countDown()
+                }
+            }
+        val provider = StreamingProviders.byteProvider(input, StreamingStrategy.NonRepeatable)
+        val lease = StreamingResourceRegistry.ownedClaim(provider)
+        val server = server()
+        val path = "/test/serialized-stream-failure"
+        server.register(path, listOf(HttpMethod.GET)) {
+            HttpResponse(statusCode = 200, bodyProvider = provider, bodyLease = lease)
+        }
+
+        try {
+            // The servlet may propagate a truncated-response exception or an HTTP error. In
+            // either case the transport must finish releasing the failed response's lease.
+            runCatching {
+                restTemplate.getForEntity("http://localhost:$port$path", String::class.java)
+            }
+            assertTrue(streamClosed.await(5, TimeUnit.SECONDS), "The adapter must release the raw stream")
+            assertTrue(reads.get() >= 2, "The serialized stream must actually fail during transfer")
+            assertTrue(provider.isClosed, "The provider must not outlive the failed response")
+            assertEquals(1, closes.get(), "The underlying InputStream must be closed exactly once")
+        } finally {
+            server.unregister(path, listOf(HttpMethod.GET))
+            lease.close()
         }
     }
 
