@@ -176,8 +176,14 @@ class HttpListenerMuseSource(
                 ?: if (error != null) 500 else 200
         val reasonPhrase = responseConfig.reasonPhrase?.let { evaluateString(it, this) }
 
+        // A bare #[payload] is a pass-through. Re-evaluating it with DataWeave's
+        // application/java default discards the payload's declared media type and
+        // can turn a JSON response back into a Java Map.
         val evaluatedBody =
-            responseConfig.body?.let { expressionEvaluator.evaluate(it, this) }
+            responseConfig.body?.let { expression ->
+                if (expression.trim() == "#[payload]") payload
+                else expressionEvaluator.evaluate(expression, this)
+            }
         val bodyValue =
             if (responseConfig.body != null) {
                 evaluatedBody?.getOrNull()
