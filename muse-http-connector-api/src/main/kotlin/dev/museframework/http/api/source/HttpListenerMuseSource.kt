@@ -201,6 +201,9 @@ class HttpListenerMuseSource(
                 is InputStream -> StreamingProviders.byteProvider(value, StreamingStrategy.NonRepeatable)
                 else -> null
             }
+        // Own any newly adapted provider before evaluating response headers: those expressions
+        // may throw, and the source's reply registry is responsible for cleanup on failure.
+        bodyProvider?.let(replyResources::register)
         val body = if (bodyProvider == null) bodyValue?.toResponseBytes(charset) else null
         val contentType =
             (if (responseConfig.body != null) evaluatedBody?.mimeType else payload?.mimeType)
@@ -219,8 +222,6 @@ class HttpListenerMuseSource(
 
         val bodyLease =
             bodyProvider?.let { exported ->
-                // A response expression may create its own provider; register it before retaining.
-                replyResources.register(exported)
                 replyResources.retain(listOf(exported))
             }
 
