@@ -68,8 +68,13 @@ class MuseExpressionEvaluatorImpl(
         if (exprCount == 0) return TypedValue.of(expression, TypedValue.MIME_TEXT)
 
         if (exprCount == 1) {
-            val singleMatch = SINGLE_EXPRESSION.matchEntire(expression)
+            val singleMatch = SINGLE_EXPRESSION.matchEntire(expression.trim())
             if (singleMatch != null) {
+                val body = singleMatch.groupValues[1].trim()
+                // A bare payload reference is the identity expression: it must preserve the
+                // original TypedValue value, MIME type and charset instead of re-reading it
+                // through the DataWeave default output. Every other expression still evaluates.
+                if (body == "payload") return event.payload
                 return dataWeaveExecutor.evaluate(singleMatch.groupValues[1], context)
             }
         }
