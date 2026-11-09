@@ -26,6 +26,71 @@ import kotlin.test.assertSame
 
 class OwnedExecutionTest {
     @Test
+    fun `more specific APIKit error handler wins over an earlier BAD_REQUEST handler`() =
+        runTest {
+            val any = ErrorType("APIKIT", "ANY")
+            val badRequest = ErrorType("APIKIT", "BAD_REQUEST", any)
+            val notFound = ErrorType("APIKIT", "NOT_FOUND", badRequest)
+            val error = MuseError(
+                description = "Not found",
+                detailedDescription = "Not found",
+                errorType = notFound,
+                cause = IllegalArgumentException("Not found"),
+            )
+            fun response(status: Int) = pipelineOf(
+                probe("http-$status") { context ->
+                    ProcessorResult.Success(
+                        context.withEvent(context.event.copy(
+                            variables = context.event.variables + ("httpStatus" to TypedValue.of(status)),
+                        )),
+                    )
+                },
+            )
+            val handler = ResolvedErrorHandler(
+                listOf(
+                    ResolvedErrorHandlerStrategy(
+                        errorType = badRequest,
+                        pipeline = response(400),
+                        kind = ResolvedErrorHandlerStrategy.Kind.CONTINUE,
+                    ),
+                    ResolvedErrorHandlerStrategy(
+                        errorType = notFound,
+                        pipeline = response(404),
+                        kind = ResolvedErrorHandlerStrategy.Kind.CONTINUE,
+                    ),
+                ),
+            )
+            val owned = OwnedExecution(
+                BoundExecution { ProcessorResult.Failure(error, it.withError(error)) },
+                handler,
+            )
+
+            val result = assertIs<ProcessorResult.Success>(owned.invoke(policyContext(this)))
+            assertEquals(404, result.context.event.variables["httpStatus"]?.value)
+        }
+
+    @Test
+    fun `ancestor handler remains the fallback when no more specific strategy matches`() =
+        runTest {
+            val ancestor = ErrorType("APIKIT", "BAD_REQUEST")
+            val child = ErrorType("APIKIT", "METHOD_NOT_ALLOWED", ancestor)
+            val error = MuseError("Method not allowed", "Method not allowed", child, IllegalStateException())
+            val handler = errorHandler(
+                errorType = ancestor,
+                pipeline = pipelineOf(probe("fallback") {
+                    ProcessorResult.Success(it.withEvent(it.event.copy(
+                        variables = it.event.variables + ("fallback" to TypedValue.of(true)),
+                    )))
+                }),
+            )
+            val result = assertIs<ProcessorResult.Success>(
+                OwnedExecution(BoundExecution { ProcessorResult.Failure(error, it.withError(error)) }, handler)
+                    .invoke(policyContext(this)),
+            )
+            assertEquals(true, result.context.event.variables["fallback"]?.value)
+        }
+
+    @Test
     fun `local continue finishes only its owner and restores E1`() =
         runTest {
             val markers = mutableListOf<String>()
