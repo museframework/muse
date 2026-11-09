@@ -10,6 +10,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class RequestValidatorTest {
+    @Test
+    fun `accepts the RAML media type regardless of header casing and parameters`() {
+        val method = ApiMethod(HttpMethod.POST, contentTypes = listOf("application/octet-stream"))
+        assertTrue(RequestValidator.acceptsContentType(method, mapOf("content-type" to "Application/Octet-Stream; charset=utf-8")))
+        assertTrue(RequestValidator.acceptsContentType(ApiMethod(HttpMethod.GET), emptyMap()))
+    }
+
+    @Test
+    fun `rejects unknown or absent media types when RAML restricts request bodies`() {
+        val method = ApiMethod(HttpMethod.POST, contentTypes = listOf("application/octet-stream"))
+        assertEquals(false, RequestValidator.acceptsContentType(method, mapOf("Content-Type" to "application/json")))
+        assertEquals(false, RequestValidator.acceptsContentType(method, emptyMap()))
+    }
+
     @Nested
     @DisplayName("validateHeaders")
     inner class ValidateHeaders {
