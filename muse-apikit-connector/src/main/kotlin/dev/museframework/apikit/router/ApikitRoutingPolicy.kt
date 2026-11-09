@@ -89,6 +89,18 @@ class ApikitRoutingPolicy(
                 ?: return flowNotFound(invocation, flowName)
 
         if (validationsEnabled) {
+            if (!RequestValidator.acceptsContentType(apiMethod, httpAttributes.headers)) {
+                return failure(
+                    errorType = ApikitErrorType.UNSUPPORTED_MEDIA_TYPE,
+                    description = "Unsupported request media type",
+                    detailedDescription =
+                        "The request Content-Type is not declared for this API method. " +
+                            "Allowed types: ${apiMethod.contentTypes.joinToString(", ")}",
+                    cause = IllegalArgumentException("Unsupported Content-Type"),
+                    event = invocation.input,
+                )
+            }
+
             val missingHeaders = RequestValidator.validateHeaders(apiMethod, httpAttributes.headers)
             if (missingHeaders.isNotEmpty()) {
                 return failure(
