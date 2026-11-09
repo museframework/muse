@@ -87,16 +87,34 @@ class JsonPayloadIT {
             try {
                 report(label, run())
             } catch (failure: Exception) {
+                val root = generateSequence(failure as Throwable) { it.cause }.last()
                 println(
-                    "DW_RESPONSE_PROBE|$label|ERROR=${failure.javaClass.name}:${failure.message?.take(250)}",
+                    "DW_RESPONSE_PROBE|$label|ERROR=${failure.javaClass.name}:${failure.message?.take(160)}" +
+                        "|root=${root.javaClass.name}:${root.message?.replace('\\n', ' ')?.take(160)}",
                 )
             }
         }
 
         attempt("explicit_json_from_java_map") {
             executor.evaluate(
-                "%dw 2.0\\noutput application/json\\n---\\npayload",
+                """
+                %dw 2.0
+                output application/json
+                ---
+                payload
+                """.trimIndent(),
                 DataWeaveContext.from(javaEvent, Properties()),
+            )
+        }
+        attempt("explicit_json_from_json_text") {
+            executor.evaluate(
+                """
+                %dw 2.0
+                output application/json
+                ---
+                payload
+                """.trimIndent(),
+                DataWeaveContext.from(jsonEvent, Properties()),
             )
         }
         attempt("write_json_from_java_map") {
