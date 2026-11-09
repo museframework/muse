@@ -592,6 +592,7 @@ jobs:
         -DskipTests -Dquarkus.native.enabled=true -Dkotlin.daemon.enabled=false
         -Dquarkus.native.container-build=false
         -Dquarkus.native.native-image-xmx=4g
+        -Dquarkus.native.additional-build-args=--initialize-at-run-time=dev.museframework.engine.api.streaming.ManagedStreamingProviders
 
     - name: Run a real APIKit endpoint from the native executable
       run: |
