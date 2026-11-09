@@ -30,7 +30,7 @@ internal class OwnedExecution(
             val errorContext = context.withEvent(failure.context.event.copy(error = failure.error))
             val strategy =
                 try {
-                    handler?.strategies?.sortedByDescending { it.errorType.depth() }?.firstOrNull { candidate ->
+                    handler?.strategies?.sortedBy { failure.error.errorType.distanceTo(it.errorType) ?: Int.MAX_VALUE }?.firstOrNull { candidate ->
                         failure.error.errorType.isDescendantOf(candidate.errorType) &&
                             candidate.predicateMatches(errorContext)
                     }
@@ -93,5 +93,18 @@ private fun ProcessorResult.normalizeOwnerReturn(
             }
     }
 
-/** More specific error types take precedence; declaration order is preserved for ties. */
-private fun ErrorType.depth(): Int = generateSequence(this) { it.parent }.count()
+/**
+ * Choose the nearest declared error type in the raised error's ancestry. Generated
+ * handler declarations may omit the parent graph, so inspecting candidate depth
+ * alone is not sufficient. Stable sorting preserves declaration order on ties.
+ */
+private fun ErrorType.distanceTo(candidate: ErrorType): Int? {
+    var current: ErrorType? = this
+    var distance = 0
+    while (current != null) {
+        if (current.namespace == candidate.namespace && current.identifier == candidate.identifier) return distance
+        current = current.parent
+        distance++
+    }
+    return null
+}
