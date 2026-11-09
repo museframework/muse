@@ -10,7 +10,9 @@ import dev.museframework.engine.api.source.MuseEventEnvelope
 import dev.museframework.engine.api.source.MuseSource
 import dev.museframework.engine.api.streaming.MuseCursorStreamProvider
 import dev.museframework.engine.api.streaming.StreamingException
+import dev.museframework.engine.api.streaming.StreamingProviders
 import dev.museframework.engine.api.streaming.StreamingResourceRegistry
+import dev.museframework.engine.api.streaming.StreamingStrategy
 import dev.museframework.http.api.config.HttpListenerConfig
 import dev.museframework.http.api.config.HttpListenerConnectionConfig
 import dev.museframework.http.api.config.HttpListenerLifecycle
@@ -22,6 +24,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.InputStream
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 import org.slf4j.LoggerFactory
 
@@ -184,8 +189,19 @@ class HttpListenerMuseSource(
             } else {
                 error?.description ?: payload?.getOrNull()
             }
-        val bodyProvider = bodyValue as? MuseCursorStreamProvider
-        val body = if (bodyProvider == null) bodyValue?.toBytes() else null
+        val charset =
+            ((if (responseConfig.body != null) evaluatedBody?.charset else payload?.charset)
+                ?: StandardCharsets.UTF_8)
+        val bodyProvider =
+            when (val value = bodyValue) {
+                is MuseCursorStreamProvider -> value
+                // A serialized DataWeave result is a plain InputStream. Adapt it lazily so the
+                // source never reads the producer's stream before the adapter streams the response.
+                // HTTP consumes its body once; repeatability is not promised by a JDK InputStream.
+                is InputStream -> StreamingProviders.byteProvider(value, StreamingStrategy.NonRepeatable)
+                else -> null
+            }
+        val body = if (bodyProvider == null) bodyValue?.toResponseBytes(charset) else null
         val contentType =
             (if (responseConfig.body != null) evaluatedBody?.mimeType else payload?.mimeType)
                 ?: "application/octet-stream"
@@ -291,11 +307,22 @@ class HttpListenerMuseSource(
         }
     }
 
-    private fun Any.toBytes(): ByteArray =
+    /**
+     * Converts an already-materialized scalar body to its wire bytes. Structured values are not
+     * serialized by diagnostics: a Map, collection or arbitrary object has no declared wire
+     * representation here, so falling back to [Any.toString] would emit invalid payloads.
+     */
+    private fun Any.toResponseBytes(charset: Charset): ByteArray =
         when (this) {
             is ByteArray -> this
-            is String -> toByteArray()
-            else -> toString().toByteArray()
+            is String -> toByteArray(charset)
+            is CharSequence -> toString().toByteArray(charset)
+            is Number, is Boolean, is Char -> toString().toByteArray(charset)
+            else ->
+                throw IllegalArgumentException(
+                    "HTTP response body of type ${javaClass.name} has no wire representation; " +
+                        "use a byte array, text, a serialized stream or a streaming provider",
+                )
         }
 
     private companion object {
