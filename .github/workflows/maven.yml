@@ -525,22 +525,22 @@ jobs:
 
     - name: Capture selected runtime dependency graph
       run: |
-        mvn -f muse-apikit-connector/pom.xml --batch-mode -ntp
-        org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree
-        -Dscope=runtime -DoutputType=json
-        -DoutputFile="$RUNNER_TEMP/amf-runtime-tree.json"
+        mvn -f muse-apikit-connector/pom.xml --batch-mode -ntp \
+          org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree \
+          -Dscope=runtime -DoutputType=json \
+          -DoutputFile="$RUNNER_TEMP/amf-runtime-tree.json"
         test -s "$RUNNER_TEMP/amf-runtime-tree.json"
 
     - name: Capture declared third-party licenses including transitives
       run: |
-        mvn -f muse-apikit-connector/pom.xml --batch-mode -ntp
-        org.codehaus.mojo:license-maven-plugin:2.7.1:add-third-party
-        -Dlicense.includeTransitiveDependencies=true
-        -Dlicense.includedScopes=compile,runtime
-        -Dlicense.addOutputDirectoryAsResourceDir=false
-        -Dlicense.useRepositoryMissingFiles=false
-        -Dlicense.failOnMissing=false
-        -Dlicense.outputDirectory="$RUNNER_TEMP/amf-licenses"
+        mvn -f muse-apikit-connector/pom.xml --batch-mode -ntp \
+          org.codehaus.mojo:license-maven-plugin:2.7.1:add-third-party \
+          -Dlicense.includeTransitiveDependencies=true \
+          -Dlicense.includedScopes=compile,runtime \
+          -Dlicense.addOutputDirectoryAsResourceDir=false \
+          -Dlicense.useRepositoryMissingFiles=false \
+          -Dlicense.failOnMissing=false \
+          -Dlicense.outputDirectory="$RUNNER_TEMP/amf-licenses"
         test -s "$RUNNER_TEMP/amf-licenses/THIRD-PARTY.txt"
         cat "$RUNNER_TEMP/amf-licenses/THIRD-PARTY.txt"
 
