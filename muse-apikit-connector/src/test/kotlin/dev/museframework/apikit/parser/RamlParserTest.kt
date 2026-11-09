@@ -20,6 +20,39 @@ import kotlin.test.assertTrue
 
 class RamlParserTest {
     @Test
+    fun `parses request media type separately from response bodies`() {
+        val classLoader = resourceClassLoader(
+            "api/body.raml",
+            """
+            #%RAML 1.0
+            title: Content types
+            /api:
+              /resources:
+                post:
+                  body:
+                    application/octet-stream:
+                      type: file
+                  responses:
+                    200:
+                      body:
+                        application/json:
+                          type: object
+                get:
+                  responses:
+                    200:
+                      body:
+                        application/json:
+                          type: object
+            """.trimIndent(),
+        )
+
+        val specification = RamlParser.parseRaml("api/body.raml", classLoader)
+        val methods = specification.resources.single { it.path == "/api/resources" }.methods
+        assertEquals(listOf("application/octet-stream"), methods.single { it.method == HttpMethod.POST }.contentTypes)
+        assertTrue(methods.single { it.method == HttpMethod.GET }.contentTypes.isEmpty())
+    }
+
+    @Test
     fun `loads and parses the specification exactly once`() {
         val openCount = AtomicInteger()
         val classLoader =
