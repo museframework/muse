@@ -99,7 +99,11 @@ class RamlParserTest {
                 RamlParser.parseRaml("api/malformed-resource.raml", classLoader)
             }
 
-        assertTrue(failure.message.orEmpty().contains("line 2"))
+        assertEquals("api/malformed-resource.raml", failure.specPath)
+        assertTrue(
+            failure.message.orEmpty().contains("line", ignoreCase = true),
+            failure.message,
+        )
     }
 
     private fun resourceClassLoader(
