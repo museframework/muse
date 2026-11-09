@@ -30,7 +30,7 @@ internal class OwnedExecution(
             val errorContext = context.withEvent(failure.context.event.copy(error = failure.error))
             val strategy =
                 try {
-                    handler?.strategies?.firstOrNull { candidate ->
+                    handler?.strategies?.sortedByDescending { it.errorType.depth() }?.firstOrNull { candidate ->
                         failure.error.errorType.isDescendantOf(candidate.errorType) &&
                             candidate.predicateMatches(errorContext)
                     }
@@ -92,3 +92,6 @@ private fun ProcessorResult.normalizeOwnerReturn(
                 entry.withEvent(terminal.event.copy(error = error))
             }
     }
+
+/** More specific error types take precedence; declaration order is preserved for ties. */
+private fun ErrorType.depth(): Int = generateSequence(this) { it.parent }.count()
