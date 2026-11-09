@@ -1,0 +1,15 @@
+#%RAML 1.0
+title: Includes and required parameters
+/users:
+  post:
+    headers:
+      X-Token:
+        type: string
+        required: true
+    queryParameters:
+      trackingId:
+        type: string
+        required: true
+    body:
+      application/json:
+        type: !include amf-user-type.raml
