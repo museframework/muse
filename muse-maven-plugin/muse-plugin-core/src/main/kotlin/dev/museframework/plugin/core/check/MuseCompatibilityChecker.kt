@@ -47,8 +47,16 @@ class MuseCompatibilityChecker(
         "" to "on-error-propagate",
         "" to "scheduling-strategy",
         "" to "fixed-frequency",
+        // Child elements owned by the parent HTTP source mapper.
+        "http" to "response",
+        "http" to "error-response",
+        "http" to "body",
+        "http" to "headers",
+        // Children owned by the parent ee:transform mapper.
         "ee" to "message",
+        "ee" to "variables",
         "ee" to "set-payload",
+        "ee" to "set-variable",
     )
 
     private val knownUnimplemented = setOf(

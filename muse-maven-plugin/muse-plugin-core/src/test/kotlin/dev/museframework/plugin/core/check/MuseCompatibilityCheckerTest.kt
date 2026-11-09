@@ -137,6 +137,56 @@ class MuseCompatibilityCheckerTest {
     }
 
     @Test
+    fun `http response and transform children are not reported as processors`() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <mule xmlns="http://www.mulesoft.org/schema/mule/core"
+                  xmlns:http="http://www.mulesoft.org/schema/mule/http"
+                  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core
+                                      http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+                <flow name="interface-flow">
+                    <http:listener config-ref="HTTP_Listener_config" path="/*">
+                        <http:response statusCode="#[vars.httpStatus default 200]">
+                            <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+                        </http:response>
+                        <http:error-response statusCode="#[vars.httpStatus default 500]">
+                            <http:body><![CDATA[#[payload]]]></http:body>
+                            <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+                        </http:error-response>
+                    </http:listener>
+                    <ee:transform>
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+                                                        ---
+                                                        {message: "Bad request"}]]></ee:set-payload>
+                        </ee:message>
+                        <ee:variables>
+                            <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                        </ee:variables>
+                    </ee:transform>
+                </flow>
+            </mule>
+        """.trimIndent()
+        val file = createTempXml(xml)
+        val doc = parser.parse(file.toPath())
+        val checker = MuseCompatibilityChecker(registry)
+        val report = checker.check(doc)
+
+        assertTrue(report.results.any { it.tag == "listener" && it.type == ComponentType.SOURCE })
+        assertTrue(report.results.any { it.tag == "transform" })
+        assertFalse(report.results.any { it.tag == "response" }, "http:response is owned by the listener mapper")
+        assertFalse(report.results.any { it.tag == "error-response" }, "http:error-response is owned by the listener mapper")
+        assertFalse(report.results.any { it.tag == "headers" }, "http:headers is owned by the response mapper")
+        assertFalse(report.results.any { it.tag == "body" }, "http:body is owned by the response mapper")
+        assertFalse(report.results.any { it.tag == "variables" }, "ee:variables is owned by the transform mapper")
+        assertFalse(report.results.any { it.tag == "set-variable" }, "ee:set-variable is owned by the transform mapper")
+        assertEquals(2, report.totalCount)
+        assertEquals(0, report.unmappedCount)
+    }
+
+    @Test
     fun `scatter gather with routes handles nested elements`() {
         val xml = """
             <?xml version="1.0" encoding="UTF-8"?>
