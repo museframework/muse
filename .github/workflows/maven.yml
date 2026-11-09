@@ -399,6 +399,18 @@ jobs:
         -pl examples/test-muse-spring-boot
         -am
 
+    # All dependencies are installed from this exact checkout in the preceding step.
+    # The root build explicitly excludes HTTP owners; exercise their contracts here.
+    - name: Verify HTTP connector API and Spring adapter owners
+      run: >-
+        mvn verify --batch-mode -Dkotlin.daemon.enabled=false
+        -pl :muse-http-connector-api,:muse-http-connector-spring
+
+    - name: Assert HTTP connector test discovery
+      run: |
+        ./scripts/assert-test-reports.sh surefire-reports muse-http-connector-api muse-http-connector-spring
+        ./scripts/assert-test-reports.sh failsafe-reports muse-http-connector-api muse-http-connector-spring
+
     - name: Install Quarkus extensions
       run: |
         mvn -f muse-quarkus/pom.xml install --batch-mode -DskipTests -Dkotlin.daemon.enabled=false
