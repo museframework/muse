@@ -187,6 +187,44 @@ class MuseCompatibilityCheckerTest {
     }
 
     @Test
+    fun `owned XML children are not silently ignored outside their mapper`() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <mule xmlns="http://www.mulesoft.org/schema/mule/core"
+                  xmlns:http="http://www.mulesoft.org/schema/mule/http"
+                  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core">
+                <flow name="wrong-parent">
+                    <http:response statusCode="200"/>
+                    <ee:variables/>
+                </flow>
+            </mule>
+        """.trimIndent()
+        val report = MuseCompatibilityChecker(registry).check(parser.parse(createTempXml(xml).toPath()))
+        assertTrue(report.results.any { it.namespace == "http" && it.tag == "response" && !it.implemented })
+        assertTrue(report.results.any { it.namespace == "ee" && it.tag == "variables" && !it.implemented })
+    }
+
+    @Test
+    fun `unknown XML nested below a mapped listener response remains visible`() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <mule xmlns="http://www.mulesoft.org/schema/mule/core"
+                  xmlns:http="http://www.mulesoft.org/schema/mule/http">
+                <flow name="unknown-nested">
+                    <http:listener config-ref="HTTP_Listener_config" path="/*">
+                        <http:response>
+                            <http:unexpected/>
+                        </http:response>
+                    </http:listener>
+                </flow>
+            </mule>
+        """.trimIndent()
+        val report = MuseCompatibilityChecker(registry).check(parser.parse(createTempXml(xml).toPath()))
+        assertTrue(report.results.any { it.namespace == "http" && it.tag == "unexpected" && !it.implemented })
+        assertFalse(report.results.any { it.namespace == "http" && it.tag == "response" })
+    }
+
+    @Test
     fun `scatter gather with routes handles nested elements`() {
         val xml = """
             <?xml version="1.0" encoding="UTF-8"?>

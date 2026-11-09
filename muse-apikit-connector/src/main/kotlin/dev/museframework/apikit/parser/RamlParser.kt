@@ -89,9 +89,6 @@ object RamlParser {
             context.currentResourcePath = resourcePath
             context.currentResourceIndent = indent
             context.currentMethods = mutableListOf()
-            context.currentMethodIndent = -1
-            context.requestBodyIndent = -1
-            context.inResponses = false
             return
         }
 
@@ -104,36 +101,8 @@ object RamlParser {
                 )
             }
             if (indent > context.currentResourceIndent) {
-                context.currentMethods.add(ApiMethod(method = httpMethod))
-                context.currentMethodIndent = indent
-                context.requestBodyIndent = -1
-                context.inResponses = false
+                context.currentMethods.add(httpMethod)
                 updateOrAddResource(resources, context)
-                return
-            }
-        }
-
-        // Only a request body belongs to the method contract. A response body's
-        // media type must not accidentally constrain incoming requests.
-        if (context.currentMethodIndent >= 0 && indent > context.currentMethodIndent) {
-            when {
-                content == "responses:" -> {
-                    context.inResponses = true
-                    context.requestBodyIndent = -1
-                }
-                content == "body:" && !context.inResponses -> context.requestBodyIndent = indent
-                !context.inResponses && context.requestBodyIndent >= 0 &&
-                    indent > context.requestBodyIndent && content.endsWith(":") -> {
-                    val type = content.removeSuffix(":").trim()
-                    if ('/' in type && !type.startsWith('/')) {
-                        val index = context.currentMethods.lastIndex
-                        if (index >= 0) {
-                            val method = context.currentMethods[index]
-                            context.currentMethods[index] = method.copy(contentTypes = method.contentTypes + type)
-                            updateOrAddResource(resources, context)
-                        }
-                    }
-                }
             }
         }
     }
@@ -189,7 +158,9 @@ object RamlParser {
         val path = context.currentResourcePath ?: return
 
         val existingIndex = resources.indexOfFirst { it.path == path }
-        val apiMethods = context.currentMethods.toList()
+        val apiMethods = context.currentMethods.map { method ->
+            ApiMethod(method = method)
+        }
 
         if (existingIndex >= 0) {
             resources[existingIndex] = ApiResource(
@@ -207,9 +178,6 @@ object RamlParser {
     private data class ParsingContext(
         var currentResourcePath: String? = null,
         var currentResourceIndent: Int = -1,
-        var currentMethods: MutableList<ApiMethod> = mutableListOf(),
-        var currentMethodIndent: Int = -1,
-        var requestBodyIndent: Int = -1,
-        var inResponses: Boolean = false,
+        var currentMethods: MutableList<HttpMethod> = mutableListOf()
     )
 }
