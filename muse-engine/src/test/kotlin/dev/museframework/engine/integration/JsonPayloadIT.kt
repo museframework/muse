@@ -55,4 +55,69 @@ class JsonPayloadIT {
         assertEquals(listOf("a", "b", "c"), result?.value)
         assertEquals(TypedValue.MIME_JAVA, result?.mimeType)
     }
+
+    /**
+     * Experimental characterization probe for C2. This intentionally reports the real
+     * DataWeave values, types and metadata; it does not specify a new serializer contract.
+     * Remove or replace with behavioral assertions after analyzing the CI evidence.
+     */
+    @Test
+    fun `characterize HTTP response representation from DataWeave and payload evaluation`() {
+        val map = linkedMapOf("message" to "Resource not found")
+        val javaEvent = MuseEvent(payload = TypedValue.of(map, TypedValue.MIME_JAVA))
+        val jsonText = """{"message":"Resource not found"}"""
+        val jsonEvent = MuseEvent(payload = TypedValue.of(jsonText, TypedValue.MIME_JSON))
+        val mapJsonEvent = MuseEvent(payload = TypedValue.of(map, TypedValue.MIME_JSON))
+        val evaluator = dev.museframework.engine.expression.MuseExpressionEvaluatorImpl(executor, Properties())
+
+        fun report(label: String, typed: TypedValue<Any>?) {
+            val value = typed?.getOrNull()
+            val javaType = value?.javaClass?.name ?: "null"
+            val display =
+                when (value) {
+                    is ByteArray -> value.toString(Charsets.UTF_8)
+                    else -> value?.toString() ?: "<null>"
+                }.replace("\\n", "\\n").take(250)
+            println(
+                "DW_RESPONSE_PROBE|$label|type=$javaType|mime=${typed?.mimeType}|charset=${typed?.charset}|value=$display",
+            )
+        }
+
+        fun attempt(label: String, run: () -> TypedValue<Any>?) {
+            try {
+                report(label, run())
+            } catch (failure: Exception) {
+                println(
+                    "DW_RESPONSE_PROBE|$label|ERROR=${failure.javaClass.name}:${failure.message?.take(250)}",
+                )
+            }
+        }
+
+        attempt("explicit_json_from_java_map") {
+            executor.evaluate(
+                "%dw 2.0\\noutput application/json\\n---\\npayload",
+                DataWeaveContext.from(javaEvent, Properties()),
+            )
+        }
+        attempt("write_json_from_java_map") {
+            executor.evaluate(
+                """write(payload, "application/json")""",
+                DataWeaveContext.from(javaEvent, Properties()),
+            )
+        }
+        attempt("identity_java_map") {
+            executor.evaluate("payload", DataWeaveContext.from(javaEvent, Properties()))
+        }
+        attempt("identity_json_text") {
+            executor.evaluate("payload", DataWeaveContext.from(jsonEvent, Properties()))
+        }
+        attempt("expression_payload_json_text") {
+            evaluator.evaluate("#[payload]", jsonEvent)
+        }
+        attempt("expression_payload_json_map") {
+            evaluator.evaluate("#[payload]", mapJsonEvent)
+        }
+        report("original_json_text", jsonEvent.payload as TypedValue<Any>)
+    }
+
 }
