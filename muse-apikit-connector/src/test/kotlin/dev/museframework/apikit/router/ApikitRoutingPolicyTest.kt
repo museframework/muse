@@ -39,7 +39,7 @@ class ApikitRoutingPolicyTest {
     fun `rejects unsupported RAML request media type and dispatches supported binary body`() =
         routing(
             spec(resource("/users", HttpMethod.POST, contentTypes = listOf("application/octet-stream"))),
-            routedFlows = setOf("post:\\\\users:myApi"),
+            routedFlows = setOf("post:\\users:myApi"),
         ) { routing ->
             val unsupported = RecordingInvocation(
                 event("/users", HttpMethod.POST, headers = mapOf("content-type" to "application/json")),
