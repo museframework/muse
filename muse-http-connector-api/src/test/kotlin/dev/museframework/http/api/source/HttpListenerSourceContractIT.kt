@@ -210,6 +210,40 @@ class HttpListenerSourceContractIT {
     }
 
     @Test
+    fun `listener closes a newly adapted stream when response headers evaluation fails`() = runTest {
+        supervisorScope {
+            val bodyExpression = "#[serializedResponse]"
+            val headersExpression = "#[badHeaders]"
+            val config =
+                createDefaultConfig(
+                    successResponse =
+                        SuccessHttpResponseConfig(
+                            body = bodyExpression,
+                            headersExpression = headersExpression,
+                        ),
+                )
+            val source = createSource(config)
+            source.start(channel)
+            every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(200)
+
+            val input = TrackingInputStream(ByteArrayInputStream("serialized".toByteArray()))
+            every { mockExpressionEvaluator.evaluate(bodyExpression, any()) } returns
+                TypedValue.of(input as Any, TypedValue.MIME_TEXT)
+            every { mockExpressionEvaluator.evaluate(headersExpression, any()) } throws
+                IllegalStateException("response headers failed")
+
+            val responseDeferred = async { server.handle(createHttpRequest()) }
+            val envelope = channel.receive()
+            envelope.replyTo.complete(MuseEvent(payload = TypedValue.of("original")))
+
+            val failure = runCatching { responseDeferred.await() }.exceptionOrNull()
+            assertInstanceOf(IllegalStateException::class.java, failure)
+            assertEquals(0, input.reads, "Failed response construction must not read the stream")
+            assertEquals(1, input.closeCount, "A not-yet-exported stream must be released once")
+        }
+    }
+
+    @Test
     fun `listener preserves already serialized json string bytes without double encoding`() = runTest {
         val bodyExpression = "#[jsonText]"
         val config = createDefaultConfig(successResponse = SuccessHttpResponseConfig(body = bodyExpression))
