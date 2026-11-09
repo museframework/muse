@@ -589,7 +589,7 @@ jobs:
     - name: Compile existing APIKit Quarkus example to Native Image
       run: >-
         mvn -f examples/test-muse-quarkus/pom.xml package --batch-mode -ntp
-        -DskipTests -Dnative -Dkotlin.daemon.enabled=false
+        -DskipTests -Dquarkus.native.enabled=true -Dkotlin.daemon.enabled=false
         -Dquarkus.native.container-build=false
         -Dquarkus.native.native-image-xmx=4g
 
