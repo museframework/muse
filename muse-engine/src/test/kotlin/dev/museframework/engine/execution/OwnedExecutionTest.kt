@@ -50,12 +50,14 @@ class OwnedExecutionTest {
             val handler = ResolvedErrorHandler(
                 listOf(
                     ResolvedErrorHandlerStrategy(
-                        errorType = badRequest,
+                        // Babelfish-generated handler declarations are independent types
+                        // without parent references; the raised error retains its ancestry.
+                        errorType = ErrorType("APIKIT", "BAD_REQUEST"),
                         pipeline = response(400),
                         kind = ResolvedErrorHandlerStrategy.Kind.CONTINUE,
                     ),
                     ResolvedErrorHandlerStrategy(
-                        errorType = notFound,
+                        errorType = ErrorType("APIKIT", "NOT_FOUND"),
                         pipeline = response(404),
                         kind = ResolvedErrorHandlerStrategy.Kind.CONTINUE,
                     ),
