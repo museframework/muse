@@ -29,6 +29,8 @@ import dev.museframework.engine.api.event.TypedValue
 import dev.museframework.engine.api.expression.MuseExpressionEvaluator
 import dev.museframework.engine.api.source.MuseEventEnvelope
 import dev.museframework.engine.api.streaming.StreamingStrategy
+import dev.museframework.engine.dataweave.MuseDataWeaveExecutor
+import dev.museframework.engine.expression.MuseExpressionEvaluatorImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -162,6 +164,55 @@ class DbOperationsIT {
                 MuseEvent(),
             )
         }
+    }
+
+    @Test
+    fun `default batch payload accepts structured rows with the production expression evaluator`() {
+        val evaluator = MuseExpressionEvaluatorImpl(MuseDataWeaveExecutor(), Properties())
+        val realOperations = JdbcOperations(DbConnectionFactory(dbConfig, Properties()), evaluator)
+        realOperations.executeDdl(
+            DbExecuteDdlConfig(ref(), "CREATE TABLE identity_batch (id INTEGER PRIMARY KEY, label VARCHAR(60) NOT NULL)"),
+            MuseEvent(),
+        )
+        val rows = listOf(
+            mapOf("id" to 1, "label" to "first"),
+            mapOf("id" to 2, "label" to "second"),
+        )
+        val counts = realOperations.bulk(
+            DbBulkInsertConfig(ref(), "INSERT INTO identity_batch(id, label) VALUES (:id, :label)"),
+            MuseEvent(payload = TypedValue.of(rows)),
+        )
+        assertEquals(listOf(1, 1), counts)
+        assertEquals(
+            "second",
+            realOperations.querySingle(
+                DbQuerySingleConfig(ref(), "SELECT label FROM identity_batch WHERE id = 2"),
+                MuseEvent(),
+            )["label"],
+        )
+    }
+
+    @Test
+    fun `default batch payload preserves JSON text compatibility with the production evaluator`() {
+        val evaluator = MuseExpressionEvaluatorImpl(MuseDataWeaveExecutor(), Properties())
+        val realOperations = JdbcOperations(DbConnectionFactory(dbConfig, Properties()), evaluator)
+        realOperations.executeDdl(
+            DbExecuteDdlConfig(ref(), "CREATE TABLE identity_batch (id INTEGER PRIMARY KEY, label VARCHAR(60) NOT NULL)"),
+            MuseEvent(),
+        )
+        val json = """[{"id": 1, "label": "caffè"}, {"id": 2, "label": "second"}]"""
+        val counts = realOperations.bulk(
+            DbBulkInsertConfig(ref(), "INSERT INTO identity_batch(id, label) VALUES (:id, :label)"),
+            MuseEvent(payload = TypedValue.of(json, TypedValue.MIME_JSON)),
+        )
+        assertEquals(listOf(1, 1), counts)
+        assertEquals(
+            "caffè",
+            realOperations.querySingle(
+                DbQuerySingleConfig(ref(), "SELECT label FROM identity_batch WHERE id = 1"),
+                MuseEvent(),
+            )["label"],
+        )
     }
 
     @Test
