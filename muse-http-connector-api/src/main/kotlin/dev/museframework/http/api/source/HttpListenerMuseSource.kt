@@ -218,7 +218,21 @@ class HttpListenerMuseSource(
             responseHeaders.putHeader(name, evaluateString(value, this))
         }
         if (responseHeaders.keys.none { it.equals("Content-Type", ignoreCase = true) }) {
-            responseHeaders["Content-Type"] = contentType
+            // Advertise explicitly non-UTF-8 text encodings without altering a caller's
+            // Content-Type override or an existing charset parameter.
+            val charsetAlreadyDeclared = contentType.split(';').drop(1).any { parameter ->
+                parameter.substringBefore('=').trim().equals("charset", ignoreCase = true)
+            }
+            val declaredContentType =
+                if (charset != StandardCharsets.UTF_8 &&
+                    contentType.substringBefore(';').trim().startsWith("text/", ignoreCase = true) &&
+                    !charsetAlreadyDeclared
+                ) {
+                    "$contentType; charset=${charset.name()}"
+                } else {
+                    contentType
+                }
+            responseHeaders["Content-Type"] = declaredContentType
         }
 
         val bodyLease =

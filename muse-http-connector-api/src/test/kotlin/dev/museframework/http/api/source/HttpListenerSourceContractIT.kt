@@ -310,7 +310,7 @@ class HttpListenerSourceContractIT {
         val response = responseDeferred.await()
 
         assertArrayEquals(text.toByteArray(charset), response.body)
-        assertEquals(TypedValue.MIME_TEXT, response.headers["Content-Type"])
+        assertEquals("text/plain; charset=ISO-8859-1", response.headers["Content-Type"])
     }
 
     @Test

@@ -418,6 +418,28 @@ class QuarkusHttpServerBehaviorIT {
     }
 
     @Test
+    fun `transmits non UTF8 response bytes and charset header over Vertx`() {
+        val body = "caffè non trovato"
+        val expected = body.toByteArray(StandardCharsets.ISO_8859_1)
+        server.register("/stream/latin1-response", listOf(HttpMethod.GET)) {
+            HttpResponse(
+                statusCode = 200,
+                headers = mapOf("Content-Type" to "text/plain; charset=ISO-8859-1"),
+                body = expected,
+            )
+        }
+
+        val response = execute("GET", "/stream/latin1-response")
+
+        assertEquals(200, response.statusCode())
+        assertArrayEquals(expected, response.body())
+        assertEquals(
+            "text/plain; charset=ISO-8859-1",
+            response.headers().firstValue("Content-Type").orElse(null),
+        )
+    }
+
+    @Test
     fun `client disconnect releases the adapted InputStream without reading it eagerly`() {
         val readStarted = CountDownLatch(1)
         val releaseRead = CountDownLatch(1)

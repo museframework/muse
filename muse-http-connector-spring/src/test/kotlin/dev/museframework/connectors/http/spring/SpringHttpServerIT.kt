@@ -11,6 +11,7 @@ import dev.museframework.http.api.model.HttpMethod
 import dev.museframework.http.api.model.HttpResponse
 import dev.museframework.http.api.server.HttpServer
 import dev.museframework.http.testkit.HttpServerContract
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -27,6 +28,8 @@ import org.springframework.test.context.TestPropertySource
 import java.io.IOException
 import java.io.InputStream
 import java.net.URI
+import java.net.Socket
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
@@ -394,6 +397,99 @@ class SpringHttpServerIT : HttpServerContract() {
             assertTrue(provider.isClosed, "The provider must not outlive the failed response")
             assertEquals(1, closes.get(), "The underlying InputStream must be closed exactly once")
         } finally {
+            server.unregister(path, listOf(HttpMethod.GET))
+            lease.close()
+        }
+    }
+
+    @Test
+    fun `transmits non UTF8 response bytes and charset header to a real client`() {
+        val server = server()
+        val path = "/test/latin1-response"
+        val body = "caffè non trovato"
+        val expected = body.toByteArray(StandardCharsets.ISO_8859_1)
+        server.register(path, listOf(HttpMethod.GET)) {
+            HttpResponse(
+                statusCode = 200,
+                headers = mapOf("Content-Type" to "text/plain; charset=ISO-8859-1"),
+                body = expected,
+            )
+        }
+
+        try {
+            val request = java.net.http.HttpRequest.newBuilder(URI.create("http://localhost:$port$path"))
+                .GET().build()
+            val response = java.net.http.HttpClient.newHttpClient().send(
+                request, java.net.http.HttpResponse.BodyHandlers.ofByteArray(),
+            )
+            assertEquals(200, response.statusCode())
+            assertArrayEquals(expected, response.body())
+            assertEquals(
+                "text/plain; charset=ISO-8859-1",
+                response.headers().firstValue("Content-Type").orElse(null),
+            )
+        } finally {
+            server.unregister(path, listOf(HttpMethod.GET))
+        }
+    }
+
+    @Test
+    fun `client reset eventually releases Spring adapted stream after a blocked read resumes`() {
+        val started = CountDownLatch(1)
+        val resumeRead = CountDownLatch(1)
+        val streamClosed = CountDownLatch(1)
+        val reads = AtomicInteger()
+        val closes = AtomicInteger()
+        val input = object : InputStream() {
+            override fun read(): Int {
+                if (reads.incrementAndGet() != 1) return -1
+                started.countDown()
+                check(resumeRead.await(5, TimeUnit.SECONDS))
+                return 'x'.code
+            }
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                if (length == 0) return 0
+                val value = read()
+                if (value < 0) return -1
+                buffer[offset] = value.toByte()
+                return 1
+            }
+
+            override fun close() {
+                closes.incrementAndGet()
+                streamClosed.countDown()
+            }
+        }
+        val provider = StreamingProviders.byteProvider(input, StreamingStrategy.NonRepeatable)
+        val lease = StreamingResourceRegistry.ownedClaim(provider)
+        val server = server()
+        val path = "/test/adapted-reset"
+        server.register(path, listOf(HttpMethod.GET)) {
+            HttpResponse(statusCode = 200, bodyProvider = provider, bodyLease = lease)
+        }
+        val socket = Socket("127.0.0.1", port)
+        try {
+            socket.setSoLinger(true, 0)
+            socket.getOutputStream().apply {
+                write(
+                    ("GET $path HTTP/1.1\r\n" +
+                        "Host: 127.0.0.1:$port\r\n" +
+                        "Connection: keep-alive\r\n\r\n").toByteArray(StandardCharsets.US_ASCII),
+                )
+                flush()
+            }
+            assertTrue(started.await(5, TimeUnit.SECONDS), "The response must start reading")
+            assertFalse(provider.isClosed, "Do not close a provider while its read is in flight")
+            socket.close()
+            resumeRead.countDown()
+            assertTrue(streamClosed.await(5, TimeUnit.SECONDS),
+                "The response lease must close the adapted InputStream after the blocked read resumes")
+            assertTrue(provider.isClosed)
+            assertEquals(1, closes.get(), "The raw InputStream closes exactly once")
+        } finally {
+            resumeRead.countDown()
+            socket.close()
             server.unregister(path, listOf(HttpMethod.GET))
             lease.close()
         }
