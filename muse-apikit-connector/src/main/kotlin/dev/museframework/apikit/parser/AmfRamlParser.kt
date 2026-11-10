@@ -67,7 +67,7 @@ internal object AmfRamlParser {
                             contentTypes = request?.payloads()
                                 ?.map { payload ->
                                     val mediaType = payload.mediaType().takeIf { it.nonNull() }?.value()?.trim()
-                                    if (mediaType == null || !bareRequestMediaType.matches(mediaType)) {
+                                    if (mediaType == null || '*' in mediaType || !bareRequestMediaType.matches(mediaType)) {
                                         throw ApiSpecificationParseException(
                                             specPath,
                                             "Unsupported request body media type for ${operation.method().value()} " +
