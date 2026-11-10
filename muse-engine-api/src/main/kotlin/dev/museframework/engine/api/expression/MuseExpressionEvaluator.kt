@@ -13,6 +13,14 @@ interface MuseExpressionEvaluator {
     fun evaluate(request: EvaluationRequest.Value, event: MuseEvent): TypedValue<Any>? =
         evaluate(request.expression, event)
 
+    /**
+     * Explicit response-value intent. The built-in evaluator preserves the original
+     * TypedValue only for a standalone #[payload]; all other expressions retain
+     * ordinary evaluation. Custom evaluators keep their legacy fallback behavior.
+     */
+    fun evaluate(request: EvaluationRequest.PayloadPreservingValue, event: MuseEvent): TypedValue<Any>? =
+        evaluate(request.expression, event)
+
     /** Splits an expression into typed elements. Close the result on every exit. */
     fun split(expression: String, event: MuseEvent): ExpressionSplit =
         split(EvaluationRequest.Iteration(IterationSource.Expression(expression)), event)

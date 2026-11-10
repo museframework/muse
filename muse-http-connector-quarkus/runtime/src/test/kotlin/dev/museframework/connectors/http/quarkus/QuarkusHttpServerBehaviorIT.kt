@@ -6,6 +6,7 @@ import dev.museframework.engine.api.streaming.MuseCursorStream
 import dev.museframework.engine.api.streaming.MuseCursorStreamProvider
 import dev.museframework.engine.api.streaming.RepeatableInMemoryCursorStreamProvider
 import dev.museframework.engine.api.streaming.StreamingResourceRegistry
+import dev.museframework.engine.api.streaming.StreamingProviders
 import dev.museframework.engine.api.streaming.StreamingStrategy
 import dev.museframework.http.api.config.HttpStreamingMode
 import dev.museframework.http.api.model.HttpMethod
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.IOException
+import java.io.InputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -378,6 +380,120 @@ class QuarkusHttpServerBehaviorIT {
     }
 
     @Test
+    fun `adapted InputStream failure releases underlying stream exactly once`() {
+        val closes = AtomicInteger()
+        val reads = AtomicInteger()
+        val input =
+            object : InputStream() {
+                override fun read(): Int =
+                    if (reads.incrementAndGet() == 1) 'a'.code
+                    else throw IOException("simulated serialized response read failure")
+
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    if (length == 0) return 0
+                    buffer[offset] = read().toByte()
+                    return 1
+                }
+
+                override fun close() {
+                    closes.incrementAndGet()
+                }
+            }
+        val provider = StreamingProviders.byteProvider(input, StreamingStrategy.NonRepeatable)
+        val lease = StreamingResourceRegistry.ownedClaim(provider)
+        server.register("/stream/adapted-input-failure", listOf(HttpMethod.GET)) {
+            HttpResponse(statusCode = 200, bodyProvider = provider, bodyLease = lease)
+        }
+
+        try {
+            assertThrows(IOException::class.java) {
+                executeHttp11("GET", "/stream/adapted-input-failure")
+            }
+            assertTrue(reads.get() >= 2, "The producer must fail while streaming")
+            assertClosed(provider)
+            assertEquals(1, closes.get(), "The retained lease must close the underlying InputStream once")
+        } finally {
+            lease.close()
+        }
+    }
+
+    @Test
+    fun `transmits non UTF8 response bytes and charset header over Vertx`() {
+        val body = "caffè non trovato"
+        val expected = body.toByteArray(StandardCharsets.ISO_8859_1)
+        server.register("/stream/latin1-response", listOf(HttpMethod.GET)) {
+            HttpResponse(
+                statusCode = 200,
+                headers = mapOf("Content-Type" to "text/plain; charset=ISO-8859-1"),
+                body = expected,
+            )
+        }
+
+        val response = execute("GET", "/stream/latin1-response")
+
+        assertEquals(200, response.statusCode())
+        assertArrayEquals(expected, response.body())
+        val contentType = response.headers().firstValue("Content-Type").orElseThrow()
+        assertEquals("text/plain", contentType.substringBefore(';').trim())
+        assertEquals("ISO-8859-1", contentType.substringAfter(';').substringAfter('=').trim())
+    }
+
+    @Test
+    fun `client disconnect releases the adapted InputStream without reading it eagerly`() {
+        val readStarted = CountDownLatch(1)
+        val releaseRead = CountDownLatch(1)
+        val streamClosed = CountDownLatch(1)
+        val closes = AtomicInteger()
+        val input =
+            object : InputStream() {
+                override fun read(): Int {
+                    readStarted.countDown()
+                    check(releaseRead.await(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    return -1
+                }
+
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+                    if (length == 0) 0 else read()
+
+                override fun close() {
+                    closes.incrementAndGet()
+                    streamClosed.countDown()
+                }
+            }
+        val provider = StreamingProviders.byteProvider(input, StreamingStrategy.NonRepeatable)
+        val lease = StreamingResourceRegistry.ownedClaim(provider)
+        val path = "/stream/adapted-client-disconnect"
+        server.register(path, listOf(HttpMethod.GET)) {
+            HttpResponse(statusCode = 200, bodyProvider = provider, bodyLease = lease)
+        }
+
+        val socket = java.net.Socket(LOOPBACK, transport.actualPort())
+        try {
+            socket.setSoLinger(true, 0) // force a reset while the response stream is still blocked
+            socket.getOutputStream().apply {
+                write(
+                    ("GET $path HTTP/1.1\r\n" +
+                        "Host: $LOOPBACK:" + transport.actualPort() + "\r\n" +
+                        "Connection: keep-alive\r\n\r\n").toByteArray(StandardCharsets.US_ASCII),
+                )
+                flush()
+            }
+            assertTrue(readStarted.await(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+                "The response must begin reading before the client disconnects")
+            assertFalse(provider.isClosed, "The source must not close an in-flight response")
+            socket.close()
+            releaseRead.countDown()
+            assertTrue(streamClosed.await(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+                "The response lease must release the adapted input after disconnect")
+            assertEquals(1, closes.get(), "The raw InputStream must close exactly once")
+        } finally {
+            releaseRead.countDown()
+            socket.close()
+            lease.close()
+        }
+    }
+
+    @Test
     fun `mid-stream failure closes the retained lease without releasing the provider directly`() {
         val provider = FailingProvider()
         val owner = StreamingResourceRegistry()
@@ -505,6 +621,7 @@ class QuarkusHttpServerBehaviorIT {
     @Test
     fun `releases inbound file store and deletes spool file`() {
         val providerRef = AtomicReference<MuseCursorStreamProvider>()
+        val didSpillToDisk = AtomicBoolean(false)
         server.configureStreaming(
             StreamingStrategy.RepeatableFileStore(
                 inMemorySizeBytes = 4,
@@ -517,6 +634,7 @@ class QuarkusHttpServerBehaviorIT {
         server.register("/stream/spool", listOf(HttpMethod.POST)) { request ->
             val provider = requireNotNull(request.bodyProvider)
             providerRef.set(provider)
+            didSpillToDisk.set(streamingTempFiles().isNotEmpty())
             HttpResponse(statusCode = 200, body = provider.openCursor().use { it.readBytes() })
         }
 
@@ -524,8 +642,9 @@ class QuarkusHttpServerBehaviorIT {
         val response = execute("POST", "/stream/spool", payload)
 
         assertArrayEquals(payload, response.body())
-        assertTrue(providerRef.get().isClosed)
-        assertTrue(streamingTempFiles().isEmpty())
+        assertTrue(didSpillToDisk.get(), "the inbound payload must actually create a spool file")
+        assertClosed(requireNotNull(providerRef.get()))
+        assertSpoolFilesDeleted()
     }
 
     @Test
@@ -548,7 +667,7 @@ class QuarkusHttpServerBehaviorIT {
 
         assertEquals(200, response.statusCode())
         assertArrayEquals(payload, response.body())
-        assertTrue(streamingTempFiles().isEmpty())
+        assertSpoolFilesDeleted()
     }
 
     @Test
@@ -761,6 +880,16 @@ class QuarkusHttpServerBehaviorIT {
             Thread.sleep(10)
         }
         assertTrue(provider.isClosed)
+    }
+
+    private fun assertSpoolFilesDeleted() {
+        val deadline = System.nanoTime() + CLOSE_TIMEOUT_SECONDS * 1_000_000_000L
+        var remaining = streamingTempFiles()
+        while (remaining.isNotEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(10)
+            remaining = streamingTempFiles()
+        }
+        assertTrue(remaining.isEmpty(), "spool files were not deleted after response cleanup: $remaining")
     }
 
     private fun streamingTempFiles(): List<Path> =

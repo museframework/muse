@@ -5,16 +5,13 @@ import dev.museframework.engine.api.event.MuseEvent
 import dev.museframework.engine.expression.MuseExpressionEvaluatorImpl
 import java.util.Properties
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class DataWeaveResourceTest {
-    @TempDir
-    lateinit var directory: Path
-
     @Test
     fun `Mule qualified property lookup shares the current property context with bare p`() {
         val properties = Properties().apply {
@@ -43,9 +40,22 @@ class DataWeaveResourceTest {
 
     @Test
     fun `existing filesystem resource remains supported`() {
+        // DataWeave's withFile() derives its identifier relative to the working directory.
+        // A JUnit temp directory under /tmp can be shorter than the module path on CI and
+        // trigger a DataWeave SDK substring failure unrelated to filesystem script loading.
+        val target = Files.createDirectories(Path.of("target").toAbsolutePath())
+        val directory = Files.createTempDirectory(target, "dataweave-resource-")
         val file = directory.resolve("script.dwl")
-        file.writeText("%dw 2.0\noutput application/java\n---\npayload.value")
-        val result = MuseDataWeaveExecutor().evaluateResource(file.toString(), DataWeaveContext(MuseEvent(payload = TypedValue.of(mapOf("value" to "file")))))
-        assertEquals("file", result?.value)
+        try {
+            file.writeText("%dw 2.0\noutput application/java\n---\npayload.value")
+            val result = MuseDataWeaveExecutor().evaluateResource(
+                file.toString(),
+                DataWeaveContext(MuseEvent(payload = TypedValue.of(mapOf("value" to "file")))),
+            )
+            assertEquals("file", result?.value)
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
     }
 }
