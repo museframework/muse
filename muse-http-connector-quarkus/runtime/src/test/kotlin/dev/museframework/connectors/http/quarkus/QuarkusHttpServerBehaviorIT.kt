@@ -600,6 +600,7 @@ class QuarkusHttpServerBehaviorIT {
     @Test
     fun `releases inbound file store and deletes spool file`() {
         val providerRef = AtomicReference<MuseCursorStreamProvider>()
+        val didSpillToDisk = AtomicBoolean(false)
         server.configureStreaming(
             StreamingStrategy.RepeatableFileStore(
                 inMemorySizeBytes = 4,
@@ -612,6 +613,7 @@ class QuarkusHttpServerBehaviorIT {
         server.register("/stream/spool", listOf(HttpMethod.POST)) { request ->
             val provider = requireNotNull(request.bodyProvider)
             providerRef.set(provider)
+            didSpillToDisk.set(streamingTempFiles().isNotEmpty())
             HttpResponse(statusCode = 200, body = provider.openCursor().use { it.readBytes() })
         }
 
@@ -619,8 +621,9 @@ class QuarkusHttpServerBehaviorIT {
         val response = execute("POST", "/stream/spool", payload)
 
         assertArrayEquals(payload, response.body())
-        assertTrue(providerRef.get().isClosed)
-        assertTrue(streamingTempFiles().isEmpty())
+        assertTrue(didSpillToDisk.get(), "the inbound payload must actually create a spool file")
+        assertClosed(requireNotNull(providerRef.get()))
+        assertSpoolFilesDeleted()
     }
 
     @Test
@@ -643,7 +646,7 @@ class QuarkusHttpServerBehaviorIT {
 
         assertEquals(200, response.statusCode())
         assertArrayEquals(payload, response.body())
-        assertTrue(streamingTempFiles().isEmpty())
+        assertSpoolFilesDeleted()
     }
 
     @Test
@@ -856,6 +859,16 @@ class QuarkusHttpServerBehaviorIT {
             Thread.sleep(10)
         }
         assertTrue(provider.isClosed)
+    }
+
+    private fun assertSpoolFilesDeleted() {
+        val deadline = System.nanoTime() + CLOSE_TIMEOUT_SECONDS * 1_000_000_000L
+        var remaining = streamingTempFiles()
+        while (remaining.isNotEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(10)
+            remaining = streamingTempFiles()
+        }
+        assertTrue(remaining.isEmpty(), "spool files were not deleted after response cleanup: $remaining")
     }
 
     private fun streamingTempFiles(): List<Path> =
