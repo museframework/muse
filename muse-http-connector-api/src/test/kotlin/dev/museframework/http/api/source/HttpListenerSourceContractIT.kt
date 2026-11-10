@@ -18,6 +18,7 @@ import dev.museframework.dsl.api.model.error.ErrorType
 import dev.museframework.engine.api.error.MuseError
 import dev.museframework.engine.api.event.MuseEvent
 import dev.museframework.engine.api.event.TypedValue
+import dev.museframework.engine.api.expression.EvaluationRequest
 import dev.museframework.engine.api.expression.MuseExpressionEvaluator
 import dev.museframework.engine.api.source.MuseEventEnvelope
 import io.mockk.*
@@ -54,6 +55,10 @@ class HttpListenerSourceContractIT {
         server = RecordingHttpServer()
         initializer = RecordingHttpListenerServerInitializer(server)
         mockExpressionEvaluator = mockk(relaxed = true)
+        every { mockExpressionEvaluator.evaluate(any<EvaluationRequest.PayloadPreservingValue>(), any()) } answers {
+            val request = firstArg<EvaluationRequest.PayloadPreservingValue>()
+            mockExpressionEvaluator.evaluate(request.expression, secondArg<MuseEvent>())
+        }
         channel = Channel(Channel.UNLIMITED)
     }
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.museframework.engine.api.event.MuseEvent
 import dev.museframework.engine.api.event.TypedValue
+import dev.museframework.engine.api.expression.EvaluationRequest
 import dev.museframework.engine.api.streaming.NonRepeatableCursorStreamProvider
 import dev.museframework.engine.api.streaming.RepeatableInMemoryCursorStreamProvider
 import dev.museframework.engine.dataweave.DataWeaveContext
@@ -138,11 +139,22 @@ class JsonPayloadIT {
     }
 
     @Test
+    fun `ordinary standalone payload evaluation still parses JSON for existing consumers`() {
+        val input = TypedValue.of<Any>("""[{"id": 1}]""", TypedValue.MIME_JSON)
+        val result = evaluator.evaluate("#[payload]", MuseEvent(payload = input))
+        val list = result?.value as? List<*> ?: error("Expected a DataWeave parsed collection")
+        val row = list.single() as? Map<*, *> ?: error("Expected a DataWeave parsed row")
+
+        assertEquals(1, (row["id"] as Number).toInt())
+        assertEquals(TypedValue.MIME_JAVA, result.mimeType)
+    }
+
+    @Test
     fun `standalone payload expression preserves serialized json text and metadata`() {
         val originalBytes = """{"message":"Risposta non trovata"}""".toByteArray(Charsets.UTF_8)
         val input = TypedValue.of<Any>(String(originalBytes, Charsets.UTF_8), TypedValue.MIME_JSON, Charsets.UTF_8)
 
-        val result = evaluator.evaluate("#[payload]", MuseEvent(payload = input))
+        val result = evaluator.evaluate(EvaluationRequest.PayloadPreservingValue("#[payload]"), MuseEvent(payload = input))
 
         assertSame(input.value, result?.value, "The original serialized JSON text must be preserved")
         assertEquals(TypedValue.MIME_JSON, result?.mimeType)
@@ -156,7 +168,7 @@ class JsonPayloadIT {
         val charset = Charset.forName("ISO-8859-1")
         val input = TypedValue.of<Any>(originalBytes, TypedValue.MIME_OCTET_STREAM, charset)
 
-        val result = evaluator.evaluate("#[payload]", MuseEvent(payload = input))
+        val result = evaluator.evaluate(EvaluationRequest.PayloadPreservingValue("#[payload]"), MuseEvent(payload = input))
 
         assertSame(input.value, result?.value)
         assertEquals(TypedValue.MIME_OCTET_STREAM, result?.mimeType)
@@ -169,7 +181,7 @@ class JsonPayloadIT {
         val provider = RepeatableInMemoryCursorStreamProvider.fromBytes("stream-payload".toByteArray())
         val input = TypedValue.of<Any>(provider, TypedValue.MIME_TEXT)
 
-        val result = evaluator.evaluate("#[payload]", MuseEvent(payload = input))
+        val result = evaluator.evaluate(EvaluationRequest.PayloadPreservingValue("#[payload]"), MuseEvent(payload = input))
 
         assertSame(provider, result?.value)
         assertEquals(TypedValue.MIME_TEXT, result?.mimeType)
@@ -183,7 +195,7 @@ class JsonPayloadIT {
         val input = TypedValue.of<Any>(provider, TypedValue.MIME_OCTET_STREAM)
 
         try {
-            val result = evaluator.evaluate("#[payload]", MuseEvent(payload = input))
+            val result = evaluator.evaluate(EvaluationRequest.PayloadPreservingValue("#[payload]"), MuseEvent(payload = input))
 
             assertSame(provider, result?.value)
             assertEquals("one-shot", provider.openCursor().use { it.readBytes().decodeToString() })
@@ -197,7 +209,7 @@ class JsonPayloadIT {
         val originalBytes = """{"message":"kept"}""".toByteArray(Charsets.UTF_8)
         val input = TypedValue.of<Any>(String(originalBytes, Charsets.UTF_8), TypedValue.MIME_JSON, Charsets.UTF_8)
 
-        val result = evaluator.evaluate("  #[payload]  ", MuseEvent(payload = input))
+        val result = evaluator.evaluate(EvaluationRequest.PayloadPreservingValue("  #[payload]  "), MuseEvent(payload = input))
 
         assertSame(input.value, result?.value)
         assertEquals(TypedValue.MIME_JSON, result?.mimeType)

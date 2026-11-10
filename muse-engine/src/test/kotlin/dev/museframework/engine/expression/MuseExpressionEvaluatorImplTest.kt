@@ -2,6 +2,7 @@ package dev.museframework.engine.expression
 
 import dev.museframework.engine.api.event.MuseEvent
 import dev.museframework.engine.api.event.TypedValue
+import dev.museframework.engine.api.expression.EvaluationRequest
 import dev.museframework.engine.dataweave.DataWeaveContext
 import dev.museframework.engine.dataweave.DataWeaveExecutor
 import io.mockk.Called
@@ -55,8 +56,19 @@ class MuseExpressionEvaluatorImplTest {
     }
 
     @Test
+    fun `ordinary standalone payload evaluation still delegates to DataWeave`() {
+        val evaluated: TypedValue<Any> = TypedValue.of(mapOf("parsed" to true), TypedValue.MIME_JAVA)
+        every { dataWeaveExecutor.evaluate("payload", context) } returns evaluated
+
+        val result = evaluator.evaluate("#[payload]", event)
+
+        assertSame(evaluated, result)
+        verify(exactly = 1) { dataWeaveExecutor.evaluate("payload", context) }
+    }
+
+    @Test
     fun `should preserve typed identity for a whitespace padded payload reference`() {
-        val result = evaluator.evaluate(" \n#[ payload ] \t", event)
+        val result = evaluator.evaluate(EvaluationRequest.PayloadPreservingValue(" \n#[ payload ] \t"), event)
 
         assertSame(event.payload, result)
         verify { dataWeaveExecutor wasNot Called }

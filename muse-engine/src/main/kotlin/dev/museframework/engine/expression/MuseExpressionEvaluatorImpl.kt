@@ -60,6 +60,12 @@ class MuseExpressionEvaluatorImpl(
         return super<MuseExpressionEvaluator>.evaluate(request, event)
     }
 
+    override fun evaluate(request: EvaluationRequest.PayloadPreservingValue, event: MuseEvent): TypedValue<Any>? {
+        val match = SINGLE_EXPRESSION.matchEntire(request.expression.trim())
+        return if (match?.groupValues?.get(1)?.trim() == "payload") event.payload
+        else evaluate(request.expression, event)
+    }
+
     override fun evaluate(expression: String, event: MuseEvent): TypedValue<Any>? {
         // Wrap properties with Spring Boot-style resolution
         val resolvableProperties = ResolvableProperties(properties)
@@ -70,16 +76,8 @@ class MuseExpressionEvaluatorImpl(
         if (exprCount == 1) {
             val singleMatch = SINGLE_EXPRESSION.matchEntire(expression)
             if (singleMatch != null) {
-                val body = singleMatch.groupValues[1].trim()
-                // A bare payload reference preserves its original TypedValue and metadata.
-                // Other standalone expressions retain their original exact-match semantics.
-                if (body == "payload") return event.payload
                 return dataWeaveExecutor.evaluate(singleMatch.groupValues[1], context)
             }
-            // Only payload identity tolerates whitespace outside the #[...] wrapper.
-            // Padded nonidentity expressions must still interpolate as text.
-            val paddedMatch = SINGLE_EXPRESSION.matchEntire(expression.trim())
-            if (paddedMatch?.groupValues?.get(1)?.trim() == "payload") return event.payload
         }
 
         val result = INTERPOLATION.replace(expression) { match ->

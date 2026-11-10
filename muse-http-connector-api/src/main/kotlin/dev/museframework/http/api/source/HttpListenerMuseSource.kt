@@ -2,6 +2,7 @@ package dev.museframework.http.api.source
 
 import dev.museframework.engine.api.event.MuseEvent
 import dev.museframework.engine.api.event.TypedValue
+import dev.museframework.engine.api.expression.EvaluationRequest
 import dev.museframework.engine.api.expression.MuseExpressionEvaluator
 import dev.museframework.engine.api.infrastructure.InfrastructureAwareSource
 import dev.museframework.engine.api.infrastructure.InfrastructureRequirement
@@ -182,7 +183,7 @@ class HttpListenerMuseSource(
         val reasonPhrase = responseConfig.reasonPhrase?.let { evaluateString(it, this) }
 
         val evaluatedBody =
-            responseConfig.body?.let { expressionEvaluator.evaluate(it, this) }
+            responseConfig.body?.let { expressionEvaluator.evaluate(EvaluationRequest.PayloadPreservingValue(it), this) }
         val bodyValue =
             if (responseConfig.body != null) {
                 evaluatedBody?.getOrNull()
