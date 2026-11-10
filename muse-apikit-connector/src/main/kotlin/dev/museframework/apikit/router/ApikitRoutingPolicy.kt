@@ -84,6 +84,10 @@ class ApikitRoutingPolicy(
             findApiMethod(flowName, httpAttributes.method)
                 ?: return flowNotFound(invocation, flowName)
 
+        val handle =
+            flowHandles[flowName]
+                ?: return flowNotFound(invocation, flowName)
+
         if (validationsEnabled && !RequestValidator.acceptsContentType(apiMethod, httpAttributes.headers)) {
             return failure(
                 errorType = ApikitErrorType.UNSUPPORTED_MEDIA_TYPE,
@@ -95,10 +99,6 @@ class ApikitRoutingPolicy(
                 event = invocation.input,
             )
         }
-
-        val handle =
-            flowHandles[flowName]
-                ?: return flowNotFound(invocation, flowName)
 
         if (validationsEnabled) {
             val missingHeaders = RequestValidator.validateHeaders(apiMethod, httpAttributes.headers)
