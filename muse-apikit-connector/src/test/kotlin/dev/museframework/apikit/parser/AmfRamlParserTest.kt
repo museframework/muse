@@ -1,5 +1,11 @@
 package dev.museframework.apikit.parser
 
+import dev.museframework.apikit.ApiSpecificationParseException
+import dev.museframework.apikit.api.model.ApiSpecification
+import java.net.URLClassLoader
+import java.nio.file.Files
+import org.junit.jupiter.api.io.TempDir
+import kotlin.test.assertFailsWith
 import dev.museframework.http.api.model.HttpMethod
 import java.net.URL
 import java.nio.file.Paths
@@ -37,5 +43,118 @@ class AmfRamlParserTest {
 
         assertEquals(HttpMethod.POST, post.method)
         assertEquals(listOf("application/json"), post.contentTypes)
+    }
+    @TempDir
+    lateinit var tempDir: Path
+
+    @Test
+    fun `projects only request body when responses precede the method body`() {
+        val spec = parse(
+            """
+            #%RAML 1.0
+            title: Property Ordering
+            /items:
+              post:
+                responses:
+                  200:
+                    body:
+                      application/xml:
+                        type: string
+                body:
+                  application/octet-stream:
+                    type: string
+            """,
+        )
+
+        assertEquals(listOf("application/octet-stream"), spec.resources.single().methods.single().contentTypes)
+    }
+
+    @Test
+    fun `inherits root mediaType only for declared request body`() {
+        val spec = parse(
+            """
+            #%RAML 1.0
+            title: Root Default
+            mediaType: application/json
+            /items:
+              get:
+                responses:
+                  200:
+                    body:
+                      application/xml:
+                        type: string
+              post:
+                body:
+                  type: string
+            """,
+        )
+
+        val methods = spec.resources.single().methods
+        assertTrue(methods.single { it.method == HttpMethod.GET }.contentTypes.isEmpty())
+        assertEquals(listOf("application/json"), methods.single { it.method == HttpMethod.POST }.contentTypes)
+    }
+
+    @Test
+    fun `inherits a list of root defaults for request body`() {
+        val spec = parse(
+            """
+            #%RAML 1.0
+            title: Multiple Defaults
+            mediaType: [application/json, application/xml]
+            /items:
+              post:
+                body:
+                  type: string
+            """,
+        )
+
+        assertEquals(
+            setOf("application/json", "application/xml"),
+            spec.resources.single().methods.single().contentTypes.toSet(),
+        )
+    }
+
+    @Test
+    fun `explicit request body type overrides root mediaType`() {
+        val spec = parse(
+            """
+            #%RAML 1.0
+            title: Override Default
+            mediaType: application/json
+            /items:
+              post:
+                body:
+                  application/octet-stream:
+                    type: string
+            """,
+        )
+
+        assertEquals(listOf("application/octet-stream"), spec.resources.single().methods.single().contentTypes)
+    }
+
+    @Test
+    fun `rejects unsupported request media type rather than silently allowing any`() {
+        assertFailsWith<ApiSpecificationParseException> {
+            parse(
+                """
+                #%RAML 1.0
+                title: Unsupported Media Constraint
+                /items:
+                  post:
+                    body:
+                      application/*:
+                        type: string
+                """,
+            )
+        }
+    }
+
+    private fun parse(source: String): ApiSpecification {
+        val file = tempDir.resolve("api/spec.raml")
+        Files.createDirectories(file.parent)
+        Files.writeString(file, source.trimIndent())
+        URLClassLoader(arrayOf(tempDir.toUri().toURL()), null).use { loader ->
+            return AmfRamlParser.parseRaml("api/spec.raml", loader)
+        }
     }
 }
