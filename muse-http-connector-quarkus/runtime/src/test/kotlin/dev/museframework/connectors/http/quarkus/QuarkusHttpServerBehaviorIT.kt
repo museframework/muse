@@ -433,10 +433,9 @@ class QuarkusHttpServerBehaviorIT {
 
         assertEquals(200, response.statusCode())
         assertArrayEquals(expected, response.body())
-        assertEquals(
-            "text/plain; charset=ISO-8859-1",
-            response.headers().firstValue("Content-Type").orElse(null),
-        )
+        val contentType = response.headers().firstValue("Content-Type").orElseThrow()
+        assertEquals("text/plain", contentType.substringBefore(';').trim())
+        assertEquals("ISO-8859-1", contentType.substringAfter(';').substringAfter('=').trim())
     }
 
     @Test

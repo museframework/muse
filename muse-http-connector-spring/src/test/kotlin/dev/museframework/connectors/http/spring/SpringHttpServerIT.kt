@@ -424,10 +424,12 @@ class SpringHttpServerIT : HttpServerContract() {
             )
             assertEquals(200, response.statusCode())
             assertArrayEquals(expected, response.body())
-            assertEquals(
-                "text/plain; charset=ISO-8859-1",
-                response.headers().firstValue("Content-Type").orElse(null),
+            val mediaType = org.springframework.http.MediaType.parseMediaType(
+                response.headers().firstValue("Content-Type").orElseThrow(),
             )
+            assertEquals("text", mediaType.type)
+            assertEquals("plain", mediaType.subtype)
+            assertEquals(StandardCharsets.ISO_8859_1, mediaType.charset)
         } finally {
             server.unregister(path, listOf(HttpMethod.GET))
         }
