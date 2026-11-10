@@ -553,6 +553,71 @@ class HttpListenerSourceContractIT {
         }
 
     @Test
+    fun `default error description is UTF8 text independent of original ASCII payload`() =
+        runTest {
+            val source = createSource(createDefaultConfig())
+            source.start(channel)
+            every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(500)
+
+            val description = "Errore: città 東京"
+            val responseDeferred = async { server.handle(createHttpRequest()) }
+            val envelope = channel.receive()
+            envelope.replyTo.complete(
+                MuseEvent(
+                    payload = TypedValue.of("original", TypedValue.MIME_TEXT, StandardCharsets.US_ASCII),
+                    error =
+                        MuseError(
+                            description = description,
+                            detailedDescription = description,
+                            errorType = ErrorType.Mule.EXPRESSION,
+                            cause = RuntimeException("Broken expression"),
+                        ),
+                ),
+            )
+
+            val response = responseDeferred.await()
+            assertEquals(500, response.statusCode)
+            assertArrayEquals(description.toByteArray(StandardCharsets.UTF_8), assertNotNull(response.body))
+            assertEquals("text/plain; charset=UTF-8", response.headers["Content-Type"])
+        }
+
+    @Test
+    fun `default error description honors explicit Content Type without recoding`() =
+        runTest {
+            val config =
+                createDefaultConfig(
+                    errorResponse = ErrorHttpResponseConfig(headers = mapOf("content-type" to "application/problem+json")),
+                )
+            val source = createSource(config)
+            source.start(channel)
+            every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(500)
+            every { mockExpressionEvaluator.evaluate("application/problem+json", any()) } returns
+                TypedValue.of("application/problem+json")
+
+            val description = "Errore: città 東京"
+            val responseDeferred = async { server.handle(createHttpRequest()) }
+            val envelope = channel.receive()
+            envelope.replyTo.complete(
+                MuseEvent(
+                    payload = TypedValue.of("original", TypedValue.MIME_TEXT, StandardCharsets.US_ASCII),
+                    error =
+                        MuseError(
+                            description = description,
+                            detailedDescription = description,
+                            errorType = ErrorType.Mule.EXPRESSION,
+                            cause = RuntimeException("Broken expression"),
+                        ),
+                ),
+            )
+
+            val response = responseDeferred.await()
+            assertEquals(500, response.statusCode)
+            assertArrayEquals(description.toByteArray(StandardCharsets.UTF_8), assertNotNull(response.body))
+            assertEquals("application/problem+json", response.headers["content-type"])
+            assertFalse(response.headers.containsKey("Content-Type"))
+        }
+
+    @Test
     fun `should return 504 Gateway Timeout when timeout is exceeded`() =
         runTest {
             val config = createDefaultConfig(timeoutMs = 100)

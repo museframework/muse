@@ -184,15 +184,15 @@ class HttpListenerMuseSource(
 
         val evaluatedBody =
             responseConfig.body?.let { expressionEvaluator.evaluate(EvaluationRequest.PayloadPreservingValue(it), this) }
-        val bodyValue =
-            if (responseConfig.body != null) {
-                evaluatedBody?.getOrNull()
-            } else {
-                error?.description ?: payload?.getOrNull()
-            }
-        val charset =
-            ((if (responseConfig.body != null) evaluatedBody?.charset else payload?.charset)
-                ?: StandardCharsets.UTF_8)
+        // A generated error description is not a representation of the original payload.
+        // Give it its own UTF-8 text metadata; otherwise preserve the selected TypedValue.
+        val defaultBody: TypedValue<Any>? =
+            error?.description?.let { description ->
+                TypedValue.of<Any>(description, "${TypedValue.MIME_TEXT}; charset=UTF-8", StandardCharsets.UTF_8)
+            } ?: payload
+        val responseBody = if (responseConfig.body != null) evaluatedBody else defaultBody
+        val bodyValue = responseBody?.getOrNull()
+        val charset = responseBody?.charset ?: StandardCharsets.UTF_8
         val bodyProvider =
             when (val value = bodyValue) {
                 is MuseCursorStreamProvider -> value
@@ -206,9 +206,7 @@ class HttpListenerMuseSource(
         // may throw, and the source's reply registry is responsible for cleanup on failure.
         bodyProvider?.let(replyResources::register)
         val body = if (bodyProvider == null) bodyValue?.toResponseBytes(charset) else null
-        val contentType =
-            (if (responseConfig.body != null) evaluatedBody?.mimeType else payload?.mimeType)
-                ?: "application/octet-stream"
+        val contentType = responseBody?.mimeType ?: "application/octet-stream"
 
         val responseHeaders = mutableMapOf<String, String>()
         responseConfig.headersExpression
