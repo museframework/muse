@@ -214,6 +214,19 @@ class ApikitRoutingPolicyTest {
         }
 
     @Test
+    fun `missing implementation flow takes precedence over unsupported Content-Type`() =
+        routing(
+            spec(resource("/users", HttpMethod.POST, contentTypes = listOf("application/octet-stream"))),
+            routedFlows = emptySet(),
+        ) { routing ->
+            val invocation = RecordingInvocation(
+                event("/users", HttpMethod.POST, headers = mapOf("Content-Type" to "application/json")),
+            )
+
+            assertFailure(routing.execute(invocation), ApikitErrorType.FLOW_NOT_FOUND)
+            assertNull(invocation.calledHandle)
+        }
+    @Test
     fun `fails with FLOW_NOT_FOUND when the matched route has no declared flow`() =
         routing(spec(resource("/users", HttpMethod.GET)), routedFlows = emptySet()) { routing ->
             assertFailure(
