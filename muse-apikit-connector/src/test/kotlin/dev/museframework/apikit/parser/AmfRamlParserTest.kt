@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir
 import kotlin.test.assertFailsWith
 import dev.museframework.http.api.model.HttpMethod
 import java.net.URL
+import java.nio.file.Path
 import java.nio.file.Paths
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -44,6 +45,7 @@ class AmfRamlParserTest {
         assertEquals(HttpMethod.POST, post.method)
         assertEquals(listOf("application/json"), post.contentTypes)
     }
+
     @TempDir
     lateinit var tempDir: Path
 
@@ -153,6 +155,7 @@ class AmfRamlParserTest {
             spec.resources.single().methods.single().contentTypes.toSet(),
         )
     }
+
     @Test
     fun `rejects unsupported request media type rather than silently allowing any`() {
         assertFailsWith<ApiSpecificationParseException> {
