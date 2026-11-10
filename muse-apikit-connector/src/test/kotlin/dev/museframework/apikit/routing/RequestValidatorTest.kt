@@ -312,6 +312,51 @@ class RequestValidatorTest {
         }
 
         @Test
+        fun `long quoted parameter values do not recurse or exhaust the stack`() {
+            listOf(4_000, 32_768).forEach { length ->
+                val value = "application/octet-stream; note=\"${"a".repeat(length)}\""
+                assertTrue(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to value)), "length=$length")
+            }
+        }
+
+        @Test
+        fun `accepts RFC quoted HTAB obs-text escapes and OWS`() {
+            val valid = listOf(
+                "application/octet-stream; note=\"a\tb\"",
+                "application/octet-stream; note=\"café\"",
+                "application/octet-stream; note=\"\u00FF\"",
+                "application/octet-stream; note=\"a\\\"b\"",
+                "application/octet-stream; note=\"a\\\\b\"",
+                " \tapplication/octet-stream\t ; \tcharset=UTF-8\t",
+                "application/octet-stream;;note=\"a;b\";",
+            )
+            valid.forEach { value ->
+                assertTrue(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to value)), value)
+            }
+        }
+
+        @Test
+        fun `rejects whitespace around parameter equals and non OWS controls`() {
+            val invalid = listOf(
+                "application/octet-stream; charset =UTF-8",
+                "application/octet-stream; charset= UTF-8",
+                "application/octet-stream; charset\t=UTF-8",
+                "application/octet-stream; charset=\tUTF-8",
+                "application/octet-stream;\ncharset=UTF-8",
+                "application/octet-stream;\rcharset=UTF-8",
+                "\napplication/octet-stream",
+                "application/octet-stream\n",
+                "application/octet-stream; note=\"a\nb\"",
+                "application/octet-stream; note=\"a\u0000b\"",
+                "application/octet-stream; note=\"a\u0100b\"",
+                "application/octet-stream; note=\"unfinished\\",
+            )
+            invalid.forEach { value ->
+                assertFalse(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to value)), value)
+            }
+        }
+
+        @Test
         fun `accepts an operation without request media constraints`() {
             val get = ApiMethod(method = HttpMethod.GET)
             assertTrue(RequestValidator.acceptsContentType(get, emptyMap()))
