@@ -7,7 +7,7 @@
     <parent>
         <groupId>dev.museframework</groupId>
         <artifactId>muse-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>muse-architecture-tests</artifactId>
@@ -126,7 +126,7 @@
         <dependency>
             <groupId>dev.museframework.test</groupId>
             <artifactId>muse-policy-extension-fixture</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -162,7 +162,7 @@
         <dependency>
             <groupId>dev.museframework.maven</groupId>
             <artifactId>muse-plugin-core</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -44,7 +44,7 @@
             <plugin>
                 <groupId>dev.museframework.maven</groupId>
                 <artifactId>muse-maven-plugin</artifactId>
-                <version>0.1.0</version>
+                <version>0.2.0-SNAPSHOT</version>
                 <executions>
                     <execution>
                         <id>muse-generate</id>
@@ -63,17 +63,17 @@
                     <dependency>
                         <groupId>dev.museframework.connectors</groupId>
                         <artifactId>muse-spring-boot</artifactId>
-                        <version>0.1.0</version>
+                        <version>0.2.0-SNAPSHOT</version>
                     </dependency>
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-http-babelfish-mappers</artifactId>
-                        <version>0.1.0</version>
+                        <version>0.2.0-SNAPSHOT</version>
                     </dependency>
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-apikit-babelfish-mappers</artifactId>
-                        <version>0.1.0</version>
+                        <version>0.2.0-SNAPSHOT</version>
                     </dependency>
                 </dependencies>
             </plugin>
@@ -138,17 +138,17 @@
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-http-connector-spring</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-apikit-connector-spring</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-spring-boot</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
