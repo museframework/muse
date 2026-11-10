@@ -11,6 +11,8 @@ import org.mule.weave.v2.runtime.DataWeaveResult
 import org.mule.weave.v2.runtime.DataWeaveScript
 import org.mule.weave.v2.runtime.ParserConfigurationBuilder
 import org.mule.weave.v2.runtime.ScriptingBindings
+import org.mule.weave.v2.sdk.NameIdentifierHelper
+import org.mule.weave.v2.sdk.WeaveResourceFactory
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -107,8 +109,13 @@ class MuseDataWeaveExecutor : DataWeaveExecutor {
             try {
                 val script = compiledScripts.getOrPut("resource:$resourcePath") {
                     val file = File(resourcePath)
-                    val sourceConfig = if (file.isFile) scriptingEngine.newConfig().withFile(file)
-                    else scriptingEngine.newConfig().withNameIdentifier(NameIdentifier.fromPath(resourcePath.trimStart('/')))
+                    val sourceConfig = if (file.isFile) {
+                        val sourcePath = file.toPath().toRealPath()
+                        // SDK withFile slices by cwd length; keep source location and identity explicit.
+                        scriptingEngine.newConfig()
+                            .withResource(WeaveResourceFactory.fromFile(sourcePath.toFile()))
+                            .withNameIdentifier(NameIdentifierHelper.fromWeaveFilePath(sourcePath.toString()))
+                    } else scriptingEngine.newConfig().withNameIdentifier(NameIdentifier.fromPath(resourcePath.trimStart('/')))
                     val config = sourceConfig
                         .withInputs(arrayOf("payload", "vars", "attributes", "correlationId", "error"))
                         .withDefaultOutputType(TypedValue.MIME_JAVA)
