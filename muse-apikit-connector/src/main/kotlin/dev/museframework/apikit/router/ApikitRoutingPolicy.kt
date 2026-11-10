@@ -84,6 +84,18 @@ class ApikitRoutingPolicy(
             findApiMethod(flowName, httpAttributes.method)
                 ?: return flowNotFound(invocation, flowName)
 
+        if (validationsEnabled && !RequestValidator.acceptsContentType(apiMethod, httpAttributes.headers)) {
+            return failure(
+                errorType = ApikitErrorType.UNSUPPORTED_MEDIA_TYPE,
+                description = "Unsupported Content-Type for ${httpAttributes.method} ${httpAttributes.requestPath}",
+                detailedDescription =
+                    "Expected one of: ${apiMethod.contentTypes.joinToString(", ")}. " +
+                        "Received: ${httpAttributes.headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value ?: "(missing)"}.",
+                cause = IllegalArgumentException("Unsupported request media type"),
+                event = invocation.input,
+            )
+        }
+
         val handle =
             flowHandles[flowName]
                 ?: return flowNotFound(invocation, flowName)
