@@ -316,6 +316,7 @@ class RequestValidatorTest {
             listOf(4_000, 32_768).forEach { length ->
                 val value = "application/octet-stream; note=\"${"a".repeat(length)}\""
                 assertTrue(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to value)), "length=$length")
+                assertFalse(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to "$value\n")))
             }
         }
 
