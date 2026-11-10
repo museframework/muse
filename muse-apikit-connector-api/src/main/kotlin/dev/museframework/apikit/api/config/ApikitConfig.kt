@@ -13,6 +13,6 @@ data class ApikitConfig(
     override val sourceClass: String? = null,
     /** Required classpath path of the RAML specification used to build APIKit routes. */
     val spec: String? = null,
-    /** Disables request header and query-parameter validation; specification bootstrap remains mandatory. */
+    /** Disables request Content-Type, required-header and query-parameter validation; specification bootstrap remains mandatory. */
     val disableValidations: Boolean = false,
 ) : MuseConfiguration
