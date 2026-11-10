@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RequestValidatorTest {
@@ -265,6 +266,66 @@ class RequestValidatorTest {
 
             assertTrue(headerResult.isEmpty())
             assertEquals(listOf("page"), queryResult)
+        }
+    }
+    @Nested
+    @DisplayName("Content-Type validation")
+    inner class ContentTypeValidation {
+        private val binary = ApiMethod(method = HttpMethod.POST, contentTypes = listOf("application/octet-stream"))
+
+        @Test
+        fun `matches Content-Type name and media type without case sensitivity`() {
+            assertTrue(RequestValidator.acceptsContentType(binary, mapOf("content-type" to "Application/Octet-Stream")))
+            assertTrue(RequestValidator.acceptsContentType(binary, mapOf("CONTENT-TYPE" to "application/octet-stream")))
+        }
+
+        @Test
+        fun `accepts valid extra request parameters for a bare RAML media type`() {
+            assertTrue(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to "application/octet-stream; charset=UTF-8")))
+            assertTrue(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to "application/octet-stream; note=\"a;b\"")))
+        }
+
+        @Test
+        fun `rejects unsupported or missing Content-Type`() {
+            assertFalse(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to "application/json")))
+            assertFalse(RequestValidator.acceptsContentType(binary, emptyMap()))
+            assertFalse(RequestValidator.acceptsContentType(binary, mapOf("Accept" to "application/octet-stream")))
+        }
+
+        @Test
+        fun `rejects malformed and ambiguous headers`() {
+            listOf(
+                "application/octet-stream; charset",
+                "application/octet-stream; charset=",
+                "application/octet-stream, application/json",
+                "application/octet-stream; charset=\"unterminated",
+                "application/octet-stream/extra",
+            ).forEach { header ->
+                assertFalse(RequestValidator.acceptsContentType(binary, mapOf("Content-Type" to header)), header)
+            }
+            assertFalse(
+                RequestValidator.acceptsContentType(
+                    binary,
+                    mapOf("Content-Type" to "application/octet-stream", "content-type" to "application/json"),
+                ),
+            )
+        }
+
+        @Test
+        fun `accepts an operation without request media constraints`() {
+            val get = ApiMethod(method = HttpMethod.GET)
+            assertTrue(RequestValidator.acceptsContentType(get, emptyMap()))
+            assertTrue(RequestValidator.acceptsContentType(get, mapOf("Content-Type" to "invalid value")))
+        }
+
+        @Test
+        fun `matches any explicitly declared request media type`() {
+            val method = ApiMethod(
+                method = HttpMethod.POST,
+                contentTypes = listOf("application/json", "application/xml"),
+            )
+            assertTrue(RequestValidator.acceptsContentType(method, mapOf("Content-Type" to "application/xml")))
+            assertFalse(RequestValidator.acceptsContentType(method, mapOf("Content-Type" to "text/plain")))
         }
     }
 }
