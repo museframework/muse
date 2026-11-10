@@ -68,15 +68,18 @@ class MuseExpressionEvaluatorImpl(
         if (exprCount == 0) return TypedValue.of(expression, TypedValue.MIME_TEXT)
 
         if (exprCount == 1) {
-            val singleMatch = SINGLE_EXPRESSION.matchEntire(expression.trim())
+            val singleMatch = SINGLE_EXPRESSION.matchEntire(expression)
             if (singleMatch != null) {
                 val body = singleMatch.groupValues[1].trim()
-                // A bare payload reference is the identity expression: it must preserve the
-                // original TypedValue value, MIME type and charset instead of re-reading it
-                // through the DataWeave default output. Every other expression still evaluates.
+                // A bare payload reference preserves its original TypedValue and metadata.
+                // Other standalone expressions retain their original exact-match semantics.
                 if (body == "payload") return event.payload
                 return dataWeaveExecutor.evaluate(singleMatch.groupValues[1], context)
             }
+            // Only payload identity tolerates whitespace outside the #[...] wrapper.
+            // Padded nonidentity expressions must still interpolate as text.
+            val paddedMatch = SINGLE_EXPRESSION.matchEntire(expression.trim())
+            if (paddedMatch?.groupValues?.get(1)?.trim() == "payload") return event.payload
         }
 
         val result = INTERPOLATION.replace(expression) { match ->
