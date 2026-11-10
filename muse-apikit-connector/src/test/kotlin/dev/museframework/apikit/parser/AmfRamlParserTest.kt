@@ -133,6 +133,27 @@ class AmfRamlParserTest {
     }
 
     @Test
+    fun `projects multiple explicit request media types`() {
+        val spec = parse(
+            """
+            #%RAML 1.0
+            title: Multiple Request Media Types
+            /items:
+              post:
+                body:
+                  application/json:
+                    type: string
+                  application/xml:
+                    type: string
+            """,
+        )
+
+        assertEquals(
+            setOf("application/json", "application/xml"),
+            spec.resources.single().methods.single().contentTypes.toSet(),
+        )
+    }
+    @Test
     fun `rejects unsupported request media type rather than silently allowing any`() {
         assertFailsWith<ApiSpecificationParseException> {
             parse(
