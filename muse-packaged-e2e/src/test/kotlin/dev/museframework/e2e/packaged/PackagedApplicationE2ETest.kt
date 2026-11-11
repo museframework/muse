@@ -16,6 +16,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PackagedApplicationE2ETest {
@@ -87,28 +88,25 @@ class PackagedApplicationE2ETest {
     }
 
     @Test
-    fun `packaged APIKit NOT_FOUND handler returns HTTP 404`() {
+    fun `packaged APIKit NOT_FOUND handler preserves JSON in HTTP 404`() {
         val response = get("/e2e/apikit/missing")
 
-        assertEquals(404, response.statusCode())
-        assertEquals("apikit-not-found", response.body())
+        assertJsonApiKitError(response, 404, "Resource not found")
     }
 
     @Test
-    fun `packaged APIKit METHOD_NOT_ALLOWED handler returns HTTP 405`() {
+    fun `packaged APIKit METHOD_NOT_ALLOWED handler preserves JSON in HTTP 405`() {
         val response = post("/e2e/apikit/ok", "not-allowed")
 
-        assertEquals(405, response.statusCode())
-        assertEquals("apikit-method-not-allowed", response.body())
+        assertJsonApiKitError(response, 405, "Method not allowed")
     }
 
     @Test
-    fun `packaged APIKit UNSUPPORTED_MEDIA_TYPE handler returns HTTP 415`() {
+    fun `packaged APIKit UNSUPPORTED_MEDIA_TYPE handler preserves JSON in HTTP 415`() {
         // The RAML declares application/octet-stream; post() sends text/plain.
         val response = post("/e2e/apikit/upload", "incorrect-media-type")
 
-        assertEquals(415, response.statusCode())
-        assertEquals("apikit-unsupported-media-type", response.body())
+        assertJsonApiKitError(response, 415, "Unsupported media type")
     }
 
     @Test
@@ -403,6 +401,20 @@ class PackagedApplicationE2ETest {
         name: String,
     ): String = state.substringAfter("$name=").substringBefore(';')
 
+    private fun assertJsonApiKitError(
+        response: HttpResponse<String>,
+        expectedStatus: Int,
+        expectedMessage: String,
+    ) {
+        assertEquals(expectedStatus, response.statusCode())
+        val mediaType = response.headers().firstValue("Content-Type").orElse("").substringBefore(';').trim()
+        assertEquals("application/json", mediaType.lowercase())
+        val expectedBody = Regex("""\{\s*"message"\s*:\s*"${Regex.escape(expectedMessage)}"\s*}""")
+        assertTrue(
+            expectedBody.matches(response.body().trim()),
+            "Expected a JSON message '${expectedMessage}', got: ${response.body()}",
+        )
+    }
     private fun get(path: String): HttpResponse<String> {
         val request =
             HttpRequest.newBuilder()
