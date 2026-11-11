@@ -62,6 +62,7 @@
 
         <!-- DataWeave -->
         <dataweave.version>2.12.2</dataweave.version>
+        <amf.version>5.15.0</amf.version>
 
         <!-- Jackson -->
         <jackson.version>2.18.2</jackson.version>
@@ -109,6 +110,13 @@
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- RAML semantic parser (MuleSoft public Maven repository) -->
+            <dependency>
+                <groupId>com.github.amlorg</groupId>
+                <artifactId>amf-api-contract_2.12</artifactId>
+                <version>${amf.version}</version>
             </dependency>
 
             <!-- ============================================================ -->

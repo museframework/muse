@@ -36,6 +36,10 @@
             <groupId>dev.museframework</groupId>
             <artifactId>muse-engine-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.github.amlorg</groupId>
+            <artifactId>amf-api-contract_2.12</artifactId>
+        </dependency>
         <!-- Test -->
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
