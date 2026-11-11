@@ -7,13 +7,13 @@
     <parent>
         <groupId>dev.museframework.test</groupId>
         <artifactId>muse-packaged-test-parent</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.2.0</version>
         <relativePath>../muse-packaged-test-parent/pom.xml</relativePath>
     </parent>
 
     <groupId>dev.museframework</groupId>
     <artifactId>muse-sftp-packaged-e2e</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
     <name>Muse SFTP Packaged E2E Fixture</name>
     <description>Independently packaged SFTP runtime and generated acceptance</description>
 
@@ -29,17 +29,17 @@
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-spring-boot</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-http-connector-spring</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-sftp-connector</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -57,13 +57,13 @@
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-sftp-connector-testkit</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>dev.museframework.test</groupId>
             <artifactId>muse-packaged-e2e-testkit</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -96,12 +96,12 @@
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-http-babelfish-mappers</artifactId>
-                        <version>0.2.0-SNAPSHOT</version>
+                        <version>0.2.0</version>
                     </dependency>
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-sftp-babelfish-mappers</artifactId>
-                        <version>0.2.0-SNAPSHOT</version>
+                        <version>0.2.0</version>
                     </dependency>
                 </dependencies>
             </plugin>

@@ -24,7 +24,7 @@
         <kotlin.version>2.3.20</kotlin.version>
         <kotlinx-coroutines.version>1.10.2</kotlinx-coroutines.version>
         <scala.version>2.12.18</scala.version>
-        <muse.version>0.2.0-SNAPSHOT</muse.version>
+        <muse.version>0.2.0</muse.version>
         <quarkus.version>3.21.0</quarkus.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>${java.version}</maven.compiler.release>

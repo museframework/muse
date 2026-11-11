@@ -6,7 +6,7 @@
 
     <groupId>dev.museframework.it</groupId>
     <artifactId>migrate-quarkus</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -20,7 +20,7 @@
             <plugin>
                 <groupId>dev.museframework.maven</groupId>
                 <artifactId>muse-maven-plugin</artifactId>
-                <version>0.2.0-SNAPSHOT</version>
+                <version>0.2.0</version>
                 <executions>
                     <execution>
                         <id>muse-migrate</id>

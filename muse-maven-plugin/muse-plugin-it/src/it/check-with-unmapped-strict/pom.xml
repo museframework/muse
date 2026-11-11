@@ -6,7 +6,7 @@
 
     <groupId>io.muse.it</groupId>
     <artifactId>check-with-unmapped-strict</artifactId>
-    <version>0.2.0-SNAPSHOT-SNAPSHOT</version>
+    <version>0.2.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -19,22 +19,22 @@
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-dsl</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-babelfish</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-http-babelfish-mappers</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-apikit-babelfish-mappers</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
     </dependencies>
 
@@ -43,17 +43,17 @@
             <plugin>
                 <groupId>dev.museframework.maven</groupId>
                 <artifactId>muse-maven-plugin</artifactId>
-                <version>0.2.0-SNAPSHOT</version>
+                <version>0.2.0</version>
                 <dependencies>
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-http-babelfish-mappers</artifactId>
-                        <version>0.2.0-SNAPSHOT</version>
+                        <version>0.2.0</version>
                     </dependency>
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-apikit-babelfish-mappers</artifactId>
-                        <version>0.2.0-SNAPSHOT</version>
+                        <version>0.2.0</version>
                     </dependency>
                 </dependencies>
                 <executions>

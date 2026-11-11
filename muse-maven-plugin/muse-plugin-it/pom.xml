@@ -7,7 +7,7 @@
     <parent>
         <groupId>dev.museframework.maven</groupId>
         <artifactId>muse-maven-plugin-parent</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.2.0</version>
     </parent>
 
     <artifactId>muse-plugin-it</artifactId>
@@ -32,32 +32,32 @@
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-spring-boot</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-engine</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-dsl</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-http-babelfish-mappers</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-apikit-babelfish-mappers</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-db-babelfish-mappers</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
     </dependencies>
 
