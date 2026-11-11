@@ -36,6 +36,11 @@
             <artifactId>muse-http-connector-spring</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <dependency>
+            <groupId>dev.museframework.connectors</groupId>
+            <artifactId>muse-apikit-connector-spring</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <!--
           The neutral external policy extension fixture: production dependencies are only muse-dsl and
           muse-engine-api, and its MuseComponentRegistrar is discovered from this JAR on the packaged
@@ -96,6 +101,11 @@
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-http-babelfish-mappers</artifactId>
+                        <version>0.1.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>dev.museframework</groupId>
+                        <artifactId>muse-apikit-babelfish-mappers</artifactId>
                         <version>0.1.0</version>
                     </dependency>
                 </dependencies>
