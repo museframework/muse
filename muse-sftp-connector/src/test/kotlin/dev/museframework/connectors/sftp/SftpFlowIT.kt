@@ -172,8 +172,7 @@ class SftpFlowIT {
                     }
 
                 runSftpApplication(sftpFlowConnection(server), flow) {
-                    awaitTrue { seen.exists() }
-                    assertEquals("SFTP:FILE_NOT_FOUND", seen.readText())
+                    awaitTrue { seen.exists() && seen.readText() == "SFTP:FILE_NOT_FOUND" }
                     assertFalse(after.exists())
                     awaitTrue { !trigger.exists() }
                 }
