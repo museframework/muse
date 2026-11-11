@@ -73,6 +73,25 @@ class HttpListenerSpringIT {
     }
 
     @Test
+    fun `should stream a DataWeave json response with real wire bytes`() {
+        val response = restTemplate.getForEntity(
+            "http://localhost:$port/listener/dataweave",
+            String::class.java,
+        )
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertTrue(
+            response.headers.contentType?.isCompatibleWith(MediaType.APPLICATION_JSON) == true,
+            "DataWeave application/json output must keep its declared content type",
+        )
+        assertNotNull(response.body)
+        val body = response.body!!
+        val parsed = com.google.gson.JsonParser.parseString(body).asJsonObject
+        assertEquals("created", parsed.get("message").asString)
+        assertFalse(body.contains("ByteArraySeekableStream"), "The serialized stream must not leak its diagnostics")
+    }
+
+    @Test
     fun `should return 404 for path not registered in any flow`() {
         val response = restTemplate.getForEntity(
             "http://localhost:$port/listener/does-not-exist",
@@ -180,6 +199,22 @@ class HttpListenerSpringIT {
                 }
                 setVariable("httpStatus") { value = "200" }
                 setPayload { value = "\"status: ok\"" }
+            },
+            flow("dataweave-flow") {
+                httpListener(connection) {
+                    path = "/listener/dataweave"
+                    allowedMethods = listOf(HttpMethod.GET)
+                    successResponse { statusCode = "200" }
+                }
+                setPayload {
+                    value =
+                        """
+                        #[%dw 2.0
+                        output application/json
+                        ---
+                        { message: "created" }]
+                        """.trimIndent()
+                }
             },
             flow("items-flow") {
                 httpListener(connection) {

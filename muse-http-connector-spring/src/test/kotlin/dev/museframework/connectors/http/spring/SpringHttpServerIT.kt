@@ -3,6 +3,7 @@ package dev.museframework.connectors.http.spring
 import dev.museframework.engine.api.streaming.MuseCursorStreamProvider
 import dev.museframework.engine.api.streaming.RepeatableInMemoryCursorStreamProvider
 import dev.museframework.engine.api.streaming.StreamingResourceRegistry
+import dev.museframework.engine.api.streaming.StreamingProviders
 import dev.museframework.engine.api.streaming.StreamingStrategy
 import dev.museframework.http.api.config.HttpListenerConnectionConfig
 import dev.museframework.http.api.config.HttpStreamingMode
@@ -10,6 +11,7 @@ import dev.museframework.http.api.model.HttpMethod
 import dev.museframework.http.api.model.HttpResponse
 import dev.museframework.http.api.server.HttpServer
 import dev.museframework.http.testkit.HttpServerContract
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -23,7 +25,11 @@ import org.springframework.http.HttpStatus
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
+import java.io.IOException
+import java.io.InputStream
 import java.net.URI
+import java.net.Socket
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
@@ -339,6 +345,155 @@ class SpringHttpServerIT : HttpServerContract() {
             assertTrue(provider.isClosed)
         } finally {
             server.unregister("/test/stream-response", listOf(HttpMethod.GET))
+        }
+    }
+
+    @Test
+    fun `serialized InputStream read failure releases underlying stream once`() {
+        val closes = AtomicInteger()
+        val reads = AtomicInteger()
+        val streamClosed = CountDownLatch(1)
+        val input =
+            object : InputStream() {
+                override fun read(): Int =
+                    if (reads.incrementAndGet() == 1) 'x'.code
+                    else throw IOException("simulated serialized response read failure")
+
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    if (length == 0) return 0
+                    buffer[offset] = read().toByte()
+                    return 1
+                }
+
+                override fun close() {
+                    closes.incrementAndGet()
+                    streamClosed.countDown()
+                }
+            }
+        val provider = StreamingProviders.byteProvider(input, StreamingStrategy.NonRepeatable)
+        val lease = StreamingResourceRegistry.ownedClaim(provider)
+        val server = server()
+        val path = "/test/serialized-stream-failure"
+        server.register(path, listOf(HttpMethod.GET)) {
+            HttpResponse(statusCode = 200, bodyProvider = provider, bodyLease = lease)
+        }
+
+        try {
+            // The servlet may propagate a truncated-response exception or an HTTP error. In
+            // either case the transport must finish releasing the failed response's lease.
+            val request =
+                java.net.http.HttpRequest.newBuilder(URI.create("http://localhost:$port$path"))
+                    .timeout(java.time.Duration.ofSeconds(10))
+                    .GET()
+                    .build()
+            runCatching {
+                java.net.http.HttpClient.newHttpClient().send(
+                    request,
+                    java.net.http.HttpResponse.BodyHandlers.ofByteArray(),
+                )
+            }
+            assertTrue(streamClosed.await(5, TimeUnit.SECONDS), "The adapter must release the raw stream")
+            assertTrue(reads.get() >= 2, "The serialized stream must actually fail during transfer")
+            assertTrue(provider.isClosed, "The provider must not outlive the failed response")
+            assertEquals(1, closes.get(), "The underlying InputStream must be closed exactly once")
+        } finally {
+            server.unregister(path, listOf(HttpMethod.GET))
+            lease.close()
+        }
+    }
+
+    @Test
+    fun `transmits non UTF8 response bytes and charset header to a real client`() {
+        val server = server()
+        val path = "/test/latin1-response"
+        val body = "caffè non trovato"
+        val expected = body.toByteArray(StandardCharsets.ISO_8859_1)
+        server.register(path, listOf(HttpMethod.GET)) {
+            HttpResponse(
+                statusCode = 200,
+                headers = mapOf("Content-Type" to "text/plain; charset=ISO-8859-1"),
+                body = expected,
+            )
+        }
+
+        try {
+            val request = java.net.http.HttpRequest.newBuilder(URI.create("http://localhost:$port$path"))
+                .GET().build()
+            val response = java.net.http.HttpClient.newHttpClient().send(
+                request, java.net.http.HttpResponse.BodyHandlers.ofByteArray(),
+            )
+            assertEquals(200, response.statusCode())
+            assertArrayEquals(expected, response.body())
+            val mediaType = org.springframework.http.MediaType.parseMediaType(
+                response.headers().firstValue("Content-Type").orElseThrow(),
+            )
+            assertEquals("text", mediaType.type)
+            assertEquals("plain", mediaType.subtype)
+            assertEquals(StandardCharsets.ISO_8859_1, mediaType.charset)
+        } finally {
+            server.unregister(path, listOf(HttpMethod.GET))
+        }
+    }
+
+    @Test
+    fun `client reset eventually releases Spring adapted stream after a blocked read resumes`() {
+        val started = CountDownLatch(1)
+        val resumeRead = CountDownLatch(1)
+        val streamClosed = CountDownLatch(1)
+        val reads = AtomicInteger()
+        val closes = AtomicInteger()
+        val input = object : InputStream() {
+            override fun read(): Int {
+                if (reads.incrementAndGet() != 1) return -1
+                started.countDown()
+                check(resumeRead.await(5, TimeUnit.SECONDS))
+                return 'x'.code
+            }
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                if (length == 0) return 0
+                val value = read()
+                if (value < 0) return -1
+                buffer[offset] = value.toByte()
+                return 1
+            }
+
+            override fun close() {
+                closes.incrementAndGet()
+                streamClosed.countDown()
+            }
+        }
+        val provider = StreamingProviders.byteProvider(input, StreamingStrategy.NonRepeatable)
+        val lease = StreamingResourceRegistry.ownedClaim(provider)
+        val server = server()
+        val path = "/test/adapted-reset"
+        server.register(path, listOf(HttpMethod.GET)) {
+            HttpResponse(statusCode = 200, bodyProvider = provider, bodyLease = lease)
+        }
+        val socket = Socket("127.0.0.1", port)
+        try {
+            socket.setSoLinger(true, 0)
+            socket.getOutputStream().apply {
+                write(
+                    ("GET $path HTTP/1.1\r\n" +
+                        "Host: 127.0.0.1:$port\r\n" +
+                        "Connection: keep-alive\r\n\r\n").toByteArray(StandardCharsets.US_ASCII),
+                )
+                flush()
+            }
+            assertTrue(started.await(5, TimeUnit.SECONDS), "The response must start reading")
+            assertFalse(provider.isClosed, "Do not close a provider while its read is in flight")
+            socket.close()
+            resumeRead.countDown()
+            assertTrue(streamClosed.await(5, TimeUnit.SECONDS),
+                "The response lease must close the adapted InputStream after the blocked read resumes")
+            assertTrue(provider.isClosed)
+            assertEquals(1, closes.get(), "The raw InputStream closes exactly once")
+        } finally {
+            resumeRead.countDown()
+            socket.close()
+            server.unregister(path, listOf(HttpMethod.GET))
+            lease.close()
         }
     }
 

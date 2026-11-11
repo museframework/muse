@@ -2,6 +2,7 @@ package dev.museframework.engine.expression
 
 import dev.museframework.engine.api.event.MuseEvent
 import dev.museframework.engine.api.event.TypedValue
+import dev.museframework.engine.api.expression.EvaluationRequest
 import dev.museframework.engine.dataweave.DataWeaveContext
 import dev.museframework.engine.dataweave.DataWeaveExecutor
 import io.mockk.Called
@@ -10,6 +11,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
 import java.util.*
 
@@ -39,6 +41,37 @@ class MuseExpressionEvaluatorImplTest {
 
         assertEquals(expected, result)
         verify(exactly = 1) { dataWeaveExecutor.evaluate("payload.name", context) }
+    }
+
+    @Test
+    fun `should preserve surrounding whitespace around nonidentity expressions as text`() {
+        val dataWeaveValue: TypedValue<Any> = TypedValue.of(42, TypedValue.MIME_JSON)
+        every { dataWeaveExecutor.evaluate("payload.age", context) } returns dataWeaveValue
+
+        val result = evaluator.evaluate("  #[payload.age] \t", event)
+
+        assertEquals("  42 \t", result?.value)
+        assertEquals(TypedValue.MIME_TEXT, result?.mimeType)
+        verify(exactly = 1) { dataWeaveExecutor.evaluate("payload.age", context) }
+    }
+
+    @Test
+    fun `ordinary standalone payload evaluation still delegates to DataWeave`() {
+        val evaluated: TypedValue<Any> = TypedValue.of(mapOf("parsed" to true), TypedValue.MIME_JAVA)
+        every { dataWeaveExecutor.evaluate("payload", context) } returns evaluated
+
+        val result = evaluator.evaluate("#[payload]", event)
+
+        assertSame(evaluated, result)
+        verify(exactly = 1) { dataWeaveExecutor.evaluate("payload", context) }
+    }
+
+    @Test
+    fun `should preserve typed identity for a whitespace padded payload reference`() {
+        val result = evaluator.evaluate(EvaluationRequest.PayloadPreservingValue(" \n#[ payload ] \t"), event)
+
+        assertSame(event.payload, result)
+        verify { dataWeaveExecutor wasNot Called }
     }
 
     @Test

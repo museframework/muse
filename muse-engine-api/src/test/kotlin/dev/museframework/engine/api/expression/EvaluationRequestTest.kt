@@ -16,6 +16,16 @@ class EvaluationRequestTest {
     }
 
     @Test
+    fun `payload preserving value requests retain legacy evaluator compatibility`() {
+        val value = TypedValue.of<Any>("legacy")
+        val evaluator = LegacyEvaluator(value)
+        val event = MuseEvent(payload = TypedValue.of("original"))
+
+        assertSame(value, evaluator.evaluate(EvaluationRequest.PayloadPreservingValue("#[payload]"), event))
+        assertEquals(listOf("#[payload]"), evaluator.calls)
+    }
+
+    @Test
     fun `raw event payload iteration does not evaluate an expression`() {
         val evaluator = LegacyEvaluator(TypedValue.of<Any>(listOf("evaluated")))
         val event = MuseEvent(payload = TypedValue.of(listOf("raw")))

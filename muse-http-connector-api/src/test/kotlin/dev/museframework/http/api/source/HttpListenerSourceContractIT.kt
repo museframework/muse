@@ -18,6 +18,7 @@ import dev.museframework.dsl.api.model.error.ErrorType
 import dev.museframework.engine.api.error.MuseError
 import dev.museframework.engine.api.event.MuseEvent
 import dev.museframework.engine.api.event.TypedValue
+import dev.museframework.engine.api.expression.EvaluationRequest
 import dev.museframework.engine.api.expression.MuseExpressionEvaluator
 import dev.museframework.engine.api.source.MuseEventEnvelope
 import io.mockk.*
@@ -29,6 +30,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import kotlin.test.assertNotNull
 
 class HttpListenerSourceContractIT {
@@ -50,6 +55,10 @@ class HttpListenerSourceContractIT {
         server = RecordingHttpServer()
         initializer = RecordingHttpListenerServerInitializer(server)
         mockExpressionEvaluator = mockk(relaxed = true)
+        every { mockExpressionEvaluator.evaluate(any<EvaluationRequest.PayloadPreservingValue>(), any()) } answers {
+            val request = firstArg<EvaluationRequest.PayloadPreservingValue>()
+            mockExpressionEvaluator.evaluate(request.expression, secondArg<MuseEvent>())
+        }
         channel = Channel(Channel.UNLIMITED)
     }
 
@@ -168,6 +177,198 @@ class HttpListenerSourceContractIT {
         lease.close()
         assertTrue(bodyProvider.isClosed)
     }
+
+    @Test
+    fun `listener adapts a serialized InputStream body to a retained streaming provider`() = runTest {
+        val bodyExpression = "#[serializedResponse]"
+        val config =
+            createDefaultConfig(
+                successResponse = SuccessHttpResponseConfig(body = bodyExpression),
+            )
+        val source = createSource(config)
+        source.start(channel)
+        every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(200)
+
+        val jsonBytes = """{"message":"Risorsa non trovata"}""".toByteArray(StandardCharsets.UTF_8)
+        val input = TrackingInputStream(ByteArrayInputStream(jsonBytes))
+        every { mockExpressionEvaluator.evaluate(bodyExpression, any()) } returns
+            TypedValue.of(input as Any, TypedValue.MIME_JSON, StandardCharsets.UTF_8)
+
+        val responseDeferred = async { server.handle(createHttpRequest()) }
+        val envelope = channel.receive()
+        envelope.replyTo.complete(MuseEvent(payload = TypedValue.of("success")))
+        val response = responseDeferred.await()
+
+        assertNull(response.body, "A serialized stream must not be materialized into the response body")
+        val provider = assertNotNull(response.bodyProvider, "A serialized stream must become a streaming body provider")
+        assertEquals("application/json", response.headers["Content-Type"])
+        assertEquals(0, input.reads, "The source must not read the stream before the adapter streams it")
+
+        val lease = assertNotNull(response.bodyLease)
+        val actualBytes = provider.openCursor().use { it.readBytes() }
+        assertArrayEquals(jsonBytes, actualBytes)
+        assertFalse(String(actualBytes, StandardCharsets.UTF_8).contains("ByteArrayInputStream@"))
+
+        lease.close()
+        assertTrue(provider.isClosed)
+        assertEquals(1, input.closeCount, "The response lease owns exactly one close of the adapted stream")
+    }
+
+    @Test
+    fun `listener closes a newly adapted stream when response headers evaluation fails`() = runTest {
+        supervisorScope {
+            val bodyExpression = "#[serializedResponse]"
+            val headersExpression = "#[badHeaders]"
+            val config =
+                createDefaultConfig(
+                    successResponse =
+                        SuccessHttpResponseConfig(
+                            body = bodyExpression,
+                            headersExpression = headersExpression,
+                        ),
+                )
+            val source = createSource(config)
+            source.start(channel)
+            every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(200)
+
+            val input = TrackingInputStream(ByteArrayInputStream("serialized".toByteArray()))
+            every { mockExpressionEvaluator.evaluate(bodyExpression, any()) } returns
+                TypedValue.of(input as Any, TypedValue.MIME_TEXT)
+            every { mockExpressionEvaluator.evaluate(headersExpression, any()) } throws
+                IllegalStateException("response headers failed")
+
+            val responseDeferred = async { server.handle(createHttpRequest()) }
+            val envelope = channel.receive()
+            envelope.replyTo.complete(MuseEvent(payload = TypedValue.of("original")))
+
+            val failure = runCatching { responseDeferred.await() }.exceptionOrNull()
+            assertInstanceOf(IllegalStateException::class.java, failure)
+            assertEquals(0, input.reads, "Failed response construction must not read the stream")
+            assertEquals(1, input.closeCount, "A not-yet-exported stream must be released once")
+        }
+    }
+
+    @Test
+    fun `listener preserves already serialized json string bytes without double encoding`() = runTest {
+        val bodyExpression = "#[jsonText]"
+        val config = createDefaultConfig(successResponse = SuccessHttpResponseConfig(body = bodyExpression))
+        val source = createSource(config)
+        source.start(channel)
+        every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(200)
+
+        val jsonText = """{"message":"kept exactly"}"""
+        every { mockExpressionEvaluator.evaluate(bodyExpression, any()) } returns
+            TypedValue.of(jsonText, TypedValue.MIME_JSON)
+
+        val responseDeferred = async { server.handle(createHttpRequest()) }
+        val envelope = channel.receive()
+        envelope.replyTo.complete(MuseEvent(payload = TypedValue.of("success")))
+        val response = responseDeferred.await()
+
+        assertArrayEquals(jsonText.toByteArray(StandardCharsets.UTF_8), response.body)
+        assertEquals("application/json", response.headers["Content-Type"])
+        assertNull(response.bodyProvider)
+    }
+
+    @Test
+    fun `listener preserves binary bytes byte for byte`() = runTest {
+        val bodyExpression = "#[binary]"
+        val config = createDefaultConfig(successResponse = SuccessHttpResponseConfig(body = bodyExpression))
+        val source = createSource(config)
+        source.start(channel)
+        every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(200)
+
+        val binary = byteArrayOf(0, 1, 2, 127, -1)
+        every { mockExpressionEvaluator.evaluate(bodyExpression, any()) } returns
+            TypedValue.of(binary, TypedValue.MIME_OCTET_STREAM)
+
+        val responseDeferred = async { server.handle(createHttpRequest()) }
+        val envelope = channel.receive()
+        envelope.replyTo.complete(MuseEvent(payload = TypedValue.of("success")))
+        val response = responseDeferred.await()
+
+        assertArrayEquals(binary, response.body)
+        assertEquals(TypedValue.MIME_OCTET_STREAM, response.headers["Content-Type"])
+    }
+
+    @Test
+    fun `listener encodes text with the charset declared by the typed value`() = runTest {
+        val bodyExpression = "#[textResponse]"
+        val config = createDefaultConfig(successResponse = SuccessHttpResponseConfig(body = bodyExpression))
+        val source = createSource(config)
+        source.start(channel)
+        every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(200)
+
+        val text = "caffè non trovato"
+        val charset = Charset.forName("ISO-8859-1")
+        every { mockExpressionEvaluator.evaluate(bodyExpression, any()) } returns
+            TypedValue.of(text, TypedValue.MIME_TEXT, charset)
+
+        val responseDeferred = async { server.handle(createHttpRequest()) }
+        val envelope = channel.receive()
+        envelope.replyTo.complete(MuseEvent(payload = TypedValue.of("success")))
+        val response = responseDeferred.await()
+
+        assertArrayEquals(text.toByteArray(charset), response.body)
+        assertEquals("text/plain; charset=ISO-8859-1", response.headers["Content-Type"])
+    }
+
+    @Test
+    fun `listener honors an explicit content type override without transforming the body`() = runTest {
+        val bodyExpression = "#[serializedResponse]"
+        val config =
+            createDefaultConfig(
+                successResponse =
+                    SuccessHttpResponseConfig(
+                        body = bodyExpression,
+                        headers = mapOf("content-type" to "application/vnd.api+json"),
+                    ),
+            )
+        val source = createSource(config)
+        source.start(channel)
+        every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(200)
+
+        every { mockExpressionEvaluator.evaluate("application/vnd.api+json", any()) } returns
+            TypedValue.of("application/vnd.api+json")
+        val jsonBytes = """{"message":"override"}""".toByteArray(StandardCharsets.UTF_8)
+        every { mockExpressionEvaluator.evaluate(bodyExpression, any()) } returns
+            TypedValue.of(jsonBytes, TypedValue.MIME_JSON)
+
+        val responseDeferred = async { server.handle(createHttpRequest()) }
+        val envelope = channel.receive()
+        envelope.replyTo.complete(MuseEvent(payload = TypedValue.of("success")))
+        val response = responseDeferred.await()
+
+        assertArrayEquals(jsonBytes, response.body)
+        assertEquals("application/vnd.api+json", response.headers["content-type"])
+        assertNull(response.headers["Content-Type"])
+    }
+
+    @Test
+    fun `listener rejects an unsupported structured body instead of using toString`() =
+        runTest {
+            // The handler failure is expected: keep it out of the test scope's failure propagation,
+            // exactly like the other response-generation failure test.
+            supervisorScope {
+                val bodyExpression = "#[structured]"
+                val config = createDefaultConfig(successResponse = SuccessHttpResponseConfig(body = bodyExpression))
+                val source = createSource(config)
+                source.start(channel)
+                every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(200)
+                every { mockExpressionEvaluator.evaluate(bodyExpression, any()) } returns
+                    TypedValue.of(mapOf("message" to "Resource not found"), TypedValue.MIME_JAVA)
+
+                val responseDeferred = async { server.handle(createHttpRequest()) }
+                val envelope = channel.receive()
+                envelope.replyTo.complete(MuseEvent(payload = TypedValue.of("success")))
+
+                val failure = runCatching { responseDeferred.await() }.exceptionOrNull()
+
+                assertNotNull(failure, "An unsupported structured body must fail explicitly")
+                assertFalse(failure.message.orEmpty().contains("={"))
+                assertFalse(failure.message.orEmpty().contains("{message=Resource not found}"))
+            }
+        }
 
     @Test
     fun `should use X-Correlation-ID header if present`() =
@@ -349,6 +550,71 @@ class HttpListenerSourceContractIT {
             val response = responseDeferred.await()
             assertEquals(500, response.statusCode)
             assertEquals("Expression evaluation failed", String(assertNotNull(response.body)))
+        }
+
+    @Test
+    fun `default error description is UTF8 text independent of original ASCII payload`() =
+        runTest {
+            val source = createSource(createDefaultConfig())
+            source.start(channel)
+            every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(500)
+
+            val description = "Errore: città 東京"
+            val responseDeferred = async { server.handle(createHttpRequest()) }
+            val envelope = channel.receive()
+            envelope.replyTo.complete(
+                MuseEvent(
+                    payload = TypedValue.of("original", TypedValue.MIME_TEXT, StandardCharsets.US_ASCII),
+                    error =
+                        MuseError(
+                            description = description,
+                            detailedDescription = description,
+                            errorType = ErrorType.Mule.EXPRESSION,
+                            cause = RuntimeException("Broken expression"),
+                        ),
+                ),
+            )
+
+            val response = responseDeferred.await()
+            assertEquals(500, response.statusCode)
+            assertArrayEquals(description.toByteArray(StandardCharsets.UTF_8), assertNotNull(response.body))
+            assertEquals("text/plain; charset=UTF-8", response.headers["Content-Type"])
+        }
+
+    @Test
+    fun `default error description honors explicit Content Type without recoding`() =
+        runTest {
+            val config =
+                createDefaultConfig(
+                    errorResponse = ErrorHttpResponseConfig(headers = mapOf("content-type" to "application/problem+json")),
+                )
+            val source = createSource(config)
+            source.start(channel)
+            every { mockExpressionEvaluator.evaluate(any<String>(), any()) } returns TypedValue.of(500)
+            every { mockExpressionEvaluator.evaluate("application/problem+json", any()) } returns
+                TypedValue.of("application/problem+json")
+
+            val description = "Errore: città 東京"
+            val responseDeferred = async { server.handle(createHttpRequest()) }
+            val envelope = channel.receive()
+            envelope.replyTo.complete(
+                MuseEvent(
+                    payload = TypedValue.of("original", TypedValue.MIME_TEXT, StandardCharsets.US_ASCII),
+                    error =
+                        MuseError(
+                            description = description,
+                            detailedDescription = description,
+                            errorType = ErrorType.Mule.EXPRESSION,
+                            cause = RuntimeException("Broken expression"),
+                        ),
+                ),
+            )
+
+            val response = responseDeferred.await()
+            assertEquals(500, response.statusCode)
+            assertArrayEquals(description.toByteArray(StandardCharsets.UTF_8), assertNotNull(response.body))
+            assertEquals("application/problem+json", response.headers["content-type"])
+            assertFalse(response.headers.containsKey("Content-Type"))
         }
 
     @Test
@@ -708,6 +974,34 @@ class HttpListenerSourceContractIT {
             is String -> toByteArray()
             else -> toString().toByteArray()
         }
+
+    private class TrackingInputStream(
+        private val delegate: InputStream,
+    ) : InputStream() {
+        var reads: Int = 0
+            private set
+        var closeCount: Int = 0
+            private set
+
+        override fun read(): Int {
+            reads++
+            return delegate.read()
+        }
+
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+        ): Int {
+            reads++
+            return delegate.read(buffer, offset, length)
+        }
+
+        override fun close() {
+            closeCount++
+            delegate.close()
+        }
+    }
 
     private class RecordingHttpListenerServerInitializer(
         private val server: HttpServer,

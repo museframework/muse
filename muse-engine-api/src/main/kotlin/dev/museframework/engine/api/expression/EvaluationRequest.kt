@@ -3,6 +3,9 @@ package dev.museframework.engine.api.expression
 /** Requested consumption shape; independent of MIME type, replay strategy, and input ownership. */
 sealed interface EvaluationRequest {
     data class Value(val expression: String) : EvaluationRequest
+
+    /** Request typed payload identity only for a standalone #[payload] expression. */
+    data class PayloadPreservingValue(val expression: String) : EvaluationRequest
     data class Iteration(val source: IterationSource) : EvaluationRequest
 }
 

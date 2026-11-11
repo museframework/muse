@@ -60,6 +60,12 @@ class MuseExpressionEvaluatorImpl(
         return super<MuseExpressionEvaluator>.evaluate(request, event)
     }
 
+    override fun evaluate(request: EvaluationRequest.PayloadPreservingValue, event: MuseEvent): TypedValue<Any>? {
+        val match = SINGLE_EXPRESSION.matchEntire(request.expression.trim())
+        return if (match?.groupValues?.get(1)?.trim() == "payload") event.payload
+        else evaluate(request.expression, event)
+    }
+
     override fun evaluate(expression: String, event: MuseEvent): TypedValue<Any>? {
         // Wrap properties with Spring Boot-style resolution
         val resolvableProperties = ResolvableProperties(properties)

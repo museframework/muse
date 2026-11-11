@@ -26,4 +26,23 @@ class Listener(private val file2: File2) : MuseConfigDefinition() {
         }
         setPayload { value = "hello world" }
     }
+
+    val dataWeaveFlow = flow("dataweave-flow") {
+        httpListener(httpListenerConfig) {
+            path = "/api/dataweave"
+            allowedMethods = listOf(HttpMethod.GET)
+            successResponse {
+                statusCode = "200"
+            }
+        }
+        setPayload {
+            value =
+                """
+                #[%dw 2.0
+                output application/json
+                ---
+                { message: "created" }]
+                """.trimIndent()
+        }
+    }
 }
