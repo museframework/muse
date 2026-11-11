@@ -415,6 +415,7 @@ class PackagedApplicationE2ETest {
             "Expected a JSON message '${expectedMessage}', got: ${response.body()}",
         )
     }
+
     private fun get(path: String): HttpResponse<String> {
         val request =
             HttpRequest.newBuilder()
