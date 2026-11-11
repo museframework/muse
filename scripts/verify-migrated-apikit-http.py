@@ -94,6 +94,13 @@ def main():
         args.port, "POST", "/api/resources", 415, "Unsupported media type",
         b'{"a":1}', {"Content-Type": "application/json"},
     )
+    # These requests must not contain Content-Type, with either body length.
+    for payload in (b"", b"hello-binary"):
+        assert_json_error(
+            args.port, "POST", "/api/resources", 415, "Unsupported media type",
+            payload,
+        )
+
     assert_json_error(
         args.port, "PUT", "/api/resources", 405, "Method not allowed",
         b"x", {"Content-Type": "application/octet-stream"},
