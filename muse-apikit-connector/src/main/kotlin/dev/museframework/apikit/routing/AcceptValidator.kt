@@ -14,12 +14,15 @@ internal enum class AcceptValidation {
  * render, or transform a response. RAML response media types are bare type/subtype values.
  *
  * A bounded forward scanner handles quoted commas, HTTP OWS, parameters, and q-values without
- * regex backtracking. Malformed headers are distinguished from a valid but unacceptable header.
- * This is not a general-purpose HTTP content negotiation implementation.
+ * regex backtracking. Empty list elements are tolerated as RFC 9110 §5.6.1.2 requires;
+ * malformed non-empty elements remain BAD_REQUEST by Muse policy (not an RFC-mandated status).
+ * This is a narrow rejection predicate: it never selects or transforms a representation.
  */
 internal object AcceptValidator {
     private const val MAX_HEADER_LENGTH = 65_536
     private const val MAX_RANGES = 256
+    // RFC 9110 §5.6.1.2: ignore a reasonable number of empty comma-separated list members.
+    private const val MAX_LIST_MEMBERS = 512
     private const val MAX_PARAMETERS = 64
 
     fun validate(method: ApiMethod, headers: Map<String, String>): AcceptValidation {
@@ -29,24 +32,19 @@ internal object AcceptValidator {
         val fields = headers.entries.filter { it.key.equals("Accept", ignoreCase = true) }
         if (fields.isEmpty()) return AcceptValidation.ACCEPTED
         var totalLength = 0
+        var members = 0
         val ranges = ArrayList<MediaRange>()
         for ((_, header) in fields) {
+            if (header.length > MAX_HEADER_LENGTH - totalLength) return AcceptValidation.MALFORMED
             totalLength += header.length
-            if (totalLength > MAX_HEADER_LENGTH) return AcceptValidation.MALFORMED
-            // Mule APIKit 1.11.11 treats absent/empty Accept as */*.
-            if (header.all { it == ' ' || it == '\t' }) continue
-            val parsed = FieldParser(header, MAX_RANGES - ranges.size, MAX_PARAMETERS).parse()
-                ?: return AcceptValidation.MALFORMED
-            ranges.addAll(parsed)
+            val parsed = FieldParser(
+                header, MAX_RANGES - ranges.size, MAX_LIST_MEMBERS - members, MAX_PARAMETERS,
+            ).parse() ?: return AcceptValidation.MALFORMED
+            ranges.addAll(parsed.ranges)
+            members += parsed.members
         }
+        // An empty Accept list imposes no representation preference.
         if (ranges.isEmpty()) return AcceptValidation.ACCEPTED
-
-        // Conflicting quality values for identical ranges have no unambiguous preference.
-        val qualities = HashMap<String, Int>()
-        for (range in ranges) {
-            val previous = qualities.putIfAbsent(range.key, range.quality)
-            if (previous != null && previous != range.quality) return AcceptValidation.MALFORMED
-        }
 
         for (offered in method.responseMediaTypes) {
             val type = parseBareType(offered) ?: return AcceptValidation.MALFORMED
@@ -73,7 +71,6 @@ internal object AcceptValidator {
         val subtype: String,
         val quality: Int,
         val mediaParameters: Int,
-        val key: String,
     ) {
         val specificity: Int = when {
             type == "*" -> 0
@@ -97,59 +94,61 @@ internal object AcceptValidator {
         return BareType(type.lowercase(), subtype.lowercase())
     }
 
+    private data class ParsedField(val ranges: List<MediaRange>, val members: Int)
+
     private class FieldParser(
         private val value: String,
         private val remainingRanges: Int,
+        private val remainingMembers: Int,
         private val maxParameters: Int,
     ) {
         private var index = 0
 
-        fun parse(): List<MediaRange>? {
+        fun parse(): ParsedField? {
             val result = ArrayList<MediaRange>()
+            var members = 0
             while (true) {
+                if (++members > remainingMembers) return null
                 skipOws()
-                if (index == value.length || result.size >= remainingRanges) return null
-                val type = token()?.lowercase() ?: return null
-                if (!consume('/')) return null
-                val subtype = token()?.lowercase() ?: return null
-                if (type.contains('*') && type != "*" || subtype.contains('*') && subtype != "*" ||
-                    type == "*" && subtype != "*"
-                ) return null
+                // Empty elements, including leading/trailing commas, are tolerated by recipients.
+                if (index < value.length && value[index] != ',') {
+                    if (result.size >= remainingRanges) return null
+                    val type = token()?.lowercase() ?: return null
+                    if (!consume('/')) return null
+                    val subtype = token()?.lowercase() ?: return null
+                    if (type.contains('*') && type != "*" || subtype.contains('*') && subtype != "*" ||
+                        type == "*" && subtype != "*"
+                    ) return null
 
-                var quality = 1000
-                var foundQuality = false
-                var mediaParameters = 0
-                var parameterCount = 0
-                val mediaParameterKey = StringBuilder()
-                while (true) {
-                    skipOws()
-                    if (!consume(';')) break
-                    skipOws()
-                    parameterCount++
-                    if (parameterCount > maxParameters) return null
-                    val name = token()?.lowercase() ?: return null
-                    val hasEquals = consume('=')
-                    if (!hasEquals && !foundQuality) return null
-                    val parameterValue = if (hasEquals) parameterValue() ?: return null else null
-                    if (name == "q") {
-                        if (foundQuality || !hasEquals || parameterValue!!.quoted) return null
-                        quality = parseQuality(parameterValue.value) ?: return null
-                        foundQuality = true
-                    } else if (!foundQuality) {
-                        mediaParameters++
-                        // Preserve the parameter identity to detect conflicting duplicate ranges.
-                        mediaParameterKey.append(';').append(name).append('=').append(parameterValue!!.value)
+                    var quality = 1000
+                    var foundQuality = false
+                    var mediaParameters = 0
+                    var parameterCount = 0
+                    while (true) {
+                        skipOws()
+                        if (!consume(';')) break
+                        skipOws()
+                        if (++parameterCount > maxParameters) return null
+                        // RFC 9110 §5.6.6 allows empty parameter productions after a semicolon.
+                        if (index == value.length || value[index] == ';' || value[index] == ',') continue
+                        val name = token()?.lowercase() ?: return null
+                        if (!consume('=')) return null
+                        val parameter = parameterValue() ?: return null
+                        if (name == "q") {
+                            if (foundQuality || parameter.quoted) return null
+                            quality = parseQuality(parameter.value) ?: return null
+                            foundQuality = true
+                        } else {
+                            // A media parameter (even if after q) requires a matching offered
+                            // representation parameter. ApiMethod currently offers bare types only.
+                            mediaParameters++
+                        }
                     }
+                    result.add(MediaRange(type, subtype, quality, mediaParameters))
                 }
-                result.add(
-                    MediaRange(type, subtype, quality, mediaParameters, "$type/$subtype$mediaParameterKey"),
-                )
                 skipOws()
-                if (index == value.length) return result
+                if (index == value.length) return ParsedField(result, members)
                 if (!consume(',')) return null
-                // Deliberately reject empty list members and trailing commas as malformed.
-                skipOws()
-                if (index == value.length || value[index] == ',') return null
             }
         }
 

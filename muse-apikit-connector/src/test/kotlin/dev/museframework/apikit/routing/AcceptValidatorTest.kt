@@ -15,6 +15,10 @@ class AcceptValidatorTest {
             "", " \t", "*/*", "APPLICATION/JSON", "application/*",
             "text/plain, application/json", "application/xml;q=0, application/json;q=0.5",
             "application/json;q=0.001", "application/json;q=1.000",
+            "application/json,", ",application/json", ",, application/json, ,",
+            "application/json;;q=0.5", "application/json;q=0,application/json;q=1",
+            "application/json;q=0.7, application/json;q=0.2",
+            "application/json;Q=0.5",
         ).forEach { header ->
             assertEquals(AcceptValidation.ACCEPTED, accept(json, header), header)
         }
@@ -27,7 +31,8 @@ class AcceptValidatorTest {
             "application/json;q=0, */*;q=1",
             "application/*;q=0, */*;q=0.8",
             "application/xml;q=1, application/json;q=0",
-            "application/json;profile=other",
+            "application/json;profile=other", "application/json;q=1;profile=other",
+            "application/json;profile=other;q=1", "application/json;note=\"a,b\"",
         ).forEach { header ->
             assertEquals(AcceptValidation.NOT_ACCEPTABLE, accept(json, header), header)
         }
@@ -56,9 +61,9 @@ class AcceptValidatorTest {
     fun `malformed preferences are not misreported as valid 406 exclusions`() {
         listOf(
             "application/json;q=2", "application/json;q=1.001", "application/json;q=0.1234",
-            "application/json;q=", "application/json;q=0;q=1", "application/json;q=0,application/json;q=1",
+            "application/json;q=", "application/json;q=0;q=1",
             "application/json; note=\"unterminated", "application/json; note=\"a\nb\"",
-            "application/json; q =0.5", "application/json,", ",application/json",
+            "application/json; q =0.5",
             "application/json;note=\"unfinished\\", "application/json\r\n",
             "application/json;q=\"0.5\"", "*/json",
         ).forEach { header ->
@@ -72,6 +77,8 @@ class AcceptValidatorTest {
         assertEquals(AcceptValidation.NOT_ACCEPTABLE, accept(json, longValid)) // parameter-qualified, not bare JSON
         assertEquals(AcceptValidation.MALFORMED, accept(json, "application/json, ${"a".repeat(70_000)}"))
         assertEquals(AcceptValidation.MALFORMED, accept(json, "application/json, ".repeat(300)))
+        assertEquals(AcceptValidation.MALFORMED, accept(json, ",".repeat(512)))
+        assertEquals(AcceptValidation.ACCEPTED, accept(json, ",".repeat(32) + "application/json"))
     }
 
     @Test
