@@ -32,6 +32,10 @@
                 <set-variable variableName="httpStatus" value="#[405]"/>
                 <set-payload value="apikit-method-not-allowed"/>
             </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <set-variable variableName="httpStatus" value="#[406]"/>
+                <set-payload value="apikit-not-acceptable"/>
+            </on-error-propagate>
             <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
                 <set-variable variableName="httpStatus" value="#[415]"/>
                 <set-payload value="apikit-unsupported-media-type"/>

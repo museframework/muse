@@ -62,6 +62,35 @@ internal object AmfRamlParser {
                 resources = api.endPoints().mapNotNull { endpoint ->
                     val methods = endpoint.operations().map { operation ->
                         val request = operation.request()
+                        // Accept constrains successful *response* representations, never request bodies.
+                        // Union of offers enables only a minimal rejection check; it cannot select
+                        // a response status or guarantee parity where 2xx statuses differ.
+                        val responseMediaTypes = operation.responses().flatMap { response ->
+                            val statusText = response.statusCode().takeIf { it.nonNull() }?.value()?.trim()
+                            val status = statusText?.toIntOrNull()
+                            if (status == null && response.payloads().isNotEmpty()) {
+                                throw ApiSpecificationParseException(
+                                    specPath,
+                                    "Unsupported RAML response status for ${operation.method().value()} " +
+                                        "${endpoint.path().value()}: ${statusText ?: "(missing)"}",
+                                )
+                            }
+                            if (status == null || status !in 200..299) {
+                                emptyList()
+                            } else {
+                                response.payloads().map { payload ->
+                                    val mediaType = payload.mediaType().takeIf { it.nonNull() }?.value()?.trim()
+                                    if (mediaType == null || '*' in mediaType || !bareRequestMediaType.matches(mediaType)) {
+                                        throw ApiSpecificationParseException(
+                                            specPath,
+                                            "Unsupported successful response media type for ${operation.method().value()} " +
+                                                "${endpoint.path().value()} ($status): ${mediaType ?: "(missing)"}",
+                                        )
+                                    }
+                                    mediaType
+                                }
+                            }
+                        }.distinctBy { it.lowercase() }
                         ApiMethod(
                             method = HttpMethod.valueOf(operation.method().value().uppercase()),
                             contentTypes = request?.payloads()
@@ -78,6 +107,7 @@ internal object AmfRamlParser {
                                 }
                                 ?.distinct()
                                 .orEmpty(),
+                            responseMediaTypes = responseMediaTypes,
                         )
                     }
                     if (methods.isEmpty()) null else ApiResource(path = endpoint.path().value(), methods = methods)

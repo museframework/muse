@@ -6,6 +6,8 @@ import dev.museframework.apikit.api.error.ApikitErrorType
 import dev.museframework.apikit.api.model.ApiMethod
 import dev.museframework.apikit.api.model.ApiSpecification
 import dev.museframework.apikit.api.routing.RoutingResult
+import dev.museframework.apikit.routing.AcceptValidation
+import dev.museframework.apikit.routing.AcceptValidator
 import dev.museframework.apikit.routing.RequestValidator
 import dev.museframework.apikit.routing.RoutingTable
 import dev.museframework.engine.api.error.MuseError
@@ -107,6 +109,28 @@ class ApikitRoutingPolicy(
                         "The request is missing required query parameter(s): " +
                             "${missingQueryParams.joinToString(", ")}. Include these parameters in your request.",
                     cause = IllegalArgumentException("Missing query params: ${missingQueryParams.joinToString(", ")}"),
+                    event = invocation.input,
+                )
+            }
+        }
+
+        if (validationsEnabled) {
+            when (AcceptValidator.validate(apiMethod, httpAttributes.headers)) {
+                AcceptValidation.ACCEPTED -> Unit
+                AcceptValidation.NOT_ACCEPTABLE -> return failure(
+                    errorType = ApikitErrorType.NOT_ACCEPTABLE,
+                    description = "No acceptable response representation for ${httpAttributes.method} ${httpAttributes.requestPath}",
+                    detailedDescription =
+                        "The Accept header excludes the available successful response media types: " +
+                            apiMethod.responseMediaTypes.joinToString(", "),
+                    cause = IllegalArgumentException("Requested response media types are not acceptable"),
+                    event = invocation.input,
+                )
+                AcceptValidation.MALFORMED -> return failure(
+                    errorType = ApikitErrorType.BAD_REQUEST,
+                    description = "Malformed Accept header for ${httpAttributes.method} ${httpAttributes.requestPath}",
+                    detailedDescription = "The HTTP Accept field has invalid or ambiguous syntax.",
+                    cause = IllegalArgumentException("Malformed Accept header"),
                     event = invocation.input,
                 )
             }

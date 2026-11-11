@@ -327,6 +327,49 @@ class ApikitRoutingPolicyTest {
             assertSame(routing.handleFor("get:\\api\\users:myApi"), invocation.calledHandle)
         }
 
+    @Test
+    fun `valid but incompatible Accept produces NOT_ACCEPTABLE without invoking flow`() =
+        routing(spec(resource("/users", HttpMethod.GET, responseMediaTypes = listOf("application/json")))) { routing ->
+            val invocation = RecordingInvocation(event("/users", HttpMethod.GET, headers = mapOf("Accept" to "application/xml")))
+            assertFailure(routing.execute(invocation), ApikitErrorType.NOT_ACCEPTABLE)
+            assertNull(invocation.calledHandle)
+            assertNull(invocation.calledEvent)
+        }
+
+    @Test
+    fun `Accept checks respect route priority and bypass without masking missing flows`() {
+        routing(spec(resource("/users", HttpMethod.GET, responseMediaTypes = listOf("application/json"))), routedFlows = emptySet()) { routing ->
+            assertFailure(routing.execute(RecordingInvocation(event("/missing", HttpMethod.GET, mapOf("Accept" to "application/xml")))), ApikitErrorType.NOT_FOUND)
+            assertFailure(routing.execute(RecordingInvocation(event("/users", HttpMethod.POST, mapOf("Accept" to "application/xml")))), ApikitErrorType.METHOD_NOT_ALLOWED)
+            assertFailure(routing.execute(RecordingInvocation(event("/users", HttpMethod.GET, mapOf("Accept" to "application/xml")))), ApikitErrorType.NOT_ACCEPTABLE)
+            assertFailure(routing.execute(RecordingInvocation(event("/users", HttpMethod.GET, mapOf("Accept" to "application/json")))), ApikitErrorType.NOT_IMPLEMENTED)
+        }
+        routing(
+            spec(resource("/users", HttpMethod.GET, responseMediaTypes = listOf("application/json"))),
+            routedFlows = emptySet(), validationsEnabled = false,
+        ) { routing ->
+            assertFailure(routing.execute(RecordingInvocation(event("/users", HttpMethod.GET, mapOf("Accept" to "application/xml")))), ApikitErrorType.NOT_IMPLEMENTED)
+        }
+    }
+
+    @Test
+    fun `malformed Accept has a deterministic BAD_REQUEST outcome`() =
+        routing(spec(resource("/users", HttpMethod.GET, responseMediaTypes = listOf("application/json")))) { routing ->
+            val invocation = RecordingInvocation(event("/users", HttpMethod.GET, headers = mapOf("Accept" to "application/json;q=2")))
+            assertFailure(routing.execute(invocation), ApikitErrorType.BAD_REQUEST)
+            assertNull(invocation.calledHandle)
+        }
+
+    @Test
+    fun `valid Accept rejection precedes invalid request Content-Type`() =
+        routing(spec(resource("/users", HttpMethod.POST, contentTypes = listOf("application/octet-stream"), responseMediaTypes = listOf("application/json"))),
+            routedFlows = setOf("post:\\users:myApi"),
+        ) { routing ->
+            val invocation = RecordingInvocation(event("/users", HttpMethod.POST, mapOf("Accept" to "application/xml", "Content-Type" to "text/plain")))
+            assertFailure(routing.execute(invocation), ApikitErrorType.NOT_ACCEPTABLE)
+            assertNull(invocation.calledHandle)
+        }
+
     private fun assertFailure(
         outcome: PolicyOutcome,
         expected: ErrorType,
@@ -352,6 +395,7 @@ class ApikitRoutingPolicyTest {
         requiredHeaders: List<ApiParameter> = emptyList(),
         requiredQueryParams: List<ApiParameter> = emptyList(),
         contentTypes: List<String> = emptyList(),
+        responseMediaTypes: List<String> = emptyList(),
     ): ApiResource =
         ApiResource(
             path = path,
@@ -362,6 +406,7 @@ class ApikitRoutingPolicyTest {
                         requiredHeaders = requiredHeaders,
                         requiredQueryParams = requiredQueryParams,
                         contentTypes = contentTypes,
+                        responseMediaTypes = responseMediaTypes,
                     ),
                 ),
         )
