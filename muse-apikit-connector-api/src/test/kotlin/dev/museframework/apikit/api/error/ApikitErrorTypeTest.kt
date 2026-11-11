@@ -48,5 +48,8 @@ class ApikitErrorTypeTest {
     fun `legacy Muse validation identifiers retain their ancestry`() {
         assertTrue(ApikitErrorType.MISSING_HEADER.isDescendantOf(ApikitErrorType.BAD_REQUEST))
         assertTrue(ApikitErrorType.MISSING_QUERY_PARAM.isDescendantOf(ApikitErrorType.BAD_REQUEST))
+        assertTrue(ApikitErrorType.INVALID_HEADER.isDescendantOf(ApikitErrorType.BAD_REQUEST))
+        assertTrue(ApikitErrorType.INVALID_QUERY_PARAM.isDescendantOf(ApikitErrorType.BAD_REQUEST))
+        assertTrue(ApikitErrorType.FLOW_NOT_FOUND.isDescendantOf(ApikitErrorType.BAD_REQUEST))
     }
 }
