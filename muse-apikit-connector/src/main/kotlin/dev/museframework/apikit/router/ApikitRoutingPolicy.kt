@@ -82,11 +82,35 @@ class ApikitRoutingPolicy(
 
         val apiMethod =
             findApiMethod(flowName, httpAttributes.method)
-                ?: return flowNotFound(invocation, flowName)
+                ?: return notImplemented(invocation, flowName)
 
-        val handle =
-            flowHandles[flowName]
-                ?: return flowNotFound(invocation, flowName)
+        if (validationsEnabled) {
+            val missingHeaders = RequestValidator.validateHeaders(apiMethod, httpAttributes.headers)
+            if (missingHeaders.isNotEmpty()) {
+                return failure(
+                    errorType = ApikitErrorType.BAD_REQUEST,
+                    description = "Missing required header(s): ${missingHeaders.joinToString(", ")}",
+                    detailedDescription =
+                        "The request is missing required header(s): ${missingHeaders.joinToString(", ")}. " +
+                            "Include these headers in your request.",
+                    cause = IllegalArgumentException("Missing headers: ${missingHeaders.joinToString(", ")}"),
+                    event = invocation.input,
+                )
+            }
+
+            val missingQueryParams = RequestValidator.validateQueryParams(apiMethod, httpAttributes.queryParams)
+            if (missingQueryParams.isNotEmpty()) {
+                return failure(
+                    errorType = ApikitErrorType.BAD_REQUEST,
+                    description = "Missing required query parameter(s): ${missingQueryParams.joinToString(", ")}",
+                    detailedDescription =
+                        "The request is missing required query parameter(s): " +
+                            "${missingQueryParams.joinToString(", ")}. Include these parameters in your request.",
+                    cause = IllegalArgumentException("Missing query params: ${missingQueryParams.joinToString(", ")}"),
+                    event = invocation.input,
+                )
+            }
+        }
 
         if (validationsEnabled && !RequestValidator.acceptsContentType(apiMethod, httpAttributes.headers)) {
             return failure(
@@ -100,33 +124,9 @@ class ApikitRoutingPolicy(
             )
         }
 
-        if (validationsEnabled) {
-            val missingHeaders = RequestValidator.validateHeaders(apiMethod, httpAttributes.headers)
-            if (missingHeaders.isNotEmpty()) {
-                return failure(
-                    errorType = ApikitErrorType.MISSING_HEADER,
-                    description = "Missing required header(s): ${missingHeaders.joinToString(", ")}",
-                    detailedDescription =
-                        "The request is missing required header(s): ${missingHeaders.joinToString(", ")}. " +
-                            "Include these headers in your request.",
-                    cause = IllegalArgumentException("Missing headers: ${missingHeaders.joinToString(", ")}"),
-                    event = invocation.input,
-                )
-            }
-
-            val missingQueryParams = RequestValidator.validateQueryParams(apiMethod, httpAttributes.queryParams)
-            if (missingQueryParams.isNotEmpty()) {
-                return failure(
-                    errorType = ApikitErrorType.MISSING_QUERY_PARAM,
-                    description = "Missing required query parameter(s): ${missingQueryParams.joinToString(", ")}",
-                    detailedDescription =
-                        "The request is missing required query parameter(s): " +
-                            "${missingQueryParams.joinToString(", ")}. Include these parameters in your request.",
-                    cause = IllegalArgumentException("Missing query params: ${missingQueryParams.joinToString(", ")}"),
-                    event = invocation.input,
-                )
-            }
-        }
+        val handle =
+            flowHandles[flowName]
+                ?: return notImplemented(invocation, flowName)
 
         return invocation.call(handle, invocation.input.withPathParams(result.pathParams))
     }
@@ -137,7 +137,7 @@ class ApikitRoutingPolicy(
     ): PolicyOutcome =
         if (result.missingHeaders.isNotEmpty()) {
             failure(
-                errorType = ApikitErrorType.MISSING_HEADER,
+                errorType = ApikitErrorType.BAD_REQUEST,
                 description = "Missing required header(s): ${result.missingHeaders.joinToString(", ")}",
                 detailedDescription =
                     "The request is missing required header(s): ${result.missingHeaders.joinToString(", ")}. " +
@@ -147,7 +147,7 @@ class ApikitRoutingPolicy(
             )
         } else {
             failure(
-                errorType = ApikitErrorType.MISSING_QUERY_PARAM,
+                errorType = ApikitErrorType.BAD_REQUEST,
                 description = "Missing required query parameter(s): ${result.missingQueryParams.joinToString(", ")}",
                 detailedDescription =
                     "The request is missing required query parameter(s): " +
@@ -157,10 +157,10 @@ class ApikitRoutingPolicy(
             )
         }
 
-    private fun flowNotFound(invocation: PolicyInvocation, flowName: String): PolicyOutcome =
+    private fun notImplemented(invocation: PolicyInvocation, flowName: String): PolicyOutcome =
         failure(
-            errorType = ApikitErrorType.FLOW_NOT_FOUND,
-            description = "Flow not found: $flowName",
+            errorType = ApikitErrorType.NOT_IMPLEMENTED,
+            description = "API operation not implemented: $flowName",
             detailedDescription =
                 "The API specification defines this route, but no implementation flow was found with name " +
                     "'$flowName'. Create a flow with this name to handle the request.",
