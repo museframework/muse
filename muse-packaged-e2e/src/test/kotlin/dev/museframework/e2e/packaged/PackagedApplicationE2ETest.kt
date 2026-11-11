@@ -103,6 +103,21 @@ class PackagedApplicationE2ETest {
     }
 
     @Test
+    fun `packaged APIKit NOT_ACCEPTABLE handler maps Accept rejection to HTTP 406`() {
+        val rejected = get("/e2e/apikit/ok", accept = "application/json")
+        assertEquals(406, rejected.statusCode())
+        assertEquals("apikit-not-acceptable", rejected.body())
+
+        val excluded = get("/e2e/apikit/ok", accept = "text/plain;q=0, */*;q=1")
+        assertEquals(406, excluded.statusCode())
+        assertEquals("apikit-not-acceptable", excluded.body())
+
+        val accepted = get("/e2e/apikit/ok", accept = "text/plain")
+        assertEquals(200, accepted.statusCode())
+        assertEquals("apikit-ok", accepted.body())
+    }
+
+    @Test
     fun `packaged APIKit UNSUPPORTED_MEDIA_TYPE handler returns HTTP 415`() {
         // The RAML declares application/octet-stream; post() sends text/plain.
         val response = post("/e2e/apikit/upload", "incorrect-media-type")
@@ -403,13 +418,13 @@ class PackagedApplicationE2ETest {
         name: String,
     ): String = state.substringAfter("$name=").substringBefore(';')
 
-    private fun get(path: String): HttpResponse<String> {
-        val request =
+    private fun get(path: String, accept: String? = null): HttpResponse<String> {
+        val builder =
             HttpRequest.newBuilder()
                 .uri(URI.create("http://127.0.0.1:$port$path"))
                 .timeout(REQUEST_TIMEOUT)
-                .GET()
-                .build()
+        if (accept != null) builder.header("Accept", accept)
+        val request = builder.GET().build()
 
         return client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
     }
