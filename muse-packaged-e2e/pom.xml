@@ -39,7 +39,7 @@
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-apikit-connector-spring</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0-SNAPSHOT</version>
         </dependency>
         <!--
           The neutral external policy extension fixture: production dependencies are only muse-dsl and
@@ -106,7 +106,7 @@
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-apikit-babelfish-mappers</artifactId>
-                        <version>0.1.0</version>
+                        <version>0.2.0-SNAPSHOT</version>
                     </dependency>
                 </dependencies>
             </plugin>
