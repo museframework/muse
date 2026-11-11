@@ -74,11 +74,11 @@ class ApikitPolicyCompositionIT {
         }
 
     @Test
-    fun `a matched route without a flow keeps its missing-route semantics`() =
+    fun `a matched route without a flow reports NOT_IMPLEMENTED`() =
         withApplication(routedFlow(raiseType = CONNECTIVITY, name = NOT_ROUTED_FLOW)) { application ->
             val reply = application.execute("/users")
 
-            assertEquals(ApikitErrorType.FLOW_NOT_FOUND, reply.error?.errorType)
+            assertEquals(ApikitErrorType.NOT_IMPLEMENTED, reply.error?.errorType)
         }
 
     private fun withApplication(
