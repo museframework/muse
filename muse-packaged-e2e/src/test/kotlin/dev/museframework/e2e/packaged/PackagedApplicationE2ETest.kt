@@ -79,6 +79,57 @@ class PackagedApplicationE2ETest {
     }
 
     @Test
+    fun `packaged APIKit routes a valid request and returns HTTP 200`() {
+        val response = get("/e2e/apikit/ok")
+
+        assertEquals(200, response.statusCode())
+        assertEquals("apikit-ok", response.body())
+    }
+
+    @Test
+    fun `packaged APIKit NOT_FOUND handler returns HTTP 404`() {
+        val response = get("/e2e/apikit/missing")
+
+        assertEquals(404, response.statusCode())
+        assertEquals("apikit-not-found", response.body())
+    }
+
+    @Test
+    fun `packaged APIKit METHOD_NOT_ALLOWED handler returns HTTP 405`() {
+        val response = post("/e2e/apikit/ok", "not-allowed")
+
+        assertEquals(405, response.statusCode())
+        assertEquals("apikit-method-not-allowed", response.body())
+    }
+
+    @Test
+    fun `packaged APIKit UNSUPPORTED_MEDIA_TYPE handler returns HTTP 415`() {
+        // The RAML declares application/octet-stream; post() sends text/plain.
+        val response = post("/e2e/apikit/upload", "incorrect-media-type")
+
+        assertEquals(415, response.statusCode())
+        assertEquals("apikit-unsupported-media-type", response.body())
+    }
+
+    @Test
+    fun `packaged APIKit NOT_IMPLEMENTED handler returns HTTP 501`() {
+        // The RAML declares the operation, but there is no matching implementation flow.
+        val response = get("/e2e/apikit/unfinished")
+
+        assertEquals(501, response.statusCode())
+        assertEquals("apikit-not-implemented", response.body())
+    }
+
+    @Test
+    fun `packaged APIKit BAD_REQUEST flow handler returns HTTP 400`() {
+        // This covers flow error handler to listener mapping, not required RAML header projection.
+        val response = get("/e2e/apikit/forced-bad")
+
+        assertEquals(400, response.statusCode())
+        assertEquals("apikit-bad-request", response.body())
+    }
+
+    @Test
     fun `packaged choice handles raised error`() {
         val response = post("/e2e/choice-error", "fail")
 

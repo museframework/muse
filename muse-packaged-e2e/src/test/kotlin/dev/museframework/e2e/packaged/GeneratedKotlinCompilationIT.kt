@@ -12,6 +12,7 @@ class GeneratedKotlinCompilationIT {
     fun `generated configuration and application classes load from compiled bytecode`() {
         val generatedConfigClasses =
             listOf(
+                "ApikitWireConfig",
                 "ChoiceErrorConfig",
                 "ConnectionsConfig",
                 "CoreFlowControlConfig",
