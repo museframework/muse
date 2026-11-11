@@ -143,6 +143,8 @@ jobs:
         retention-days: 7
 
   published-core-compatibility:
+    # Published 0.1.0 core compatibility applies to the stable line, not 0.2.0-SNAPSHOT.
+    if: ${{ github.ref == 'refs/heads/main' || github.base_ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 6
     strategy:
