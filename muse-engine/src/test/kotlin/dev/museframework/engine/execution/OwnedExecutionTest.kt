@@ -474,6 +474,41 @@ class OwnedExecutionTest {
             }
         }
 
+    @Test
+    fun `first matching handler retains declaration-order precedence`() =
+        runTest {
+            val parent = ErrorType("TEST", "PARENT")
+            val child = ErrorType("TEST", "CHILD", parent)
+            val error = policyError("CHILD").copy(errorType = child)
+            val selected = mutableListOf<String>()
+            val handler = ResolvedErrorHandler(
+                listOf(
+                    ResolvedErrorHandlerStrategy(
+                        errorType = parent,
+                        pipeline = pipelineOf(probe("generic") {
+                            selected += "generic"
+                            ProcessorResult.Success(it)
+                        }),
+                        kind = ResolvedErrorHandlerStrategy.Kind.CONTINUE,
+                    ),
+                    ResolvedErrorHandlerStrategy(
+                        errorType = child,
+                        pipeline = pipelineOf(probe("specific") {
+                            selected += "specific"
+                            ProcessorResult.Success(it)
+                        }),
+                        kind = ResolvedErrorHandlerStrategy.Kind.CONTINUE,
+                    ),
+                ),
+            )
+            val owned = OwnedExecution(
+                BoundExecution { ProcessorResult.Failure(error, it.withError(error)) },
+                handler,
+            )
+
+            assertIs<ProcessorResult.Success>(owned.invoke(policyContext(this)))
+            assertEquals(listOf("generic"), selected)
+        }
     private fun errorHandler(
         errorType: ErrorType = ErrorType.Mule.ANY,
         pipeline: Pipeline,

@@ -65,8 +65,16 @@ internal object AmfRamlParser {
                         ApiMethod(
                             method = HttpMethod.valueOf(operation.method().value().uppercase()),
                             contentTypes = request?.payloads()
-                                ?.mapNotNull { payload ->
-                                    payload.mediaType().takeIf { it.nonNull() }?.value()
+                                ?.map { payload ->
+                                    val mediaType = payload.mediaType().takeIf { it.nonNull() }?.value()?.trim()
+                                    if (mediaType == null || '*' in mediaType || !bareRequestMediaType.matches(mediaType)) {
+                                        throw ApiSpecificationParseException(
+                                            specPath,
+                                            "Unsupported request body media type for ${operation.method().value()} " +
+                                                "${endpoint.path().value()}: ${mediaType ?: "(missing)"}",
+                                        )
+                                    }
+                                    mediaType
                                 }
                                 ?.distinct()
                                 .orEmpty(),
@@ -129,3 +137,7 @@ private fun readBounded(stream: java.io.InputStream): String {
     if (bytes.size > 2 * 1024 * 1024) throw IOException("RAML resource exceeds 2 MiB limit")
     return String(bytes, StandardCharsets.UTF_8)
 }
+
+// Only bare type/subtype constraints are representable by ApiMethod.contentTypes.
+// Refuse declared parameters or wildcards instead of silently loosening validation.
+private val bareRequestMediaType = Regex("""[!#\$%&'*+.^_\x60|~0-9A-Za-z-]+/[!#\$%&'*+.^_\x60|~0-9A-Za-z-]+""")

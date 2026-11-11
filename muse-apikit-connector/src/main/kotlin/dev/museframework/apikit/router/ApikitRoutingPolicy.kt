@@ -82,17 +82,13 @@ class ApikitRoutingPolicy(
 
         val apiMethod =
             findApiMethod(flowName, httpAttributes.method)
-                ?: return flowNotFound(invocation, flowName)
-
-        val handle =
-            flowHandles[flowName]
-                ?: return flowNotFound(invocation, flowName)
+                ?: return notImplemented(invocation, flowName)
 
         if (validationsEnabled) {
             val missingHeaders = RequestValidator.validateHeaders(apiMethod, httpAttributes.headers)
             if (missingHeaders.isNotEmpty()) {
                 return failure(
-                    errorType = ApikitErrorType.MISSING_HEADER,
+                    errorType = ApikitErrorType.BAD_REQUEST,
                     description = "Missing required header(s): ${missingHeaders.joinToString(", ")}",
                     detailedDescription =
                         "The request is missing required header(s): ${missingHeaders.joinToString(", ")}. " +
@@ -105,7 +101,7 @@ class ApikitRoutingPolicy(
             val missingQueryParams = RequestValidator.validateQueryParams(apiMethod, httpAttributes.queryParams)
             if (missingQueryParams.isNotEmpty()) {
                 return failure(
-                    errorType = ApikitErrorType.MISSING_QUERY_PARAM,
+                    errorType = ApikitErrorType.BAD_REQUEST,
                     description = "Missing required query parameter(s): ${missingQueryParams.joinToString(", ")}",
                     detailedDescription =
                         "The request is missing required query parameter(s): " +
@@ -116,6 +112,22 @@ class ApikitRoutingPolicy(
             }
         }
 
+        if (validationsEnabled && !RequestValidator.acceptsContentType(apiMethod, httpAttributes.headers)) {
+            return failure(
+                errorType = ApikitErrorType.UNSUPPORTED_MEDIA_TYPE,
+                description = "Unsupported Content-Type for ${httpAttributes.method} ${httpAttributes.requestPath}",
+                detailedDescription =
+                    "Expected one of: ${apiMethod.contentTypes.joinToString(", ")}. " +
+                        "Received: ${httpAttributes.headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value ?: "(missing)"}.",
+                cause = IllegalArgumentException("Unsupported request media type"),
+                event = invocation.input,
+            )
+        }
+
+        val handle =
+            flowHandles[flowName]
+                ?: return notImplemented(invocation, flowName)
+
         return invocation.call(handle, invocation.input.withPathParams(result.pathParams))
     }
 
@@ -125,7 +137,7 @@ class ApikitRoutingPolicy(
     ): PolicyOutcome =
         if (result.missingHeaders.isNotEmpty()) {
             failure(
-                errorType = ApikitErrorType.MISSING_HEADER,
+                errorType = ApikitErrorType.BAD_REQUEST,
                 description = "Missing required header(s): ${result.missingHeaders.joinToString(", ")}",
                 detailedDescription =
                     "The request is missing required header(s): ${result.missingHeaders.joinToString(", ")}. " +
@@ -135,7 +147,7 @@ class ApikitRoutingPolicy(
             )
         } else {
             failure(
-                errorType = ApikitErrorType.MISSING_QUERY_PARAM,
+                errorType = ApikitErrorType.BAD_REQUEST,
                 description = "Missing required query parameter(s): ${result.missingQueryParams.joinToString(", ")}",
                 detailedDescription =
                     "The request is missing required query parameter(s): " +
@@ -145,10 +157,10 @@ class ApikitRoutingPolicy(
             )
         }
 
-    private fun flowNotFound(invocation: PolicyInvocation, flowName: String): PolicyOutcome =
+    private fun notImplemented(invocation: PolicyInvocation, flowName: String): PolicyOutcome =
         failure(
-            errorType = ApikitErrorType.FLOW_NOT_FOUND,
-            description = "Flow not found: $flowName",
+            errorType = ApikitErrorType.NOT_IMPLEMENTED,
+            description = "API operation not implemented: $flowName",
             detailedDescription =
                 "The API specification defines this route, but no implementation flow was found with name " +
                     "'$flowName'. Create a flow with this name to handle the request.",
