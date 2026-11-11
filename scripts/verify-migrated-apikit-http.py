@@ -4,7 +4,6 @@
 import argparse
 import http.client
 import json
-import socket
 import time
 
 
