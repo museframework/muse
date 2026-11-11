@@ -549,7 +549,7 @@ class QuarkusHttpServerBehaviorIT {
 
         assertEquals(200, response.statusCode())
         assertEquals("leased-response", response.body().decodeToString())
-        assertTrue(provider.isClosed)
+        assertClosed(provider)
         assertEquals(1, closes.get(), "The adapter closes the retained lease, not the provider")
         assertEquals(1, releases.get(), "Last-owner cleanup runs once, through the lease")
     }
