@@ -481,6 +481,23 @@ jobs:
           -Dkotlin.daemon.enabled=false clean compile
         test -n "$(find examples/mule-test-backend/target/generated-sources/muse -name '*.kt' -print -quit)"
 
+    # This is the original unchanged migrated backend, not the synthetic packaged APIKit fixture.
+    - name: Verify canonical APIKit HTTP statuses and DataWeave JSON error bodies
+      run: |
+        set -euo pipefail
+        mvn -f examples/mule-test-backend/pom.xml --batch-mode -ntp \
+          -Dkotlin.daemon.enabled=false -DskipTests clean package spring-boot:repackage
+        jar="examples/mule-test-backend/target/mule-test-backend-1.0.0-SNAPSHOT.jar"
+        test -s "$jar"
+        java -jar "$jar" --server.port=8080 --server.address=127.0.0.1 \
+          --spring.main.banner-mode=off > "${RUNNER_TEMP}/apikit-migrated-http.log" 2>&1 &
+        app_pid=$!
+        trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+        if ! python3 scripts/verify-migrated-apikit-http.py --port 8080; then
+          cat "${RUNNER_TEMP}/apikit-migrated-http.log"
+          exit 1
+        fi
+
   native-image:
     runs-on: ubuntu-latest
     needs: build
