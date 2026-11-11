@@ -1,0 +1,37 @@
+#%RAML 1.0
+title: Packaged APIKit error handler HTTP contract
+version: v1
+
+/e2e:
+  /apikit:
+    /ok:
+      get:
+        responses:
+          200:
+            body:
+              text/plain:
+                type: string
+    /forced-bad:
+      get:
+        responses:
+          200:
+            body:
+              text/plain:
+                type: string
+    /upload:
+      post:
+        body:
+          application/octet-stream:
+            type: file
+        responses:
+          200:
+            body:
+              text/plain:
+                type: string
+    /unfinished:
+      get:
+        responses:
+          200:
+            body:
+              text/plain:
+                type: string
