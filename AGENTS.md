@@ -336,6 +336,13 @@ mvn clean verify \
   -Dkotlin.daemon.enabled=false
 ```
 
+## Branching and release workflow
+
+- `main` is the release-ready branch and must carry a non-SNAPSHOT Maven version.
+- `develop` is the integration branch for the next `-SNAPSHOT` version.
+- Normal code changes target `develop` through reviewed PRs; release and hotfix changes reach `main` through reviewed PRs and matching release tags.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for branch conventions and [docs/development/releasing.md](docs/development/releasing.md) for Maven version, tagging, and publication rules.
+
 ## Release rules
 
 - Release versions must not use `-SNAPSHOT`.
