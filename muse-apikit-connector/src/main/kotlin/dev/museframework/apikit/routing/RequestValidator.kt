@@ -30,7 +30,7 @@ object RequestValidator {
         method.requiredHeaders
             .filter { it.required }
             .map { it.name }
-            .filter { headerName -> !headers.containsKey(headerName) }
+            .filter { headerName -> headers.keys.none { it.equals(headerName, ignoreCase = true) } }
 
     fun validateQueryParams(
         method: ApiMethod,
