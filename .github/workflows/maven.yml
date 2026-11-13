@@ -142,9 +142,38 @@ jobs:
         if-no-files-found: error
         retention-days: 7
 
+  stable-published-core-version:
+    # The published 0.1.0 compatibility gate is meaningful only while main itself is 0.1.0.
+    # Do not run it on release PRs or against a later stable source line.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      current_version: ${{ steps.detect.outputs.current_version }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Read the stable Muse BOM version
+      id: detect
+      run: |
+        python3 - <<'PY'
+        import os
+        import xml.etree.ElementTree as ET
+
+        version = ET.parse("muse-bom/pom.xml").getroot().findtext(
+            "{http://maven.apache.org/POM/4.0.0}version"
+        )
+        if not version:
+            raise SystemExit("Cannot determine the Muse BOM version")
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+            output.write(f"current_version={version}\n")
+        PY
+
   published-core-compatibility:
-    # Published 0.1.0 core compatibility applies to the stable line, not 0.2.0-SNAPSHOT.
-    if: ${{ github.ref == 'refs/heads/main' || github.base_ref == 'main' }}
+    # Verify published 0.1.0 compatibility only for main@0.1.0.
+    # After publishing 0.2.0, establish its own published-artifact gate separately.
+    needs: stable-published-core-version
+    if: ${{ needs.stable-published-core-version.outputs.current_version == '0.1.0' }}
     runs-on: ubuntu-latest
     timeout-minutes: 6
     strategy:
