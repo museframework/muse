@@ -85,6 +85,7 @@ class SpringBootRuntimeStrategyTest {
                 ),
             )
 
+        assertContains(pom, "<kotlin.version>2.4.21</kotlin.version>")
         assertContains(pom, "<artifactId>spring-boot-starter-parent</artifactId>")
         assertContains(pom, "<artifactId>muse-spring-boot</artifactId>")
         assertContains(pom, "<artifactId>muse-http-connector-spring</artifactId>")

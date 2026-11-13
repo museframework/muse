@@ -38,7 +38,7 @@ object SpringBootPomXmlGenerator {
             appendLine()
             appendLine("    <properties>")
             appendLine("        <java.version>21</java.version>")
-            appendLine("        <kotlin.version>2.3.20</kotlin.version>")
+            appendLine("        <kotlin.version>2.4.21</kotlin.version>")
             appendLine("        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>")
             appendLine("        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>")
             appendLine("        <maven.compiler.source>\${java.version}</maven.compiler.source>")

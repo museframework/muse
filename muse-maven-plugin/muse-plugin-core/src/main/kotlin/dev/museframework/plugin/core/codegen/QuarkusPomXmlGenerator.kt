@@ -2,7 +2,7 @@ package dev.museframework.plugin.core.codegen
 
 object QuarkusPomXmlGenerator {
     private const val QUARKUS_VERSION = "3.21.0"
-    private const val KOTLIN_VERSION = "2.3.20"
+    private const val KOTLIN_VERSION = "2.4.21"
     private const val MUSE_VERSION = "0.1.0"
 
     fun generate(config: MigrationProjectConfig): String {
