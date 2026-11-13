@@ -22,6 +22,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Validate version bump script and tracked POM coverage
+      run: |
+        python3 scripts/test_set_version_poms.py
+        bash scripts/set-version.sh --dry-run 999.999.999-SNAPSHOT > /dev/null
+
     - name: Discover verification owners with strict family pairs
       id: discover
       run: |
