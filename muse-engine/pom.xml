@@ -7,7 +7,7 @@
     <parent>
         <groupId>dev.museframework</groupId>
         <artifactId>muse-parent</artifactId>
-        <version>0.2.0</version>
+        <version>0.2.1</version>
     </parent>
 
     <groupId>dev.museframework.connectors</groupId>
@@ -82,7 +82,7 @@
         <dependency>
             <groupId>dev.museframework.test</groupId>
             <artifactId>muse-policy-extension-fixture</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>

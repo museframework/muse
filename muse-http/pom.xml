@@ -7,7 +7,7 @@
 
     <groupId>dev.museframework.connectors</groupId>
     <artifactId>muse-http-parent</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
     <packaging>pom</packaging>
     <name>Muse HTTP Connector Parent</name>
     <description>Independent reactor for Muse HTTP connector artifacts</description>
@@ -40,7 +40,7 @@
     </scm>
 
     <properties>
-        <muse.version>0.2.0</muse.version>
+        <muse.version>0.2.1</muse.version>
         <kotlin.version>2.3.20</kotlin.version>
         <kotlin.code.style>official</kotlin.code.style>
         <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
