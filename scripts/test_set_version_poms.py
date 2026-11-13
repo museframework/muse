@@ -45,6 +45,9 @@ class SetVersionTests(unittest.TestCase):
   <groupId>dev.museframework.it</groupId><artifactId>fixture</artifactId><version>{OLD}</version>
   <build><plugins><plugin><groupId>dev.museframework.maven</groupId><artifactId>muse-maven-plugin</artifactId><version>{OLD}</version></plugin></plugins></build>
   <dependencies><dependency><groupId>dev.museframework</groupId><artifactId>muse-dsl</artifactId><version>{OLD}</version></dependency></dependencies>"""))
+        self.write("muse-maven-plugin/muse-plugin-it/src/it/odd-version/pom.xml", pom(f"""
+  <groupId>io.muse.it</groupId><artifactId>odd-version</artifactId><version>{OLD}-SNAPSHOT</version>
+  <dependencies><dependency><groupId>dev.museframework</groupId><artifactId>muse-engine</artifactId><version>{OLD}</version></dependency></dependencies>"""))
         self.write("examples/mule-original/pom.xml", pom("""
   <groupId>org.mule</groupId><artifactId>original</artifactId><version>1.0.0-SNAPSHOT</version>"""))
         self.root.joinpath("scripts").mkdir(parents=True, exist_ok=True)
@@ -64,12 +67,15 @@ class SetVersionTests(unittest.TestCase):
     def test_updates_all_tracked_muse_poms_without_changing_external_versions(self) -> None:
         result = self.run_script(NEW)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Updating 5 POMs", result.stdout)
+        self.assertIn("Updating 6 POMs", result.stdout)
         for file in ["pom.xml", "muse-bom/pom.xml", "muse-engine/pom.xml",
                      "muse-http/pom.xml", "muse-maven-plugin/muse-plugin-it/src/it/basic/pom.xml"]:
             data = (self.root / file).read_text()
             self.assertNotIn(OLD, data)
             self.assertIn(NEW, data)
+        unusual = (self.root / "muse-maven-plugin/muse-plugin-it/src/it/odd-version/pom.xml").read_text()
+        self.assertIn(f"<version>{OLD}-SNAPSHOT</version>", unusual)
+        self.assertIn(f"<artifactId>muse-engine</artifactId><version>{NEW}</version>", unusual)
         self.assertIn("1.0.0-SNAPSHOT", (self.root / "examples/mule-original/pom.xml").read_text())
         self.assertIn("<version>1.2.3</version>", (self.root / "muse-engine/pom.xml").read_text())
         self.assertEqual(self.run_script(NEW).returncode, 0)
@@ -78,7 +84,7 @@ class SetVersionTests(unittest.TestCase):
         before = (self.root / "muse-bom/pom.xml").read_bytes()
         result = self.run_script("--dry-run", NEW)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Would update 5 POMs", result.stdout)
+        self.assertIn("Would update 6 POMs", result.stdout)
         self.assertEqual((self.root / "muse-bom/pom.xml").read_bytes(), before)
 
     def test_invalid_version_is_rejected(self) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -110,6 +111,12 @@ def plan_changes(root_path: Path, new_version: str) -> tuple[str, list[tuple[Pat
     if not poms or root_pom not in poms:
         raise ValueError("No tracked Maven POMs found; run from a Git checkout")
 
+    # Match complete XML element values, never prefixes of longer fixture versions.
+    version_tag = re.compile(
+        r"(?P<start><(?P<tag>version|muse\.version)>\s*)"
+        + re.escape(old_version)
+        + r"(?P<end>\s*</(?P=tag)>)"
+    )
     updates: list[tuple[Path, str]] = []
     for path in poms:
         content = path.read_bytes().decode("utf-8")
@@ -117,14 +124,18 @@ def plan_changes(root_path: Path, new_version: str) -> tuple[str, list[tuple[Pat
             continue
         xml = read_xml(content, path)
         expected = allowed_occurrences(xml, old_version)
-        actual = content.count(old_version)
-        if actual != expected:
+        matches = list(version_tag.finditer(content))
+        if len(matches) != expected:
             raise ValueError(
-                f"{path}: {actual} occurrences of {old_version}, but only {expected} "
+                f"{path}: {len(matches)} exact XML version matches, but only {expected} "
                 "are recognized Muse coordinates; aborting without changes"
             )
-        if new_version != old_version:
-            updates.append((path, content.replace(old_version, new_version)))
+        if new_version != old_version and matches:
+            changed = version_tag.sub(
+                lambda match: match.group("start") + new_version + match.group("end"),
+                content,
+            )
+            updates.append((path, changed))
     return old_version, updates
 
 
