@@ -6,7 +6,7 @@
 
     <groupId>io.muse.it</groupId>
     <artifactId>check-lenient-ok</artifactId>
-    <version>0.2.0-SNAPSHOT-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -19,12 +19,12 @@
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-dsl</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.3.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-babelfish</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.3.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
 
@@ -33,7 +33,7 @@
             <plugin>
                 <groupId>dev.museframework.maven</groupId>
                 <artifactId>muse-maven-plugin</artifactId>
-                <version>0.2.0-SNAPSHOT</version>
+                <version>0.3.0-SNAPSHOT</version>
                 <executions>
                     <execution>
                         <id>muse-check</id>
