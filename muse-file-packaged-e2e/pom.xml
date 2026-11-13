@@ -7,13 +7,13 @@
     <parent>
         <groupId>dev.museframework.test</groupId>
         <artifactId>muse-packaged-test-parent</artifactId>
-        <version>0.2.0</version>
+        <version>0.2.1</version>
         <relativePath>../muse-packaged-test-parent/pom.xml</relativePath>
     </parent>
 
     <groupId>dev.museframework</groupId>
     <artifactId>muse-file-packaged-e2e</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
     <name>Muse File Packaged E2E Fixture</name>
     <description>Independently packaged file runtime and generated acceptance</description>
 
@@ -29,12 +29,12 @@
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-spring-boot</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework.connectors</groupId>
             <artifactId>muse-file-connector</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -52,7 +52,7 @@
         <dependency>
             <groupId>dev.museframework.test</groupId>
             <artifactId>muse-packaged-e2e-testkit</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -85,7 +85,7 @@
                     <dependency>
                         <groupId>dev.museframework</groupId>
                         <artifactId>muse-file-babelfish-mappers</artifactId>
-                        <version>0.2.0</version>
+                        <version>0.2.1</version>
                     </dependency>
                 </dependencies>
             </plugin>

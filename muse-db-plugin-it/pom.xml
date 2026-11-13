@@ -7,7 +7,7 @@
     <parent>
         <groupId>dev.museframework</groupId>
         <artifactId>muse-parent</artifactId>
-        <version>0.2.0</version>
+        <version>0.2.1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -33,22 +33,22 @@
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-dsl</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-babelfish</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-db-connector-api</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-db-babelfish-mappers</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
         </dependency>
     </dependencies>
 

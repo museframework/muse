@@ -6,12 +6,12 @@
     <parent>
         <groupId>dev.museframework</groupId>
         <artifactId>muse-parent</artifactId>
-        <version>0.2.0</version>
+        <version>0.2.1</version>
         <relativePath>../../../../../pom.xml</relativePath>
     </parent>
     <groupId>dev.museframework.test</groupId>
     <artifactId>muse-policy-extension-fixture</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
     <name>Muse Policy Extension Fixture</name>
     <properties>
         <skipPublishing>true</skipPublishing>
