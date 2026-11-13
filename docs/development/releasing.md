@@ -9,22 +9,6 @@ Muse follows a lightweight GitFlow model. The normal development branch carries 
 - A release branch uses the exact target version without the `-SNAPSHOT` suffix. Once that release is complete, update `develop` to the following development version, e.g. `0.3.0-SNAPSHOT` after `0.2.0`.
 - Treat SNAPSHOT artifacts as development artifacts. The tag-based Maven Central workflow is for stable releases; snapshot publishing requires a separate explicitly configured destination and must not happen implicitly.
 
-## Updating the Maven version
-
-From the repository root, run:
-
-```bash
-./scripts/set-version.sh --dry-run 0.4.0-SNAPSHOT
-./scripts/set-version.sh 0.4.0-SNAPSHOT
-python3 scripts/test_set_version_poms.py
-git diff --check
-git diff -- '**/pom.xml' pom.xml
-```
-
-The script requires Bash, Git, and Python 3 (standard library only); it does not need Maven or a Maven plugin. It detects the current version from the BOM and validates the root parent, then updates tracked POMs including HTTP modules, Maven Invoker fixtures, and Muse example coordinates. It recognizes Muse group IDs under `dev.museframework` and preserves unrelated dependency versions and the existing XML formatting.
-
-The script is idempotent, does not commit, tag, or publish artifacts, and aborts before writing if it encounters ambiguous uses of the old version. Use `--dry-run` first, review the resulting diff, and perform the appropriate Maven verification before a release.
-
 ## Release procedure
 
 1. Verify `develop` is ready: review its intended changes, CI status, dependency and module versions, and pending pull requests.
