@@ -22,7 +22,7 @@
 
         <app.runtime>4.9.16</app.runtime>
         <mule.maven.plugin.version>4.7.0</mule.maven.plugin.version>
-        <kotlin.version>2.3.0</kotlin.version>
+        <kotlin.version>2.4.21</kotlin.version>
         <skipPublishing>true</skipPublishing>
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>

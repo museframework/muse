@@ -77,6 +77,7 @@ class QuarkusRuntimeStrategyTest {
                 ),
             )
 
+        assertContains(pom, "<kotlin.version>2.4.21</kotlin.version>")
         assertContains(pom, "<artifactId>quarkus-maven-plugin</artifactId>")
         assertContains(pom, "<artifactId>muse-quarkus</artifactId>")
         assertContains(pom, "<artifactId>muse-http-connector-quarkus</artifactId>")
