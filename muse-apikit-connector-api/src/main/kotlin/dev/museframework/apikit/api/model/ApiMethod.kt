@@ -7,4 +7,6 @@ data class ApiMethod(
     val contentTypes: List<String> = emptyList(),
     val requiredHeaders: List<ApiParameter> = emptyList(),
     val requiredQueryParams: List<ApiParameter> = emptyList(),
+    /** Successful RAML response representations, independent from request [contentTypes]. */
+    val responseMediaTypes: List<String> = emptyList(),
 )

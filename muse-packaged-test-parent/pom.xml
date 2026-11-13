@@ -13,7 +13,7 @@
 
     <groupId>dev.museframework.test</groupId>
     <artifactId>muse-packaged-test-parent</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <packaging>pom</packaging>
     <name>Muse Packaged Test Parent</name>
     <description>Shared packaged fixture build configuration without connector dependencies</description>
@@ -23,7 +23,7 @@
             <dependency>
                 <groupId>dev.museframework</groupId>
                 <artifactId>muse-bom</artifactId>
-                <version>0.1.0</version>
+                <version>0.2.0</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -50,7 +50,7 @@
                 <plugin>
                     <groupId>dev.museframework.maven</groupId>
                     <artifactId>muse-maven-plugin</artifactId>
-                    <version>0.1.0</version>
+                    <version>0.2.0</version>
                     <configuration>
                         <packageName>${muse.generated.package}</packageName>
                         <runtime>spring-boot</runtime>

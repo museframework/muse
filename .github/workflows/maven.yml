@@ -142,7 +142,38 @@ jobs:
         if-no-files-found: error
         retention-days: 7
 
+  stable-published-core-version:
+    # The published 0.1.0 compatibility gate is meaningful only while main itself is 0.1.0.
+    # Do not run it on release PRs or against a later stable source line.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      current_version: ${{ steps.detect.outputs.current_version }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Read the stable Muse BOM version
+      id: detect
+      run: |
+        python3 - <<'PY'
+        import os
+        import xml.etree.ElementTree as ET
+
+        version = ET.parse("muse-bom/pom.xml").getroot().findtext(
+            "{http://maven.apache.org/POM/4.0.0}version"
+        )
+        if not version:
+            raise SystemExit("Cannot determine the Muse BOM version")
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+            output.write(f"current_version={version}\n")
+        PY
+
   published-core-compatibility:
+    # Verify published 0.1.0 compatibility only for main@0.1.0.
+    # After publishing 0.2.0, establish its own published-artifact gate separately.
+    needs: stable-published-core-version
+    if: ${{ needs.stable-published-core-version.outputs.current_version == '0.1.0' }}
     runs-on: ubuntu-latest
     timeout-minutes: 6
     strategy:
@@ -481,6 +512,23 @@ jobs:
           -Dkotlin.daemon.enabled=false clean compile
         test -n "$(find examples/mule-test-backend/target/generated-sources/muse -name '*.kt' -print -quit)"
 
+    # This is the original unchanged migrated backend, not the synthetic packaged APIKit fixture.
+    - name: Verify canonical APIKit HTTP statuses and DataWeave JSON error bodies
+      run: |
+        set -euo pipefail
+        mvn -f examples/mule-test-backend/pom.xml --batch-mode -ntp \
+          -Dkotlin.daemon.enabled=false -DskipTests clean package spring-boot:repackage
+        jar="examples/mule-test-backend/target/mule-test-backend-1.0.0-SNAPSHOT.jar"
+        test -s "$jar"
+        java -jar "$jar" --server.port=8080 --server.address=127.0.0.1 \
+          --spring.main.banner-mode=off > "${RUNNER_TEMP}/apikit-migrated-http.log" 2>&1 &
+        app_pid=$!
+        trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+        if ! python3 scripts/verify-migrated-apikit-http.py --port 8080; then
+          cat "${RUNNER_TEMP}/apikit-migrated-http.log"
+          exit 1
+        fi
+
   native-image:
     runs-on: ubuntu-latest
     needs: build
@@ -513,4 +561,129 @@ jobs:
       with:
         name: native-executable
         path: examples/test-muse-spring-boot-native/target/*-runner
+        retention-days: 7
+
+  # PR #14 only: capture the actual resolved AMF runtime dependency/licensing evidence.
+  # POM license declarations are evidence for review, not legal clearance.
+  amf-license-audit:
+    if: github.event_name == 'pull_request' && github.head_ref == 'spike/apikit-amf-parser-20261109'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Install the AMF-owning module and its dependencies from the PR
+      run: >-
+        mvn install --batch-mode -ntp -DskipTests -Dkotlin.daemon.enabled=false
+        -pl :muse-apikit-connector -am
+
+    - name: Capture selected runtime dependency graph
+      run: |
+        mvn -f muse-apikit-connector/pom.xml --batch-mode -ntp \
+          org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree \
+          -Dscope=runtime -DoutputType=json \
+          -DoutputFile="$RUNNER_TEMP/amf-runtime-tree.json"
+        test -s "$RUNNER_TEMP/amf-runtime-tree.json"
+
+    - name: Capture declared third-party licenses including transitives
+      run: |
+        mvn -f muse-apikit-connector/pom.xml --batch-mode -ntp \
+          org.codehaus.mojo:license-maven-plugin:2.7.1:add-third-party \
+          -Dlicense.includeTransitiveDependencies=true \
+          -Dlicense.includedScopes=compile,runtime \
+          -Dlicense.addOutputDirectoryAsResourceDir=false \
+          -Dlicense.useRepositoryMissingFiles=false \
+          -Dlicense.failOnMissing=false \
+          -Dlicense.outputDirectory="$RUNNER_TEMP/amf-licenses"
+        test -s "$RUNNER_TEMP/amf-licenses/THIRD-PARTY.txt"
+        cat "$RUNNER_TEMP/amf-licenses/THIRD-PARTY.txt"
+
+    - name: Upload dependency and POM-license evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: amf-runtime-dependency-license-audit
+        path: |
+          ${{ runner.temp }}/amf-runtime-tree.json
+          ${{ runner.temp }}/amf-licenses/THIRD-PARTY.txt
+        if-no-files-found: warn
+        retention-days: 14
+
+  # PR #14 only: test the actual APIKit consumer, not the disabled Spring native sample.
+  amf-native-probe:
+    if: github.event_name == 'pull_request' && github.head_ref == 'spike/apikit-amf-parser-20261109'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up GraalVM 21 with Native Image
+      uses: graalvm/setup-graalvm@v1
+      with:
+        java-version: '21'
+        distribution: 'graalvm-community'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        cache: maven
+
+    - name: Confirm Native Image toolchain
+      run: |
+        java -version
+        native-image --version
+
+    - name: Install APIKit and its reactor dependencies from this commit
+      run: >-
+        mvn install --batch-mode -ntp -DskipTests -Dkotlin.daemon.enabled=false
+        -pl :muse-apikit-connector -am
+
+    - name: Install existing Quarkus extensions
+      run: |
+        mvn -f muse-quarkus/pom.xml install --batch-mode -ntp -DskipTests -Dkotlin.daemon.enabled=false
+        mvn -f muse-http-connector-quarkus/pom.xml install --batch-mode -ntp -DskipTests -Dkotlin.daemon.enabled=false
+        mvn -f muse-apikit-connector-quarkus/pom.xml install --batch-mode -ntp -DskipTests -Dkotlin.daemon.enabled=false
+
+    - name: Compile existing APIKit Quarkus example to Native Image
+      run: >-
+        mvn -f examples/test-muse-quarkus/pom.xml package --batch-mode -ntp
+        -DskipTests -Dquarkus.native.enabled=true -Dkotlin.daemon.enabled=false
+        -Dquarkus.native.container-build=false
+        -Dquarkus.native.native-image-xmx=4g
+        -Dquarkus.native.additional-build-args=--initialize-at-run-time=dev.museframework.engine.api.streaming.ManagedStreamingProviders
+
+    - name: Run a real APIKit endpoint from the native executable
+      run: |
+        set -euo pipefail
+        executable="$(find examples/test-muse-quarkus/target -maxdepth 1 -type f -name '*-runner' -print -quit)"
+        test -n "$executable"
+        QUARKUS_HTTP_PORT=18765 "$executable" > "$RUNNER_TEMP/amf-native-app.log" 2>&1 &
+        app_pid=$!
+        trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+        for attempt in $(seq 1 40); do
+          if curl --fail --silent --show-error --max-time 2 \
+            http://127.0.0.1:18765/apikit/hello -o "$RUNNER_TEMP/amf-native-response.txt"; then
+            cat "$RUNNER_TEMP/amf-native-response.txt"
+            exit 0
+          fi
+          if ! kill -0 "$app_pid" 2>/dev/null; then
+            cat "$RUNNER_TEMP/amf-native-app.log"
+            exit 1
+          fi
+          sleep 1
+        done
+        cat "$RUNNER_TEMP/amf-native-app.log"
+        exit 1
+
+    - name: Upload native runtime diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: amf-native-probe-logs
+        path: |
+          ${{ runner.temp }}/amf-native-app.log
+          ${{ runner.temp }}/amf-native-response.txt
+        if-no-files-found: ignore
         retention-days: 7

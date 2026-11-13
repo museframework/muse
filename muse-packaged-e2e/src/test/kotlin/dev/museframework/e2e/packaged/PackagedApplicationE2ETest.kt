@@ -16,6 +16,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PackagedApplicationE2ETest {
@@ -76,6 +77,69 @@ class PackagedApplicationE2ETest {
 
         assertEquals(200, response.statusCode())
         assertEquals("Echo: hello", response.body())
+    }
+
+    @Test
+    fun `packaged APIKit routes a valid request and returns HTTP 200`() {
+        val response = get("/e2e/apikit/ok")
+
+        assertEquals(200, response.statusCode())
+        assertEquals("apikit-ok", response.body())
+    }
+
+    @Test
+    fun `packaged APIKit NOT_FOUND handler preserves JSON in HTTP 404`() {
+        val response = get("/e2e/apikit/missing")
+
+        assertJsonApiKitError(response, 404, "Resource not found")
+    }
+
+    @Test
+    fun `packaged APIKit METHOD_NOT_ALLOWED handler preserves JSON in HTTP 405`() {
+        val response = post("/e2e/apikit/ok", "not-allowed")
+
+        assertJsonApiKitError(response, 405, "Method not allowed")
+    }
+
+    @Test
+    fun `packaged APIKit NOT_ACCEPTABLE handler maps Accept rejection to HTTP 406`() {
+        val rejected = get("/e2e/apikit/ok", accept = "application/json")
+        assertEquals(406, rejected.statusCode())
+        assertEquals("apikit-not-acceptable", rejected.body())
+
+        val excluded = get("/e2e/apikit/ok", accept = "text/plain;q=0, */*;q=1")
+        assertEquals(406, excluded.statusCode())
+        assertEquals("apikit-not-acceptable", excluded.body())
+
+        val accepted = get("/e2e/apikit/ok", accept = "text/plain")
+        assertEquals(200, accepted.statusCode())
+        assertEquals("apikit-ok", accepted.body())
+    }
+
+    @Test
+    fun `packaged APIKit UNSUPPORTED_MEDIA_TYPE handler preserves JSON in HTTP 415`() {
+        // The RAML declares application/octet-stream; post() sends text/plain.
+        val response = post("/e2e/apikit/upload", "incorrect-media-type")
+
+        assertJsonApiKitError(response, 415, "Unsupported media type")
+    }
+
+    @Test
+    fun `packaged APIKit NOT_IMPLEMENTED handler returns HTTP 501`() {
+        // The RAML declares the operation, but there is no matching implementation flow.
+        val response = get("/e2e/apikit/unfinished")
+
+        assertEquals(501, response.statusCode())
+        assertEquals("apikit-not-implemented", response.body())
+    }
+
+    @Test
+    fun `packaged APIKit BAD_REQUEST flow handler returns HTTP 400`() {
+        // This covers flow error handler to listener mapping, not required RAML header projection.
+        val response = get("/e2e/apikit/forced-bad")
+
+        assertEquals(400, response.statusCode())
+        assertEquals("apikit-bad-request", response.body())
     }
 
     @Test
@@ -352,13 +416,28 @@ class PackagedApplicationE2ETest {
         name: String,
     ): String = state.substringAfter("$name=").substringBefore(';')
 
-    private fun get(path: String): HttpResponse<String> {
-        val request =
+    private fun assertJsonApiKitError(
+        response: HttpResponse<String>,
+        expectedStatus: Int,
+        expectedMessage: String,
+    ) {
+        assertEquals(expectedStatus, response.statusCode())
+        val mediaType = response.headers().firstValue("Content-Type").orElse("").substringBefore(';').trim()
+        assertEquals("application/json", mediaType.lowercase())
+        val expectedBody = Regex("""\{\s*"message"\s*:\s*"${Regex.escape(expectedMessage)}"\s*}""")
+        assertTrue(
+            expectedBody.matches(response.body().trim()),
+            "Expected a JSON message '${expectedMessage}', got: ${response.body()}",
+        )
+    }
+
+    private fun get(path: String, accept: String? = null): HttpResponse<String> {
+        val builder =
             HttpRequest.newBuilder()
                 .uri(URI.create("http://127.0.0.1:$port$path"))
                 .timeout(REQUEST_TIMEOUT)
-                .GET()
-                .build()
+        if (accept != null) builder.header("Accept", accept)
+        val request = builder.GET().build()
 
         return client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
     }

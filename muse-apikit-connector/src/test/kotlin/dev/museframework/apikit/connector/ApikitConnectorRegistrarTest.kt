@@ -126,7 +126,7 @@ class ApikitConnectorRegistrarTest {
             val outcome = policy.execute(StubInvocation(eventFor("/users")))
 
             val failure = assertIs<PolicyOutcome.Failure>(outcome)
-            assertEquals(ApikitErrorType.MISSING_HEADER, failure.error.errorType)
+            assertEquals(ApikitErrorType.BAD_REQUEST, failure.error.errorType)
         }
 
     private fun specWithRequiredParameters(): ApiSpecification =

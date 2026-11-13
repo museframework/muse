@@ -6,7 +6,7 @@
 
     <groupId>dev.museframework.it</groupId>
     <artifactId>file-project-mapper-only-fails</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -21,22 +21,22 @@
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-dsl</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-babelfish</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-file-connector-api</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-file-babelfish-mappers</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0</version>
         </dependency>
     </dependencies>
 
@@ -45,7 +45,7 @@
             <plugin>
                 <groupId>dev.museframework.maven</groupId>
                 <artifactId>muse-maven-plugin</artifactId>
-                <version>0.1.0</version>
+                <version>0.2.0</version>
                 <executions>
                     <execution>
                         <id>muse-generate</id>
