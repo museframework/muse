@@ -109,7 +109,7 @@ class RequestValidatorTest {
         }
 
         @Test
-        fun `should be case-sensitive for header names`() {
+        fun `should match required header names case insensitively`() {
             val method =
                 ApiMethod(
                     method = HttpMethod.GET,
@@ -122,7 +122,7 @@ class RequestValidatorTest {
 
             val result = RequestValidator.validateHeaders(method, headers)
 
-            assertEquals(listOf("Authorization"), result)
+            assertTrue(result.isEmpty())
         }
     }
 

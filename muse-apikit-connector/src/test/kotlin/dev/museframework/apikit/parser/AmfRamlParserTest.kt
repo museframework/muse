@@ -1,7 +1,9 @@
 package dev.museframework.apikit.parser
 
 import dev.museframework.apikit.ApiSpecificationParseException
+import dev.museframework.apikit.api.model.ApiParameter
 import dev.museframework.apikit.api.model.ApiSpecification
+import dev.museframework.apikit.routing.RequestValidator
 import java.net.URLClassLoader
 import java.nio.file.Files
 import org.junit.jupiter.api.io.TempDir
@@ -44,6 +46,38 @@ class AmfRamlParserTest {
 
         assertEquals(HttpMethod.POST, post.method)
         assertEquals(listOf("application/json"), post.contentTypes)
+        assertEquals(listOf(ApiParameter("X-Token")), post.requiredHeaders)
+        assertEquals(listOf(ApiParameter("trackingId")), post.requiredQueryParams)
+        assertEquals(listOf("X-Token"), RequestValidator.validateHeaders(post, emptyMap()))
+        assertEquals(listOf("trackingId"), RequestValidator.validateQueryParams(post, emptyMap()))
+        assertTrue(RequestValidator.validateHeaders(post, mapOf("x-token" to "secret")).isEmpty())
+        assertTrue(RequestValidator.validateQueryParams(post, mapOf("trackingId" to "42")).isEmpty())
+    }
+
+    @Test
+    fun `projects implicit required and explicitly optional RAML parameters`() {
+        val spec = parse(
+            """
+            #%RAML 1.0
+            title: Required and optional parameters
+            /items:
+              get:
+                headers:
+                  X-Implicit: string
+                  X-Optional:
+                    type: string
+                    required: false
+                queryParameters:
+                  implicitId: string
+                  optionalFilter:
+                    type: string
+                    required: false
+            """,
+        )
+        val method = spec.resources.single().methods.single()
+
+        assertEquals(listOf(ApiParameter("X-Implicit")), method.requiredHeaders)
+        assertEquals(listOf(ApiParameter("implicitId")), method.requiredQueryParams)
     }
 
     @TempDir

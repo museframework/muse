@@ -11,6 +11,7 @@ import dev.museframework.apikit.ApiSpecificationNotFoundException
 import dev.museframework.apikit.ApiSpecificationParseException
 import dev.museframework.apikit.ApiSpecificationReadException
 import dev.museframework.apikit.api.model.ApiMethod
+import dev.museframework.apikit.api.model.ApiParameter
 import dev.museframework.apikit.api.model.ApiResource
 import dev.museframework.apikit.api.model.ApiSpecification
 import dev.museframework.http.api.model.HttpMethod
@@ -106,6 +107,15 @@ internal object AmfRamlParser {
                                     mediaType
                                 }
                                 ?.distinct()
+                                .orEmpty(),
+                            // RAML 1.0 parameters are required unless explicitly declared optional.
+                            requiredHeaders = request?.headers()
+                                ?.filterNot { it.required().`is`(false) }
+                                ?.map { ApiParameter(it.name().value()) }
+                                .orEmpty(),
+                            requiredQueryParams = request?.queryParameters()
+                                ?.filterNot { it.required().`is`(false) }
+                                ?.map { ApiParameter(it.name().value()) }
                                 .orEmpty(),
                             responseMediaTypes = responseMediaTypes,
                         )
