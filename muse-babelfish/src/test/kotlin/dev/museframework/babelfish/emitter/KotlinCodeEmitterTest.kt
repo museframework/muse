@@ -98,8 +98,8 @@ class KotlinCodeEmitterTest {
         val result = TranslationResult(
             sourceFile = Path.of("escaped-flow.xml"),
             flows = listOf(
-                MuseFlow.Flow(name = "flow", docId = "flow-\\\"quoted"),
-                MuseFlow.SubFlow(name = "sub", docId = "sub-\\\"quoted"),
+                MuseFlow.Flow(name = "flow", docId = "flow-\"quoted"),
+                MuseFlow.SubFlow(name = "sub", docId = "sub-\"quoted"),
             ),
             usedConfigs = emptyMap(),
         )
