@@ -26,6 +26,8 @@ object SetVariableCodeEmitter : ElementCodeEmitter<SetVariableConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.setVariable")
         val codeBlock = CodeBlock.builder().apply {
             add("setVariable(%S)·{\n", element.variableName)
+            add("    docId·=·%S\n", element.docId)
+            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
             add("    value·=·%S\n", element.value)
             element.mimeType?.let { add("    mimeType·=·%S\n", it) }
             add("}")

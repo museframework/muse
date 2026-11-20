@@ -35,6 +35,8 @@ object RaiseErrorCodeEmitter : ElementCodeEmitter<RaiseErrorConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.raiseError")
         val codeBlock = CodeBlock.builder().apply {
             add("raiseError·{\n")
+            add("    docId·=·%S\n", element.docId)
+            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
             add("    type·=·%S\n", element.type)
             if (element.description.isNotEmpty()) {
                 add("    description·=·%S\n", element.description)

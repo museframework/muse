@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+    <flow name="orders" doc:id="flow-original">
+        <scheduler doc:id="source-original" doc:name="Timer">
+            <scheduling-strategy>
+                <fixed-frequency frequency="1000"/>
+            </scheduling-strategy>
+        </scheduler>
+        <choice doc:id="choice-original" doc:name="Choose payload">
+            <when expression="#[true]">
+                <set-payload doc:id="payload-original" doc:name="Prepare payload" value="ok"/>
+            </when>
+        </choice>
+        <flow-ref name="orders-sub" doc:id="ref-original"/>
+    </flow>
+    <sub-flow name="orders-sub" doc:id="subflow-original">
+        <set-variable variableName="answer" value="42" doc:id="variable-original"/>
+    </sub-flow>
+</mule>

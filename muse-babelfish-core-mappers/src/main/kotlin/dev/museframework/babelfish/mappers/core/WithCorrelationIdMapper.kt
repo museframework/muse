@@ -37,6 +37,8 @@ object WithCorrelationIdCodeEmitter : ElementCodeEmitter<WithCorrelationIdConfig
         ctx.addImport("dev.museframework.dsl.dsl.withCorrelationId")
         val codeBlock = CodeBlock.builder().apply {
             add("withCorrelationId(%S)·{\n", element.correlationId)
+            add("    docId·=·%S\n", element.docId)
+            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
             if (element.pipeline.isNotEmpty()) {
                 add("%L", ctx.emitPipelineElements(element.pipeline, "    "))
             }

@@ -16,6 +16,7 @@ import dev.museframework.dsl.api.config.SchedulerTimeUnit
 import dev.museframework.dsl.api.config.ScatterGatherConfig
 import dev.museframework.dsl.api.config.SetPayloadConfig
 import dev.museframework.dsl.api.model.error.ErrorHandlerStrategy
+import dev.museframework.dsl.api.model.flow.FlowRefConfig
 import dev.museframework.dsl.api.model.flow.MuseFlow
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
@@ -174,6 +175,38 @@ class CoreTranslationIT {
         assertContains(code, "frequency = \"5000\"")
         assertContains(code, "startDelay = \"1000\"")
         assertContains(code, "timeUnit = SchedulerTimeUnit.MILLISECONDS")
+    }
+
+    @Test
+    fun `preserves explicit flow source router and nested processor IDs in emitted Kotlin`() {
+        val result = translate("component-identity.xml")
+        val flow = assertIs<MuseFlow.Flow>(result.flows[0])
+        val subFlow = assertIs<MuseFlow.SubFlow>(result.flows[1])
+        val source = assertIs<SchedulerConfig>(flow.source)
+        val choice = assertIs<ChoiceConfig>(flow.pipeline[0])
+        val payload = assertIs<SetPayloadConfig>(choice.whenRoutes.single().pipeline.single())
+        val reference = assertIs<FlowRefConfig>(flow.pipeline[1])
+
+        assertEquals("flow-original", flow.docId)
+        assertEquals("source-original", source.docId)
+        assertEquals("choice-original", choice.docId)
+        assertEquals("payload-original", payload.docId)
+        assertEquals("ref-original", reference.docId)
+        assertEquals("subflow-original", subFlow.docId)
+        assertEquals("variable-original", subFlow.pipeline.single().docId)
+
+        val code = emit(result)
+        listOf(
+            "flow-original",
+            "source-original",
+            "choice-original",
+            "payload-original",
+            "ref-original",
+            "subflow-original",
+            "variable-original",
+        ).forEach { id -> assertContains(code, "docId = \"$id\"") }
+        assertContains(code, "docName = \"Prepare payload\"")
+        assertEquals(code, emit(translate("component-identity.xml")))
     }
 
     private fun translate(fixtureName: String): TranslationResult {
