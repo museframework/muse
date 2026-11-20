@@ -255,14 +255,14 @@ class QuarkusHttpServer : HttpServer {
             return streamProviderBody(vertxResponse, context.request().connection(), provider, mode, version)
         }
         if (provider != null) {
-            provider.openCursor().use { cursor ->
-                val bytes = cursor.readBytes()
-                val size = provider.size
-                if (size >= 0) {
-                    vertxResponse.putHeader("Content-Length", size.toString())
-                }
-                awaitFuture(vertxResponse.end(Buffer.buffer(bytes)))
+            val bytes = provider.openCursor().use { cursor -> cursor.readBytes() }
+            val size = provider.size
+            if (size >= 0) {
+                vertxResponse.putHeader("Content-Length", size.toString())
             }
+            // Once materialized, the provider is no longer needed to write the response.
+            response.bodyLease?.close()
+            awaitFuture(vertxResponse.end(Buffer.buffer(bytes)))
             return
         }
         if (body != null) {
