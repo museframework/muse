@@ -116,7 +116,7 @@ class MuleDocumentMapper(
         errors: MutableList<UnmappedElementException>,
         isSubFlow: Boolean,
     ): MuseFlow {
-        val docId = raw.source?.attrs?.get("doc:id") ?: UUID.randomUUID().toString()
+        val docId = raw.docId ?: UUID.randomUUID().toString()
 
         // Map error handler if present
         val errorHandler =

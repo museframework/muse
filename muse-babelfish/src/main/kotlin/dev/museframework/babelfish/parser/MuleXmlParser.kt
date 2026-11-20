@@ -89,7 +89,14 @@ class MuleXmlParser {
         val source = if (!isSubFlow) nonError.firstOrNull() else null
         val pipeline = if (source != null) nonError.drop(1) else nonError
 
-        return RawFlow(name, source, pipeline, errorHandler, loc)
+        return RawFlow(
+            name = name,
+            source = source,
+            pipeline = pipeline,
+            errorHandler = errorHandler,
+            location = loc,
+            docId = el.attributes.firstOrNull { it.namespacePrefix == "doc" && it.name == "id" }?.value,
+        )
     }
 
     private fun toRaw(

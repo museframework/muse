@@ -5,7 +5,8 @@ data class RawFlow(
     val source: RawElement?,
     val pipeline: List<RawElement>,
     val errorHandler: RawErrorHandler?,
-    val location: SourceLocation
+    val location: SourceLocation,
+    val docId: String? = null,
 )
 
 data class RawErrorHandler(
