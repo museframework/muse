@@ -1,9 +1,15 @@
 package dev.museframework.e2e.packaged
 
+import dev.museframework.dsl.api.config.ChoiceConfig
 import dev.museframework.dsl.api.config.MuseConfigDefinition
+import dev.museframework.dsl.api.config.SetPayloadConfig
+import dev.museframework.e2e.packaged.generated.CoreFlowControlConfig
+import dev.museframework.e2e.packaged.generated.CrossFileSubflowConfig
+import dev.museframework.e2e.packaged.generated.SimpleEchoConfig
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Modifier
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -36,6 +42,35 @@ class GeneratedKotlinCompilationIT {
         assertTrue(Modifier.isPublic(mainMethod.modifiers))
         assertTrue(Modifier.isStatic(mainMethod.modifiers))
         assertEquals(Void.TYPE, mainMethod.returnType)
+    }
+
+    @Test
+    fun `compiled Kotlin keeps distinct flow and payload XML IDs including escaped characters`() {
+        val flow = SimpleEchoConfig().packagedEchoFlow
+
+        assertEquals("echo-flow-original", flow.docId)
+        assertEquals("echo-\"quoted\"-\$", assertIs<SetPayloadConfig>(flow.pipeline.single()).docId)
+    }
+
+    @Test
+    fun `compiled Kotlin keeps router and same-type branch processor XML IDs`() {
+        val flow = CoreFlowControlConfig().coreChoiceFirstMatch
+        val choice = assertIs<ChoiceConfig>(flow.pipeline.single())
+
+        assertEquals("choice-flow-original", flow.docId)
+        assertEquals("choice-router-original", choice.docId)
+        assertEquals(
+            listOf("choice-first-original", "choice-second-original"),
+            choice.whenRoutes.map { route -> assertIs<SetPayloadConfig>(route.pipeline.single()).docId },
+        )
+    }
+
+    @Test
+    fun `compiled Kotlin keeps subflow and nested payload XML IDs`() {
+        val subFlow = CrossFileSubflowConfig().packagedCrossFileSubflow
+
+        assertEquals("cross-file-subflow-original", subFlow.docId)
+        assertEquals("cross-file-payload-original", assertIs<SetPayloadConfig>(subFlow.pipeline.single()).docId)
     }
 
     private fun loadGeneratedClass(simpleName: String): Class<*> =

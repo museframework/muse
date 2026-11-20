@@ -4,7 +4,8 @@
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
 
-    <sub-flow name="packaged-cross-file-subflow" doc:id="packaged-cross-file-subflow">
-        <set-payload value='#["Cross-file: " ++ payload]' doc:name="Set cross-file response"/>
+    <sub-flow name="packaged-cross-file-subflow" doc:id="cross-file-subflow-original">
+        <set-payload value='#["Cross-file: " ++ payload]' doc:name="Set cross-file response"
+                     doc:id="cross-file-payload-original"/>
     </sub-flow>
 </mule>
