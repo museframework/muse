@@ -1,6 +1,7 @@
 package dev.museframework.babelfish.emitter
 
 import dev.museframework.babelfish.mapper.TranslationResult
+import dev.museframework.dsl.api.model.flow.MuseFlow
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import kotlin.test.assertContains
@@ -90,6 +91,23 @@ class KotlinCodeEmitterTest {
         assertContains(code, "import dev.museframework.quarkus.MuseConfigProvider")
         assertContains(code, "class NativeFlowConfig : MuseConfigProvider")
         assertTrue(!code.contains("MuseConfigDefinition"))
+    }
+
+    @Test
+    fun `escapes flow and subflow documentation IDs in generated Kotlin`() {
+        val result = TranslationResult(
+            sourceFile = Path.of("escaped-flow.xml"),
+            flows = listOf(
+                MuseFlow.Flow(name = "flow", docId = "flow-\\\"quoted"),
+                MuseFlow.SubFlow(name = "sub", docId = "sub-\\\"quoted"),
+            ),
+            usedConfigs = emptyMap(),
+        )
+
+        val code = KotlinCodeEmitter().emit(result, "com.acme")
+
+        assertContains(code, "docId = \"flow-\\\"quoted\"")
+        assertContains(code, "docId = \"sub-\\\"quoted\"")
     }
 
     @Test

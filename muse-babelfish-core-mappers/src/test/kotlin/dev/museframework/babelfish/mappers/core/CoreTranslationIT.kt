@@ -23,6 +23,7 @@ import java.nio.file.Path
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -162,6 +163,7 @@ class CoreTranslationIT {
         val strategy = assertIs<FixedFrequencyStrategy>(scheduler.schedulingStrategy)
 
         assertEquals("scheduler-flow", flow.name)
+        assertNotEquals("scheduler-001", flow.docId, "Source ID must not become the flow ID")
         assertEquals("5000", strategy.frequency)
         assertEquals("1000", strategy.startDelay)
         assertEquals(SchedulerTimeUnit.MILLISECONDS, strategy.timeUnit)

@@ -49,8 +49,8 @@ object FlowRefCodeEmitter : ElementCodeEmitter<FlowRefConfig> {
             is FlowRef.ByName -> {
                 val codeBlock = CodeBlock.builder().apply {
                     add("flowRef(%S)·{\n", ref.name)
-            add("    docId·=·%S\n", element.docId)
-            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
+                    add("    docId·=·%S\n", element.docId)
+                    if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
                     element.targetConfig?.let { target ->
                         ctx.addImport("dev.museframework.dsl.api.config.TargetConfig")
                         add("    targetConfig·=·TargetConfig(%S", target.target)
