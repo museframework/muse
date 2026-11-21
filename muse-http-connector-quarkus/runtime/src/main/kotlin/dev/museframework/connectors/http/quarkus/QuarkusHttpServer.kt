@@ -2,6 +2,7 @@ package dev.museframework.connectors.http.quarkus
 
 import dev.museframework.engine.api.streaming.MuseCursorStreamProvider
 import dev.museframework.engine.api.streaming.StreamMaximumSizeExceededException
+import dev.museframework.engine.api.streaming.StreamingCleanupException
 import dev.museframework.engine.api.streaming.StreamingException
 import dev.museframework.engine.api.streaming.StreamingProviders
 import dev.museframework.engine.api.streaming.StreamingResourceLease
@@ -255,14 +256,29 @@ class QuarkusHttpServer : HttpServer {
             return streamProviderBody(vertxResponse, context.request().connection(), provider, mode, version)
         }
         if (provider != null) {
-            provider.openCursor().use { cursor ->
-                val bytes = cursor.readBytes()
+            val cursor = provider.openCursor()
+            val bytes = try {
+                val materialized = cursor.readBytes()
                 val size = provider.size
                 if (size >= 0) {
                     vertxResponse.putHeader("Content-Length", size.toString())
                 }
-                awaitFuture(vertxResponse.end(Buffer.buffer(bytes)))
+                materialized
+            } catch (failure: Throwable) {
+                closeAddingSuppressed(cursor, failure)
+                throw failure
             }
+            try {
+                cursor.close()
+            } catch (cleanupFailure: Exception) {
+                logger.error("Failed to close materialized response cursor", cleanupFailure)
+            }
+            try {
+                response.bodyLease?.close()
+            } catch (cleanupFailure: StreamingCleanupException) {
+                logger.error("Failed to release materialized response streaming resources", cleanupFailure)
+            }
+            awaitFuture(vertxResponse.end(Buffer.buffer(bytes)))
             return
         }
         if (body != null) {
