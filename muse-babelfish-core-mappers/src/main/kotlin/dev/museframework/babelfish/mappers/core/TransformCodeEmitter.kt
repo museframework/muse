@@ -17,7 +17,7 @@ object TransformCodeEmitter : ElementCodeEmitter<TransformConfig> {
         val codeBlock = CodeBlock.builder().apply {
             add("transform·{\n")
             add("    docName·=·%S\n", element.docName)
-            add("    docId·=·%S\n", element.docId)
+            addDocumentationId(element.docId, ctx)
 
             element.setPayload?.let { dwExpr ->
                 add("    setPayload·=·%L\n", emitDwExpression(dwExpr))

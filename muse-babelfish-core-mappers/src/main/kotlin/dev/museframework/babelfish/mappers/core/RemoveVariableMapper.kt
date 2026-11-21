@@ -34,8 +34,7 @@ object RemoveVariableCodeEmitter : ElementCodeEmitter<RemoveVariableConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.removeVariable")
         val codeBlock = CodeBlock.builder().apply {
             add("removeVariable(%S)·{\n", element.variableName)
-            add("    docId·=·%S\n", element.docId)
-            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
+            addDocumentation(element, ctx)
             add("}")
         }.build()
         return codeBlock.toString()

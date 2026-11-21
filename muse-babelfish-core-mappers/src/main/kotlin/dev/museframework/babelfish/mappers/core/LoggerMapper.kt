@@ -41,8 +41,7 @@ object LoggerCodeEmitter : ElementCodeEmitter<LoggerConfig> {
         ctx.addImport("dev.museframework.dsl.api.config.LogLevel")
         val codeBlock = CodeBlock.builder().apply {
             add("logger·{\n")
-            add("    docId·=·%S\n", element.docId)
-            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
+            addDocumentation(element, ctx)
             add("    message·=·%S\n", element.message)
             add("    level·=·LogLevel.%L\n", element.level)
             add("}")

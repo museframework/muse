@@ -87,10 +87,10 @@ class GeneratedKotlinCompilationIT {
         val remove = assertIs<RemoveVariableConfig>(correlation.pipeline[1])
 
         assertEquals("flow\nidentity", flow.docId)
-        assertEquals("scheduler-identity", scheduler.docId)
+        assertEquals("scheduler\r\nidentity", scheduler.docId)
         assertEquals("correlation-identity", correlation.docId)
         assertEquals("identity-correlation", correlation.correlationId)
-        assertEquals("payload-identity", payload.docId)
+        assertEquals("payload\r\nidentity", payload.docId)
         assertEquals("remove-identity", remove.docId)
         assertEquals("temporary", remove.variableName)
     }

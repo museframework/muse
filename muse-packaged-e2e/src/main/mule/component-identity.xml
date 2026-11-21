@@ -2,13 +2,13 @@
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
       xmlns:meta="http://www.mulesoft.org/schema/mule/documentation">
     <flow name="scheduled-identity" meta:id="flow&#10;identity">
-        <scheduler meta:id="scheduler-identity">
+        <scheduler meta:id="scheduler&#13;&#10;identity">
             <scheduling-strategy>
                 <fixed-frequency frequency="1" startDelay="1" timeUnit="DAYS"/>
             </scheduling-strategy>
         </scheduler>
         <with-correlation-id value="identity-correlation" meta:id="correlation-identity">
-            <set-payload value="ready" meta:id="payload-identity"/>
+            <set-payload value="ready" meta:id="payload&#13;&#10;identity"/>
             <remove-variable variableName="temporary" meta:id="remove-identity"/>
         </with-correlation-id>
     </flow>

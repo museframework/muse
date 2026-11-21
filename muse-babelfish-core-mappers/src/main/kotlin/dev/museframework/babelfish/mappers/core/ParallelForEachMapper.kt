@@ -44,8 +44,7 @@ object ParallelForEachCodeEmitter : ElementCodeEmitter<ParallelForEachConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.parallelForEach")
         val codeBlock = CodeBlock.builder().apply {
             add("parallelForEach·{\n")
-            add("    docId·=·%S\n", element.docId)
-            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
+            addDocumentation(element, ctx)
             if (
                 element.collection != null ||
                 element.timeout != null ||

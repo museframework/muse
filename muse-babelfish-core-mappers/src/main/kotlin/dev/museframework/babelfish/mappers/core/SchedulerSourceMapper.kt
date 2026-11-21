@@ -72,7 +72,7 @@ object KotlinPoetSchedulerSourceCodeEmitter : SourceCodeEmitter<SchedulerConfig>
                     if (source.docName.isNotEmpty()) {
                         addStatement("    docName = %S", source.docName)
                     }
-                    addStatement("    docId = %S", source.docId)
+                    addDocumentationId(source.docId, ctx)
                     if (source.disallowConcurrentExecution) {
                         addStatement("    disallowConcurrentExecution = true")
                     }

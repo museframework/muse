@@ -37,8 +37,7 @@ object AsyncCodeEmitter : ElementCodeEmitter<AsyncConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.async")
         val codeBlock = CodeBlock.builder().apply {
             add("async·{\n")
-            add("    docId·=·%S\n", element.docId)
-            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
+            addDocumentation(element, ctx)
             if (element.maxConcurrency != null || element.pipeline.isNotEmpty()) {
                 element.maxConcurrency?.let { add("    maxConcurrency·=·%L\n", it) }
                 if (element.pipeline.isNotEmpty()) {

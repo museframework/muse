@@ -41,8 +41,7 @@ object ForEachCodeEmitter : ElementCodeEmitter<ForEachConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.forEach")
         val codeBlock = CodeBlock.builder().apply {
             add("forEach·{\n")
-            add("    docId·=·%S\n", element.docId)
-            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
+            addDocumentation(element, ctx)
             if (element.collection != null || element.batchSize != 1 || element.batchSizeExpression != null ||
                 element.rootMessageVariableName != "rootMessage" || 
                 element.counterVariableName != "counter" || 

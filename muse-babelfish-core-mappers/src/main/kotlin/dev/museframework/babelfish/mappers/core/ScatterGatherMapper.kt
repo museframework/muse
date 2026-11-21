@@ -54,8 +54,7 @@ object ScatterGatherCodeEmitter : ElementCodeEmitter<ScatterGatherConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.scatterGather")
         val codeBlock = CodeBlock.builder().apply {
             add("scatterGather·{\n")
-            add("    docId·=·%S\n", element.docId)
-            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
+            addDocumentation(element, ctx)
             element.timeout?.let { add("    timeout·=·%L\n", it) }
             element.maxConcurrency?.let { add("    maxConcurrency·=·%L\n", it) }
             element.targetConfig?.let { target ->

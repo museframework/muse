@@ -57,8 +57,7 @@ object ChoiceCodeEmitter : ElementCodeEmitter<ChoiceConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.choice")
         val codeBlock = CodeBlock.builder().apply {
             add("choice·{\n")
-            add("    docId·=·%S\n", element.docId)
-            if (element.docName.isNotBlank()) add("    docName·=·%S\n", element.docName)
+            addDocumentation(element, ctx)
             element.whenRoutes.forEach { route ->
                 add("    `when`(%S)·{\n", route.expression)
                 add("%L", ctx.emitPipelineElements(route.pipeline, "        "))
