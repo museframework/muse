@@ -555,6 +555,69 @@ class QuarkusHttpServerBehaviorIT {
     }
 
     @Test
+    fun `materialized response is sent even when provider cleanup fails`() {
+        val delegate = RepeatableInMemoryCursorStreamProvider.fromBytes("materialized response bytes".toByteArray())
+        val releaseAttempts = AtomicInteger()
+        val provider =
+            object : MuseCursorStreamProvider by delegate {
+                override fun releaseResources() {
+                    releaseAttempts.incrementAndGet()
+                    throw IOException("simulated provider cleanup failure")
+                }
+            }
+        server.register("/stream/materialized-cleanup-failure", listOf(HttpMethod.GET)) {
+            HttpResponse(
+                statusCode = 200,
+                bodyProvider = provider,
+                streamingMode = HttpStreamingMode.NEVER,
+            )
+        }
+
+        val response = execute("GET", "/stream/materialized-cleanup-failure")
+
+        assertEquals(200, response.statusCode())
+        assertEquals("materialized response bytes", response.body().decodeToString())
+        assertEquals("27", response.headers().firstValue("Content-Length").orElse(null))
+        assertEquals(1, releaseAttempts.get())
+    }
+
+    @Test
+    fun `materialized response is sent even when cursor close fails`() {
+        val delegate = RepeatableInMemoryCursorStreamProvider.fromBytes("materialized response bytes".toByteArray())
+        val provider =
+            object : MuseCursorStreamProvider by delegate {
+                override fun openCursor(): MuseCursorStream {
+                    val cursor = delegate.openCursor()
+                    return object : MuseCursorStream(), MuseCursor by cursor {
+                        override fun read(): Int = cursor.read()
+
+                        override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+                            cursor.read(buffer, offset, length)
+
+                        override fun close() {
+                            cursor.close()
+                            throw IOException("simulated cursor close failure")
+                        }
+                    }
+                }
+            }
+        server.register("/stream/materialized-cursor-close-failure", listOf(HttpMethod.GET)) {
+            HttpResponse(
+                statusCode = 200,
+                bodyProvider = provider,
+                streamingMode = HttpStreamingMode.NEVER,
+            )
+        }
+
+        val response = execute("GET", "/stream/materialized-cursor-close-failure")
+
+        assertEquals(200, response.statusCode())
+        assertEquals("materialized response bytes", response.body().decodeToString())
+        assertEquals("27", response.headers().firstValue("Content-Length").orElse(null))
+        assertTrue(provider.isClosed)
+    }
+
+    @Test
     fun `a response setup failure closes exactly the lease the response owns`() {
         val delegate = RepeatableInMemoryCursorStreamProvider.fromBytes("setup-failure".toByteArray())
         val closes = AtomicInteger()
