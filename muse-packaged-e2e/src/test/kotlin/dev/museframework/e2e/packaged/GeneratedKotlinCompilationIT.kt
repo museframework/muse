@@ -2,7 +2,11 @@ package dev.museframework.e2e.packaged
 
 import dev.museframework.dsl.api.config.ChoiceConfig
 import dev.museframework.dsl.api.config.MuseConfigDefinition
+import dev.museframework.dsl.api.config.RemoveVariableConfig
+import dev.museframework.dsl.api.config.SchedulerConfig
 import dev.museframework.dsl.api.config.SetPayloadConfig
+import dev.museframework.dsl.api.config.WithCorrelationIdConfig
+import dev.museframework.e2e.packaged.generated.ComponentIdentityConfig
 import dev.museframework.e2e.packaged.generated.CoreFlowControlConfig
 import dev.museframework.e2e.packaged.generated.CrossFileSubflowConfig
 import dev.museframework.e2e.packaged.generated.SimpleEchoConfig
@@ -20,6 +24,7 @@ class GeneratedKotlinCompilationIT {
             listOf(
                 "ApikitWireConfig",
                 "ChoiceErrorConfig",
+                "ComponentIdentityConfig",
                 "ConnectionsConfig",
                 "CoreFlowControlConfig",
                 "CrossFileEntryConfig",
@@ -71,6 +76,23 @@ class GeneratedKotlinCompilationIT {
 
         assertEquals("cross-file-subflow-original", subFlow.docId)
         assertEquals("cross-file-payload-original", assertIs<SetPayloadConfig>(subFlow.pipeline.single()).docId)
+    }
+
+    @Test
+    fun `compiled Kotlin keeps the scheduler router and nested processor IDs of a single flow`() {
+        val flow = ComponentIdentityConfig().scheduledIdentity
+        val scheduler = assertIs<SchedulerConfig>(flow.source)
+        val correlation = assertIs<WithCorrelationIdConfig>(flow.pipeline.single())
+        val payload = assertIs<SetPayloadConfig>(correlation.pipeline[0])
+        val remove = assertIs<RemoveVariableConfig>(correlation.pipeline[1])
+
+        assertEquals("flow\nidentity", flow.docId)
+        assertEquals("scheduler-identity", scheduler.docId)
+        assertEquals("correlation-identity", correlation.docId)
+        assertEquals("identity-correlation", correlation.correlationId)
+        assertEquals("payload-identity", payload.docId)
+        assertEquals("remove-identity", remove.docId)
+        assertEquals("temporary", remove.variableName)
     }
 
     private fun loadGeneratedClass(simpleName: String): Class<*> =

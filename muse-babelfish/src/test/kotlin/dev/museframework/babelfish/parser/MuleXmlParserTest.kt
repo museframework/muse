@@ -73,7 +73,7 @@ class MuleXmlParserTest {
         }
 
         @Test
-        fun `flow and subflow keep their own XML documentation IDs`() {
+        fun `documentation metadata is read by namespace regardless of the XML prefix`() {
             val doc = parser.parse(fixture("doc-id-flow.xml"))
             val flow = doc.flows.single()
             val subFlow = doc.subFlows.single()
@@ -81,6 +81,7 @@ class MuleXmlParserTest {
             assertEquals("flow-original", flow.docId)
             assertEquals("source-original", flow.source?.attrs?.get("doc:id"))
             assertEquals("subflow-original", subFlow.docId)
+            assertEquals("processor-original", flow.pipeline.single().attrs["doc:id"])
         }
 
         @Test

@@ -98,16 +98,16 @@ class KotlinCodeEmitterTest {
         val result = TranslationResult(
             sourceFile = Path.of("escaped-flow.xml"),
             flows = listOf(
-                MuseFlow.Flow(name = "flow", docId = "flow-\"quoted"),
-                MuseFlow.SubFlow(name = "sub", docId = "sub-\"quoted"),
+                MuseFlow.Flow(name = "flow", docId = "flow-\"quoted\nline"),
+                MuseFlow.SubFlow(name = "sub", docId = "sub-\"quoted\r\tend"),
             ),
             usedConfigs = emptyMap(),
         )
 
         val code = KotlinCodeEmitter().emit(result, "com.acme")
 
-        assertContains(code, "docId = \"flow-\\\"quoted\"")
-        assertContains(code, "docId = \"sub-\\\"quoted\"")
+        assertContains(code, "docId = \"flow-\\\"quoted\\nline\"")
+        assertContains(code, "docId = \"sub-\\\"quoted\\r\\tend\"")
     }
 
     @Test
