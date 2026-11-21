@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:meta="http://www.mulesoft.org/schema/mule/documentation">
+    <flow name="orders" meta:id="flow-original">
+        <scheduler meta:id="source-original"/>
+        <set-payload value="ok" meta:id="processor-original"/>
+    </flow>
+    <sub-flow name="orders-sub" meta:id="subflow-original">
+        <set-payload value="nested"/>
+    </sub-flow>
+</mule>

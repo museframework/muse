@@ -73,6 +73,18 @@ class MuleXmlParserTest {
         }
 
         @Test
+        fun `documentation metadata is read by namespace regardless of the XML prefix`() {
+            val doc = parser.parse(fixture("doc-id-flow.xml"))
+            val flow = doc.flows.single()
+            val subFlow = doc.subFlows.single()
+
+            assertEquals("flow-original", flow.docId)
+            assertEquals("source-original", flow.source?.attrs?.get("doc:id"))
+            assertEquals("subflow-original", subFlow.docId)
+            assertEquals("processor-original", flow.pipeline.single().attrs["doc:id"])
+        }
+
+        @Test
         fun `error handler is separated from pipeline`() {
             val doc = parser.parse(fixture("flow-with-error-handler.xml"))
             val flow = doc.flows.first()

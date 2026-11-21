@@ -37,9 +37,9 @@ object UntilSuccessfulCodeEmitter : ElementCodeEmitter<UntilSuccessfulConfig> {
     override fun emit(element: UntilSuccessfulConfig, ctx: CodegenContext): String {
         ctx.addImport("dev.museframework.dsl.dsl.untilSuccessful")
         val codeBlock = CodeBlock.builder().apply {
-            add("untilSuccessful·{")
+            add("untilSuccessful·{\n")
+            addDocumentation(element, ctx)
             if (element.maxRetries != 5 || element.millisBetweenRetries != 1000L || element.pipeline.isNotEmpty()) {
-                add("\n")
                 if (element.maxRetries != 5) add("    maxRetries·=·%L\n", element.maxRetries)
                 if (element.millisBetweenRetries != 1000L) {
                     add("    millisBetweenRetries·=·%L\n", element.millisBetweenRetries)
