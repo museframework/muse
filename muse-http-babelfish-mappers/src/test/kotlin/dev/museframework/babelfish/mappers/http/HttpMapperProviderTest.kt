@@ -1,9 +1,9 @@
 package dev.museframework.babelfish.mappers.http
 
+import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
 import dev.museframework.babelfish.mapper.MappingContext
-import dev.museframework.babelfish.mapper.TranslationResult
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.babelfish.model.SourceLocation
@@ -59,20 +59,21 @@ class HttpMapperProviderTest {
 
     @Test
     fun `provider registers http emitters on independent emitters`() {
-        repeat(2) {
-            val registry = BabelfishRegistry().apply { HttpMapperProvider().registerMappings(this) }
-            val rawConfig = listenerConfig()
-            val mapper = registry.resolveConfig(rawConfig, SOURCE_FILE)
-            val config = mapper.map(rawConfig, MappingContext(registry, SOURCE_FILE))
-            val translationResult =
-                TranslationResult(
-                    sourceFile = SOURCE_FILE,
-                    flows = emptyList(),
-                    usedConfigs = mapOf("HTTP_Listener_config" to config),
-                )
-            val emitter = KotlinCodeEmitter().apply { HttpMapperProvider().registerEmitters(this) }
+        val provider = HttpMapperProvider()
+        val registry = BabelfishRegistry().apply { provider.registerMappings(this) }
+        val translation = MuseBabelfish.translateXmlToMuseKotlinDsl(
+            Path.of("src/test/resources/mule/http/http-listener-request.xml"),
+            registry,
+        )
 
-            assertContains(emitter.emit(translationResult, "com.example"), "httpListenerConnection")
+        repeat(2) {
+            val emitter = KotlinCodeEmitter().apply { provider.registerEmitters(this) }
+            val code = emitter.emit(translation, "com.example")
+
+            assertContains(code, "httpListenerConnection(\"HTTP_Listener_config\")")
+            assertContains(code, "httpListener(\"HTTP_Listener_config\")")
+            assertContains(code, "httpRequestConnection {")
+            assertContains(code, "httpRequest(httpRequestConnection(\"HTTP_Request_config\"))")
         }
     }
 
