@@ -273,19 +273,11 @@ mvn -f muse-http/pom.xml verify \
 
 Maven plugin Invoker fixtures:
 
-The central owner includes Quarkus migration output, and the Quarkus reactor is
-separate from the root reactor. Use the owner runner to prepare root artifacts,
-install Quarkus into the same private Maven repository, then run the Invoker
-fixtures:
-
-```bash
-verification_root="$(mktemp -d)"
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/run-verification-owner.py \
-  muse-maven-plugin/muse-plugin-it \
-  --repository "$verification_root/muse-plugin-it-repo" \
-  --scratch "$verification_root/muse-plugin-it-scratch" \
-  --result-json "$verification_root/muse-plugin-it.json"
-```
+The central `muse-plugin-it` owner includes Quarkus migration output, but the
+Quarkus reactor is separate from the root reactor. Use the Maven-only
+[three-stage procedure](docs/development/verification.md#plugin-invoker-fixtures)
+for local verification with one isolated Maven repository. The automated owner
+runner additionally validates the test reports.
 
 File provider realm fixtures:
 

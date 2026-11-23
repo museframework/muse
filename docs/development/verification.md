@@ -41,21 +41,39 @@ mvn -f muse-http/pom.xml verify \
   -am
 ```
 
-Run the core, HTTP, APIKit, and Database plugin fixtures:
+### Plugin Invoker fixtures
 
-The central fixture includes Quarkus migration output, and the Quarkus reactor
-is separate from the root reactor. Use the owner runner so it prepares the root
-artifacts, installs Quarkus into the same private repository, and then runs the
-Invoker fixtures.
+The central `muse-plugin-it` owner runs core, HTTP, APIKit, and Database plugin
+fixtures, including Quarkus migration output. Quarkus is in a separate Maven
+reactor, so `-am` on the root reactor cannot install its artifacts. Run these
+three commands from the repository root, sharing an isolated Maven repository:
 
 ```bash
 verification_root="$(mktemp -d)"
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/run-verification-owner.py \
-  muse-maven-plugin/muse-plugin-it \
-  --repository "$verification_root/muse-plugin-it-repo" \
-  --scratch "$verification_root/muse-plugin-it-scratch" \
-  --result-json "$verification_root/muse-plugin-it.json"
+verification_repo="$verification_root/maven-repo"
+
+# Prepare root reactor artifacts for the central Invoker owner.
+mvn clean install --batch-mode -ntp \
+  -DskipTests -Dkotlin.daemon.enabled=false \
+  -pl :muse-plugin-it -am \
+  -Dmaven.repo.local="$verification_repo"
+
+# Install the separate Quarkus reactor into the same repository.
+mvn clean install --batch-mode -ntp \
+  -DskipTests -Dkotlin.daemon.enabled=false \
+  -f muse-quarkus/pom.xml \
+  -Dmaven.repo.local="$verification_repo"
+
+# Run the Maven Invoker fixtures.
+mvn clean verify --batch-mode -ntp \
+  -DskipTests -Dkotlin.daemon.enabled=false \
+  -Pplugin-it -pl :muse-plugin-it -am \
+  -Dmaven.repo.local="$verification_repo"
 ```
+
+This local procedure needs Maven and a POSIX shell, not Python. The optional
+`scripts/run-verification-owner.py` runner requires Python 3 and adds automated
+report validation and JSON diagnostics.
 
 Run a family provider realm (File shown; use `muse-sftp-plugin-it` or
 `muse-db-plugin-it` the same way):
