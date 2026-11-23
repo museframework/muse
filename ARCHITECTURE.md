@@ -298,11 +298,20 @@ mvn -B verify -Dmuse.packageName=org.example.integrations
 With an input at `src/main/mule/order-API.XML`, translation produces
 `target/generated-sources/muse/org/example/integrations/OrderAPIConfig.kt`.
 For a one-time migration, run these commands as separate Maven invocations so
-the compilation reads the replacement POM.
+the compilation reads the replacement POM. Before compiling, align the
+generated POM's Muse BOM and every Muse runtime or connector dependency with the
+migration plugin version. The Spring Boot POM generator currently writes
+`0.1.0` for `muse-bom`, `muse-spring-boot`, and included connector adapters; for
+this example, update those versions to `0.3.0-SNAPSHOT`.
 
 ```bash
 mvn -B dev.museframework.maven:muse-maven-plugin:0.3.0-SNAPSHOT:migrate \
   -Dmuse.runtime=spring-boot -Dmuse.packageName=org.example.integrations
+```
+
+After updating the generated POM versions, compile the migrated project:
+
+```bash
 mvn -B compile
 ```
 
@@ -318,6 +327,12 @@ still applies XML line-ending normalization to physical line endings. Use XML
 character references such as `&#13;&#10;` where an exact CRLF value is needed
 in parsed character data or attributes. Database SQL uses the parsed untrimmed
 leaf text. Database parameter expressions continue to use trimmed text.
+
+The legacy renderer also inserted indentation spaces into multiline DataWeave
+expression values after line breaks. In the APIKit comparison fixture, it added
+five spaces after each newline; the KotlinPoet output preserves the parsed XML
+text exactly. This changes the expression value, not only whitespace in the
+generated Kotlin source.
 
 The Maven translation goals use the allocated Kotlin class name for the source
 file and reject generated paths that collide, including paths that differ only
