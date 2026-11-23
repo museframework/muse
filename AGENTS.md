@@ -280,7 +280,7 @@ fixtures:
 
 ```bash
 verification_root="$(mktemp -d)"
-PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/run-verification-owner.py \
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/run-verification-owner.py \
   muse-maven-plugin/muse-plugin-it \
   --repository "$verification_root/muse-plugin-it-repo" \
   --scratch "$verification_root/muse-plugin-it-scratch" \
