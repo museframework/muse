@@ -1,6 +1,7 @@
 package dev.museframework.babelfish.mappers.sftp
 
 import com.squareup.kotlinpoet.CodeBlock
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
@@ -45,8 +46,8 @@ internal fun CodeBlock.Builder.addMatcher(matcher: SftpFileMatcher, default: Sft
     matcher.filenamePattern?.let { add("filenamePattern = %L,\n", kotlinStringLiteral(it)) }
     matcher.pathPattern?.let { add("pathPattern = %L,\n", kotlinStringLiteral(it)) }
     if (matcher.fileType != SftpFileType.ANY) add("fileType = %T.%N,\n", SftpFileType::class, matcher.fileType.name)
-    matcher.minSize?.let { add("minSize = %L,\n", it) }
-    matcher.maxSize?.let { add("maxSize = %L,\n", it) }
+    matcher.minSize?.let { add("minSize = %L,\n", kotlinNumericLiteral(it)) }
+    matcher.maxSize?.let { add("maxSize = %L,\n", kotlinNumericLiteral(it)) }
     if (!matcher.caseSensitive) add("caseSensitive = false,\n")
     unindent()
     add(")\n")

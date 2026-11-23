@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.sftp.api.config.SftpConnectionConfig
@@ -83,7 +84,7 @@ object SftpConnectionConfigCodeEmitter : ConfigCodeEmitter<SftpConnectionConfig>
         addString("name", config.name)
         addString("docName", config.docName)
         addString("host", config.host)
-        if (config.port != 22) addStatement("port = %L", config.port)
+        if (config.port != 22) addStatement("port = %L", kotlinNumericLiteral(config.port))
         addString("portExpression", config.portExpression)
         addString("username", config.username)
         addString("password", config.password)
@@ -94,9 +95,15 @@ object SftpConnectionConfigCodeEmitter : ConfigCodeEmitter<SftpConnectionConfig>
             addStatement("hostKeyChecking = %T.%N", SftpHostKeyChecking::class, config.hostKeyChecking.name)
         }
         if (config.workingDirectory != "/") addString("workingDirectory", config.workingDirectory)
-        if (config.connectionTimeoutMs != 10_000L) addStatement("connectionTimeoutMs = %L", config.connectionTimeoutMs)
-        if (config.authenticationTimeoutMs != 10_000L) addStatement("authenticationTimeoutMs = %L", config.authenticationTimeoutMs)
-        if (config.operationTimeoutMs != 30_000L) addStatement("operationTimeoutMs = %L", config.operationTimeoutMs)
+        if (config.connectionTimeoutMs != 10_000L) {
+            addStatement("connectionTimeoutMs = %L", kotlinNumericLiteral(config.connectionTimeoutMs))
+        }
+        if (config.authenticationTimeoutMs != 10_000L) {
+            addStatement("authenticationTimeoutMs = %L", kotlinNumericLiteral(config.authenticationTimeoutMs))
+        }
+        if (config.operationTimeoutMs != 30_000L) {
+            addStatement("operationTimeoutMs = %L", kotlinNumericLiteral(config.operationTimeoutMs))
+        }
         endControlFlow()
     }
 }

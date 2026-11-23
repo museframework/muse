@@ -6,6 +6,7 @@ import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.AsyncConfig
@@ -40,7 +41,7 @@ object AsyncCodeEmitter : ElementCodeEmitter<AsyncConfig> {
     override fun emit(element: AsyncConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
         beginControlFlow("%M", async)
         addDocumentation(element)
-        element.maxConcurrency?.let { addStatement("maxConcurrency = %L", it) }
+        element.maxConcurrency?.let { addStatement("maxConcurrency = %L", kotlinNumericLiteral(it)) }
         add(ctx.emitPipelineElements(element.pipeline))
         endControlFlow()
     }

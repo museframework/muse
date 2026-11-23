@@ -94,7 +94,7 @@ class HttpListenerMapperTest {
         // Then
         assertTrue(code.contains("httpListenerConnection(\"HTTP_Listener_config\")"))
         assertTrue(code.contains("host = \"0.0.0.0\""))
-        assertTrue(code.contains("port = 8_081"))
+        assertTrue(code.contains("port = 8081"))
         assertTrue(code.contains("import dev.museframework.http.api.model.HttpProtocol"))
         assertTrue(code.contains("protocol = HttpProtocol.HTTPS"))
         assertTrue(code.contains("basePath = \"/service\""))
@@ -193,7 +193,7 @@ class HttpListenerMapperTest {
         assertTrue(code.contains("httpListener(httpListenerConnection(\"mule-listener\") {"))
         assertTrue(code.contains("docName = \"Display name\""))
         assertTrue(code.contains("host = \"127.0.0.1\""))
-        assertTrue(code.contains("port = 9_001"))
+        assertTrue(code.contains("port = 9001"))
     }
 
     private fun responseElement(

@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
@@ -139,7 +140,7 @@ internal fun CodeBlock.Builder.addMatcher(matcher: LocalFileMatcher?) {
         value?.let { add("%N = %T.parse(%S),\n", name, Instant::class, it.toString()) }
     }
     fun duration(name: String, value: Duration?) {
-        value?.let { add("%N = %T.ofMillis(%L),\n", name, Duration::class, it.toMillis()) }
+        value?.let { add("%N = %T.ofMillis(%L),\n", name, Duration::class, kotlinNumericLiteral(it.toMillis())) }
     }
     fun policy(name: String, value: FileTypeRequirement) {
         if (value != FileTypeRequirement.INCLUDE) add("%N = %T.%N,\n", name, FileTypeRequirement::class, value.name)
@@ -158,8 +159,8 @@ internal fun CodeBlock.Builder.addMatcher(matcher: LocalFileMatcher?) {
     policy("directories", matcher.directories)
     policy("regularFiles", matcher.regularFiles)
     policy("symbolicLinks", matcher.symbolicLinks)
-    matcher.minSize?.let { add("minSize = %L,\n", it) }
-    matcher.maxSize?.let { add("maxSize = %L,\n", it) }
+    matcher.minSize?.let { add("minSize = %L,\n", kotlinNumericLiteral(it)) }
+    matcher.maxSize?.let { add("maxSize = %L,\n", kotlinNumericLiteral(it)) }
     unindent()
     add(")\n")
 }
@@ -168,8 +169,8 @@ internal fun CodeBlock.Builder.addSubset(subset: LocalSubsetList?) {
     if (subset == null) return
     add("subset = %T(\n", LocalSubsetList::class)
     indent()
-    if (subset.limit != 0) add("limit = %L,\n", subset.limit)
-    if (subset.offset != 0) add("offset = %L,\n", subset.offset)
+    if (subset.limit != 0) add("limit = %L,\n", kotlinNumericLiteral(subset.limit))
+    if (subset.offset != 0) add("offset = %L,\n", kotlinNumericLiteral(subset.offset))
     if (subset.criteria != FileListSortCriteria.DATE_MODIFIED) {
         add("criteria = %T.%N,\n", FileListSortCriteria::class, subset.criteria.name)
     }

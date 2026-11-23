@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
@@ -353,7 +354,7 @@ private fun CodeBlock.Builder.emitParameterized(element: DbParameterizedOperatio
 private fun CodeBlock.Builder.emitGeneratedKeys(keys: DbGeneratedKeys) {
     if (keys.enabled) addStatement("autoGenerateKeys = true")
     keys.columnNames.forEach { addStatement("generatedKeyColumn(%L)", kotlinStringLiteral(it)) }
-    keys.columnIndexes.forEach { addStatement("generatedKeyColumn(%L)", it) }
+    keys.columnIndexes.forEach { addStatement("generatedKeyColumn(%L)", kotlinNumericLiteral(it)) }
 }
 
 private fun emitOperation(
@@ -373,12 +374,20 @@ private fun StreamingStrategy.kotlinCode(): CodeBlock =
         is StreamingStrategy.RepeatableInMemory -> CodeBlock.of(
             "%T.RepeatableInMemory(initialBufferSizeBytes = %L, bufferSizeIncrementBytes = %L, maxBufferSizeBytes = %L, " +
                 "initialObjectBufferSize = %L, objectBufferSizeIncrement = %L, maxObjectBufferSize = %L)",
-            StreamingStrategy::class, initialBufferSizeBytes, bufferSizeIncrementBytes, maxBufferSizeBytes,
-            initialObjectBufferSize, objectBufferSizeIncrement, maxObjectBufferSize,
+            StreamingStrategy::class,
+            kotlinNumericLiteral(initialBufferSizeBytes),
+            kotlinNumericLiteral(bufferSizeIncrementBytes),
+            kotlinNumericLiteral(maxBufferSizeBytes),
+            kotlinNumericLiteral(initialObjectBufferSize),
+            kotlinNumericLiteral(objectBufferSizeIncrement),
+            kotlinNumericLiteral(maxObjectBufferSize),
         )
         is StreamingStrategy.RepeatableFileStore -> CodeBlock.of(
             "%T.RepeatableFileStore(inMemorySizeBytes = %L, tempDirectory = %L, deleteFilesOnClose = %L)",
-            StreamingStrategy::class, inMemorySizeBytes, tempDirectory?.let(::kotlinStringLiteral), deleteFilesOnClose,
+            StreamingStrategy::class,
+            kotlinNumericLiteral(inMemorySizeBytes),
+            tempDirectory?.let(::kotlinStringLiteral),
+            deleteFilesOnClose,
         )
         StreamingStrategy.NonRepeatable -> CodeBlock.of("%T.NonRepeatable", StreamingStrategy::class)
     }

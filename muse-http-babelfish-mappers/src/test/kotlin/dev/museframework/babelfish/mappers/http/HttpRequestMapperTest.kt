@@ -312,7 +312,7 @@ class HttpRequestMapperTest {
         assertTrue(code.contains("name = \"mule-request\""))
         assertTrue(code.contains("docName = \"Display name\""))
         assertTrue(code.contains("host = \"127.0.0.1\""))
-        assertTrue(code.contains("port = 9_002"))
+        assertTrue(code.contains("port = 9002"))
         assertTrue(code.contains("method = HttpMethod.PATCH"))
     }
 

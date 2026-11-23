@@ -82,7 +82,7 @@ class FileMatcherMappingTest {
         assertContains(code, "filenamePattern = \"*.txt\"")
         assertContains(code, "pathPattern = \"inbox/*\"")
         assertContains(code, "symbolicLinks = FileTypeRequirement.EXCLUDE")
-        assertContains(code, "updatedInTheLast = Duration.ofMillis(1_000)")
+        assertContains(code, "updatedInTheLast = Duration.ofMillis(1000L)")
         assertContains(code, "criteria = FileListSortCriteria.DATE_CREATED")
         assertContains(code, "order = SortOrder.ASCENDING")
     }

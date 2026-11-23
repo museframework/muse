@@ -165,6 +165,38 @@ def _pl_selector(owner: VerificationOwner, seeds: list[str]) -> str:
     return ",".join(selectors)
 
 
+def prerequisite_reactor_argvs(
+    owner: VerificationOwner,
+    root: Path,
+    repository: Path,
+) -> list[tuple[str, list[str]]]:
+    """Install artifacts owned by a reactor outside the root project reactor."""
+    if owner.artifact_id != "muse-plugin-it":
+        return []
+
+    quarkus_pom = root / "muse-quarkus" / "pom.xml"
+    if not quarkus_pom.is_file():
+        raise ValueError(f"central plugin owner requires separate Quarkus reactor POM: {quarkus_pom}")
+
+    return [
+        (
+            "quarkus-seed",
+            [
+                "mvn",
+                "clean",
+                "install",
+                "--batch-mode",
+                "-ntp",
+                "-DskipTests",
+                "-Dkotlin.daemon.enabled=false",
+                "-f",
+                "muse-quarkus/pom.xml",
+                f"-Dmaven.repo.local={repository}",
+            ],
+        ),
+    ]
+
+
 def prepare_argv(
     owner: VerificationOwner,
     root: Path,
@@ -303,10 +335,11 @@ def run_owner(
     reports: list[str] = []
     artifacts: list[str] = []
 
-    planned = (
+    planned = [
         ("prepare", prepare_argv(owner, root, repository)),
+        *prerequisite_reactor_argvs(owner, root, repository),
         ("verify", verify_argv(owner, repository)),
-    )
+    ]
     for label, argv in planned:
         log_path = scratch / f"{owner.artifact_id}-{label}.log"
         completed = executor(argv, cwd=root, log_path=log_path)

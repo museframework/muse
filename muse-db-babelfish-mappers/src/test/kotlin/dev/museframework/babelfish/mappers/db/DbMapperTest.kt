@@ -1,5 +1,9 @@
 package dev.museframework.babelfish.mappers.db
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.MemberName
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
@@ -16,12 +20,24 @@ import dev.museframework.db.api.model.DbParameterType
 import dev.museframework.db.api.model.DbQuerySettings
 import dev.museframework.db.api.operation.DbBulkInsertConfig
 import dev.museframework.db.api.operation.DbExecuteScriptConfig
+import dev.museframework.db.api.operation.DbStoredProcedureConfig
 import dev.museframework.db.api.source.DbRowListenerConfig
+import dev.museframework.dsl.api.model.flow.MuseFlow
 import dev.museframework.engine.api.streaming.StreamingStrategy
+import org.jetbrains.kotlin.cli.common.ExitCode
+import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.ResourceLock
+import org.junit.jupiter.api.parallel.Resources
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.net.URLClassLoader
+import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.JDBCType
 import java.time.Duration
+import java.util.Locale
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -253,7 +269,10 @@ class DbMapperTest {
         assertFalse(mapped.parameterTypes.containsKey("label"))
 
         val code = DbStoredProcedureCodeEmitter.emit(mapped, CodegenContext("generated")).toString()
-        assertContains(code, "inOutParameters(mapOf(\"result\" to \"3\", \"label\" to \"abc\"))")
+        assertContains(
+            code,
+            "inOutParameters(mapOf<String, Any?>(\"result\" to \"3\", \"label\" to \"abc\"))",
+        )
     }
 
     @Test
@@ -445,12 +464,168 @@ class DbMapperTest {
 
         assertContains(emit(emptyList()), "batchParameters(listOf())")
         val body = emit(listOf(emptyMap(), row))
-        assertContains(body, "mapOf(),")
+        assertContains(body, "mapOf<String, Any?>(),")
         assertContains(body, "\"nullable\" to null")
         assertContains(body, "\"byte\" to (1).toByte()")
         assertContains(body, "\"short\" to (2).toShort()")
         assertContains(body, "\"long\" to 3L")
         assertContains(body, "\"float\" to 4.5F")
+    }
+
+    @Test
+    @ResourceLock(Resources.LOCALE)
+    fun `database emitter output compiles and materializes under arabic format locale`() {
+        val originalLocale = Locale.getDefault(Locale.Category.FORMAT)
+        try {
+            Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag("ar-EG"))
+            val config =
+                DbBulkInsertConfig(
+                    configRef = DbConfigRef.ByName("database"),
+                    sql = "INSERT INTO numbers VALUES (:int, :long)",
+                    batchParameters = DbBatchParameterSource.Values(listOf(numericValues(8081, 8082L))),
+                )
+            val source = generatedOperationSource(config)
+
+            withCompiledKotlin(source) { generated ->
+                val flow = generated.getMethod("batchFlow").invoke(null) as MuseFlow.Flow
+                val operation = flow.pipeline.single() as DbBulkInsertConfig
+                val row = (operation.batchParameters as DbBatchParameterSource.Values).values.single()
+                assertEquals(8081, row["int"])
+                assertEquals(8082L, row["long"])
+                assertNumericTypes(row, source)
+                assertEquals(FLOAT_NAN.toRawBits(), (row.getValue("float") as Float).toRawBits())
+                assertEquals(DOUBLE_NAN.toRawBits(), (row.getValue("double") as Double).toRawBits())
+            }
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, originalLocale)
+        }
+    }
+
+    @Test
+    fun `compiled batch and in-out parameter maps preserve integer and long value types`() {
+        val values = numericValues(1, 2L)
+        val batchConfig =
+            DbBulkInsertConfig(
+                configRef = DbConfigRef.ByName("database"),
+                sql = "INSERT INTO numbers VALUES (:int, :long)",
+                batchParameters = DbBatchParameterSource.Values(listOf(values)),
+            )
+        val storedProcedureConfig =
+            DbStoredProcedureConfig(
+                configRef = DbConfigRef.ByName("database"),
+                sql = "CALL numeric_values(:int, :long)",
+                inOutParameters = DbParameterSource.Values(values),
+            )
+        val source = generatedOperationSource(batchConfig, storedProcedureConfig)
+
+        withCompiledKotlin(source) { generated ->
+            val batchFlow = generated.getMethod("batchFlow").invoke(null) as MuseFlow.Flow
+            val batchOperation = batchFlow.pipeline.single() as DbBulkInsertConfig
+            val batchValues = (batchOperation.batchParameters as DbBatchParameterSource.Values).values.single()
+            val procedureFlow = generated.getMethod("procedureFlow").invoke(null) as MuseFlow.Flow
+            val procedure = procedureFlow.pipeline.single() as DbStoredProcedureConfig
+            val inOutValues = (procedure.inOutParameters as DbParameterSource.Values).values
+
+            assertAll(
+                { assertNumericTypes(batchValues, source) },
+                { assertNumericTypes(inOutValues, source) },
+            )
+        }
+    }
+
+    private fun assertNumericTypes(values: Map<*, *>, source: String) {
+        assertAll(
+            { assertEquals(Int::class.javaObjectType.name, values["int"]?.javaClass?.name, source) },
+            { assertEquals(Long::class.javaObjectType.name, values["long"]?.javaClass?.name, source) },
+        )
+    }
+
+    private fun numericValues(
+        intValue: Int,
+        longValue: Long,
+    ): Map<String, Any?> =
+        linkedMapOf<String, Any?>().apply {
+            put("int", intValue)
+            put("long", longValue)
+            put("float", FLOAT_NAN)
+            put("double", DOUBLE_NAN)
+        }
+
+    private fun generatedOperationSource(
+        batch: DbBulkInsertConfig,
+        storedProcedure: DbStoredProcedureConfig? = null,
+    ): String =
+        FileSpec.builder(GENERATED_PACKAGE, "GeneratedNumericValues")
+            .addFunction(
+                operationFlow(
+                    "batchFlow",
+                    DbBulkInsertCodeEmitter.emit(batch, CodegenContext(GENERATED_PACKAGE)),
+                ),
+            ).apply {
+                storedProcedure?.let { procedure ->
+                    addFunction(
+                        operationFlow(
+                            "procedureFlow",
+                            DbStoredProcedureCodeEmitter.emit(procedure, CodegenContext(GENERATED_PACKAGE)),
+                        ),
+                    )
+                }
+            }
+            .build()
+            .toString()
+
+    private fun operationFlow(
+        functionName: String,
+        operation: CodeBlock,
+    ): FunSpec =
+        FunSpec.builder(functionName)
+            .returns(MuseFlow.Flow::class)
+            .addCode("return %M(%S) {\n", MemberName("dev.museframework.dsl.dsl", "flow"), functionName)
+            .addCode(operation)
+            .addCode("}\n")
+            .build()
+
+    private fun withCompiledKotlin(
+        source: String,
+        verify: (Class<*>) -> Unit,
+    ) {
+        val temporaryDirectory = Files.createTempDirectory("db-generated-kotlin-")
+        try {
+            val sourceFile = temporaryDirectory.resolve("GeneratedNumericValues.kt")
+            val outputDirectory = Files.createDirectory(temporaryDirectory.resolve("classes"))
+            Files.writeString(sourceFile, source)
+
+            val compilerOutput = ByteArrayOutputStream()
+            val compilerClasspath =
+                System.getProperty("surefire.test.class.path")
+                    ?: System.getProperty("java.class.path")
+            val result =
+                K2JVMCompiler().exec(
+                    PrintStream(compilerOutput),
+                    "-no-stdlib",
+                    "-no-reflect",
+                    "-classpath",
+                    requireNotNull(compilerClasspath),
+                    "-jvm-target",
+                    "21",
+                    "-d",
+                    outputDirectory.toString(),
+                    sourceFile.toString(),
+                )
+            assertEquals(ExitCode.OK, result, compilerOutput.toString(Charsets.UTF_8.name()))
+
+            URLClassLoader(arrayOf(outputDirectory.toUri().toURL()), javaClass.classLoader).use { classLoader ->
+                val generated =
+                    Class.forName(
+                        "$GENERATED_PACKAGE.GeneratedNumericValuesKt",
+                        true,
+                        classLoader,
+                    )
+                verify(generated)
+            }
+        } finally {
+            temporaryDirectory.toFile().deleteRecursively()
+        }
     }
 
     private fun raw(
@@ -483,4 +658,10 @@ class DbMapperTest {
         attrs = mapOf("config-ref" to "database") + attrs,
         children = listOf(raw("sql", text = "INSERT INTO t(a) VALUES (1)")) + children,
     )
+
+    private companion object {
+        const val GENERATED_PACKAGE = "dev.museframework.babelfish.mappers.db.generated"
+        val FLOAT_NAN: Float = Float.fromBits(0x7fc00001)
+        val DOUBLE_NAN: Double = Double.fromBits(0x7ff8000000000001L)
+    }
 }

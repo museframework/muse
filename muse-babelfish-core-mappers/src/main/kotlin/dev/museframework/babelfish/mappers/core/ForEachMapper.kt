@@ -6,6 +6,7 @@ import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
@@ -46,7 +47,7 @@ object ForEachCodeEmitter : ElementCodeEmitter<ForEachConfig> {
         beginControlFlow("%M", forEach)
         addDocumentation(element)
         element.collection?.let { addStatement("collection = %L", kotlinStringLiteral(it)) }
-        if (element.batchSize != 1) addStatement("batchSize = %L", element.batchSize)
+        if (element.batchSize != 1) addStatement("batchSize = %L", kotlinNumericLiteral(element.batchSize))
         element.batchSizeExpression?.let { addStatement("batchSizeExpression = %L", kotlinStringLiteral(it)) }
         if (element.rootMessageVariableName != "rootMessage") {
             addStatement("rootMessageVariableName = %L", kotlinStringLiteral(element.rootMessageVariableName))

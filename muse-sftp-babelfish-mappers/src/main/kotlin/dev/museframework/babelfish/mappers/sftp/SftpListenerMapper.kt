@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.SourceMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.SourceCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
@@ -79,8 +80,10 @@ object SftpListenerCodeEmitter : SourceCodeEmitter<SftpListenerConfig> {
         if (source.directory != "/") addString("directory", source.directory)
         addNonDefaultBoolean("recursive", source.recursive, default = true)
         addMatcher(source.matcher, SftpFileMatcher(fileType = SftpFileType.REGULAR_FILE))
-        if (source.pollIntervalMs != 1_000L) addStatement("pollIntervalMs = %L", source.pollIntervalMs)
-        source.sizeCheckDelayMs?.let { addStatement("sizeCheckDelayMs = %L", it) }
+        if (source.pollIntervalMs != 1_000L) {
+            addStatement("pollIntervalMs = %L", kotlinNumericLiteral(source.pollIntervalMs))
+        }
+        source.sizeCheckDelayMs?.let { addStatement("sizeCheckDelayMs = %L", kotlinNumericLiteral(it)) }
         addNonDefaultBoolean("watermarkEnabled", source.watermarkEnabled, default = true)
         when (val action = source.postAction) {
             SftpPostAction.None -> Unit

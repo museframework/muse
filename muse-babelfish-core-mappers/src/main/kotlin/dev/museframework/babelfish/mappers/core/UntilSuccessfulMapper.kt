@@ -6,6 +6,7 @@ import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.UntilSuccessfulConfig
@@ -41,9 +42,9 @@ object UntilSuccessfulCodeEmitter : ElementCodeEmitter<UntilSuccessfulConfig> {
     override fun emit(element: UntilSuccessfulConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
         beginControlFlow("%M", untilSuccessful)
         addDocumentation(element)
-        if (element.maxRetries != 5) addStatement("maxRetries = %L", element.maxRetries)
+        if (element.maxRetries != 5) addStatement("maxRetries = %L", kotlinNumericLiteral(element.maxRetries))
         if (element.millisBetweenRetries != 1000L) {
-            addStatement("millisBetweenRetries = %L", element.millisBetweenRetries)
+            addStatement("millisBetweenRetries = %L", kotlinNumericLiteral(element.millisBetweenRetries))
         }
         add(ctx.emitPipelineElements(element.pipeline))
         endControlFlow()

@@ -8,6 +8,7 @@ import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
@@ -98,19 +99,23 @@ object HttpRequestConnectionConfigCodeEmitter : ConfigCodeEmitter<HttpRequestCon
         if (config.protocol != HttpProtocol.HTTP) {
             addStatement("protocol = %T.%N", HttpProtocol::class, config.protocol.name)
         }
-        addStatement("port = %L", config.port)
+        addStatement("port = %L", kotlinNumericLiteral(config.port))
         config.portExpression?.let { addStatement("portExpression = %L", kotlinStringLiteral(it)) }
         if (config.basePath != "/") addStatement("basePath = %L", kotlinStringLiteral(config.basePath))
         if (config.connectionTimeoutMs != 30000L) {
-            addStatement("connectionTimeoutMs = %L", config.connectionTimeoutMs)
+            addStatement("connectionTimeoutMs = %L", kotlinNumericLiteral(config.connectionTimeoutMs))
         }
         if (config.connectionIdleTimeoutMs != 30000L) {
-            addStatement("connectionIdleTimeoutMs = %L", config.connectionIdleTimeoutMs)
+            addStatement("connectionIdleTimeoutMs = %L", kotlinNumericLiteral(config.connectionIdleTimeoutMs))
         }
-        if (config.responseTimeoutMs != 30000L) addStatement("responseTimeoutMs = %L", config.responseTimeoutMs)
+        if (config.responseTimeoutMs != 30000L) {
+            addStatement("responseTimeoutMs = %L", kotlinNumericLiteral(config.responseTimeoutMs))
+        }
         if (!config.followRedirects) addStatement("followRedirects = false")
         if (!config.usePersistentConnections) addStatement("usePersistentConnections = false")
-        if (config.maxConnections != -1) addStatement("maxConnections = %L", config.maxConnections)
+        if (config.maxConnections != -1) {
+            addStatement("maxConnections = %L", kotlinNumericLiteral(config.maxConnections))
+        }
         if (!config.enableCookies) addStatement("enableCookies = false")
         if (config.sendCorrelationId != SendCorrelationId.AUTO) {
             addStatement("sendCorrelationId = %T.%N", SendCorrelationId::class, config.sendCorrelationId.name)
@@ -166,7 +171,9 @@ object HttpRequestCodeEmitter : ElementCodeEmitter<HttpRequestConfig> {
         element.queryParamsExpression?.let { addStatement("queryParamsExpression = %L", kotlinStringLiteral(it)) }
         element.uriParamsExpression?.let { addStatement("uriParamsExpression = %L", kotlinStringLiteral(it)) }
         element.body?.let { addStatement("body = %L", kotlinStringLiteral(it)) }
-        element.responseTimeoutMs?.let { addStatement("responseTimeoutMs = %L", it) }
+        element.responseTimeoutMs?.let {
+            addStatement("responseTimeoutMs = %L", kotlinNumericLiteral(it))
+        }
         element.followRedirects?.let { addStatement("followRedirects = %L", it) }
         element.sendBodyMode?.let { addStatement("sendBodyMode = %T.%N", HttpSendBodyMode::class, it.name) }
         element.requestStreamingMode?.let { addStatement("requestStreamingMode = %T.%N", HttpStreamingMode::class, it.name) }

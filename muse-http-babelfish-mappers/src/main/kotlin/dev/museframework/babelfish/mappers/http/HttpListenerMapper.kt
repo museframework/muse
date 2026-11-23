@@ -9,6 +9,7 @@ import dev.museframework.babelfish.api.SourceMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
 import dev.museframework.babelfish.emitter.SourceCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
@@ -107,7 +108,7 @@ object HttpListenerConnectionConfigCodeEmitter : ConfigCodeEmitter<HttpListenerC
         indent()
         addStatement("docName = %L", kotlinStringLiteral(config.docName))
         addStatement("host = %L", kotlinStringLiteral(config.host))
-        addStatement("port = %L", config.port)
+        addStatement("port = %L", kotlinNumericLiteral(config.port))
         if (config.protocol != HttpProtocol.HTTP) {
             addStatement("protocol = %T.%N", HttpProtocol::class, config.protocol.name)
         }
@@ -118,10 +119,10 @@ object HttpListenerConnectionConfigCodeEmitter : ConfigCodeEmitter<HttpListenerC
             addStatement("usePersistentConnections = false")
         }
         if (config.connectionIdleTimeoutMs != 40000L) {
-            addStatement("connectionIdleTimeoutMs = %L", config.connectionIdleTimeoutMs)
+            addStatement("connectionIdleTimeoutMs = %L", kotlinNumericLiteral(config.connectionIdleTimeoutMs))
         }
         if (config.readTimeoutMs != 30000L) {
-            addStatement("readTimeoutMs = %L", config.readTimeoutMs)
+            addStatement("readTimeoutMs = %L", kotlinNumericLiteral(config.readTimeoutMs))
         }
         unindent()
         add("}")

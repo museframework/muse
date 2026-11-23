@@ -2,6 +2,7 @@ package dev.museframework.babelfish.mappers.file
 
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.MemberName
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.model.config.ConfigRef
@@ -32,7 +33,7 @@ internal fun CodeBlock.Builder.addString(property: String, value: String?) {
 }
 
 internal fun CodeBlock.Builder.addLong(property: String, value: Long?) {
-    value?.let { addStatement("%N = %L", property, it) }
+    value?.let { addStatement("%N = %L", property, kotlinNumericLiteral(it)) }
 }
 
 internal fun CodeBlock.Builder.addNonDefaultBoolean(property: String, value: Boolean, default: Boolean) {

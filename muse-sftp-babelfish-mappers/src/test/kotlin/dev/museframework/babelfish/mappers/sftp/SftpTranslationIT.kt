@@ -130,7 +130,7 @@ class SftpTranslationIT {
         assertContains(code, "docId = \"poll-\${'$'}id\"")
         assertContains(code, "docName = \"CSV \\\"poll\\\"\"")
         assertContains(code, "directory = \"inbox\"")
-        assertContains(code, "pollIntervalMs = 2_000")
+        assertContains(code, "pollIntervalMs = 2000")
         assertContains(code, "moveAfterProcessing(\"archive\", overwrite = true)")
         assertContains(code, "sftpRead(sftpConnection(\"Sftp_Config\"))")
         assertContains(code, "path = \"inbox/input.csv\"")

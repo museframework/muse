@@ -4,6 +4,7 @@ import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.buildCodeBlock
 import com.squareup.kotlinpoet.joinToCode
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
@@ -231,16 +232,18 @@ internal fun DbConfigRef.code(): CodeBlock {
 internal fun CodeBlock.Builder.emitTimeout(settings: DbQuerySettings) {
     if (!settings.queryTimeout.isZero) {
         addStatement(
-            "queryTimeout = %T.ofSeconds(%LL, %LL)",
-            Duration::class, settings.queryTimeout.seconds, settings.queryTimeout.nano,
+            "queryTimeout = %T.ofSeconds(%L, %L)",
+            Duration::class,
+            kotlinNumericLiteral(settings.queryTimeout.seconds),
+            kotlinNumericLiteral(settings.queryTimeout.nano.toLong()),
         )
     }
 }
 
 internal fun CodeBlock.Builder.emitRowSettings(settings: DbQuerySettings) {
     emitTimeout(settings)
-    settings.fetchSize?.let { addStatement("fetchSize = %L", it) }
-    settings.maxRows?.let { addStatement("maxRows = %L", it) }
+    settings.fetchSize?.let { addStatement("fetchSize = %L", kotlinNumericLiteral(it)) }
+    settings.maxRows?.let { addStatement("maxRows = %L", kotlinNumericLiteral(it)) }
 }
 
 internal fun CodeBlock.Builder.emitSettings(settings: DbQuerySettings) {
@@ -258,7 +261,7 @@ internal fun CodeBlock.Builder.emitTypedParameter(functionName: String, name: St
     val arguments = buildCodeBlock {
         add("%L, %T.%N", kotlinStringLiteral(name), JDBCType::class, type.jdbcType.name)
         type.typeName?.let { add(", typeName = %L", kotlinStringLiteral(it)) }
-        type.scale?.let { add(", scale = %L", it) }
+        type.scale?.let { add(", scale = %L", kotlinNumericLiteral(it)) }
     }
     addStatement("%N(%L)", functionName, arguments)
 }
@@ -284,18 +287,14 @@ internal fun CodeBlock.Builder.emitBatchParameters(source: DbBatchParameterSourc
 
 internal fun Map<String, Any?>.parameterMap(): CodeBlock {
     val entries = map { (key, value) -> CodeBlock.of("%L to %L", kotlinStringLiteral(key), value.parameterValue()) }
-    return CodeBlock.of("mapOf(%L)", entries.joinToCode())
+    return CodeBlock.of("mapOf<String, Any?>(%L)", entries.joinToCode())
 }
 
 private fun Any?.parameterValue(): CodeBlock =
     when (this) {
-        null, is Boolean, is Int -> CodeBlock.of("%L", this)
+        null, is Boolean -> CodeBlock.of("%L", this)
         is String -> kotlinStringLiteral(this)
         is Char -> CodeBlock.of("%L.single()", kotlinStringLiteral(toString()))
-        is Byte -> CodeBlock.of("(%L).toByte()", this)
-        is Short -> CodeBlock.of("(%L).toShort()", this)
-        is Long -> if (this == Long.MIN_VALUE) CodeBlock.of("%T.MIN_VALUE", Long::class) else CodeBlock.of("%LL", this)
-        is Float -> if (isFinite()) CodeBlock.of("%LF", this) else CodeBlock.of("%T.fromBits(%L)", Float::class, toRawBits())
-        is Double -> if (isFinite()) CodeBlock.of("%L", this) else CodeBlock.of("%T.fromBits(%LL)", Double::class, toRawBits())
+        is Number -> kotlinNumericLiteral(this)
         else -> throw IllegalArgumentException("Cannot emit database parameter value of type ${this::class.java.name}")
     }

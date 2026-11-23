@@ -6,6 +6,7 @@ import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
@@ -49,8 +50,8 @@ object ParallelForEachCodeEmitter : ElementCodeEmitter<ParallelForEachConfig> {
         beginControlFlow("%M", parallelForEach)
         addDocumentation(element)
         element.collection?.let { addStatement("collection = %L", kotlinStringLiteral(it)) }
-        element.timeout?.let { addStatement("timeout = %L", it) }
-        element.maxConcurrency?.let { addStatement("maxConcurrency = %L", it) }
+        element.timeout?.let { addStatement("timeout = %L", kotlinNumericLiteral(it)) }
+        element.maxConcurrency?.let { addStatement("maxConcurrency = %L", kotlinNumericLiteral(it)) }
         element.targetConfig?.let { target ->
             addStatement("target = %L", kotlinStringLiteral(target.target))
             target.targetValue?.let { addStatement("targetValue = %L", kotlinStringLiteral(it)) }
