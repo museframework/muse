@@ -74,10 +74,10 @@ class PackagedDatabaseConnectorE2ETest {
     }
 
     @Test
-    fun `packaged database flow executes against bundled JDBC driver`() {
+    fun `packaged H2 flow reads the inserted row using indented XML input parameters`() {
         val response = post("/e2e/database", "ignored")
 
-        assertEquals(200, response.statusCode())
+        assertEquals(200, response.statusCode(), response.body())
         assertEquals("Packaged database", response.body())
     }
 

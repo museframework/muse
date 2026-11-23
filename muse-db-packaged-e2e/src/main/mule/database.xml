@@ -27,7 +27,10 @@
             <db:sql>INSERT INTO packaged_value(id, name) VALUES (1, 'Packaged database')</db:sql>
         </db:insert>
         <db:query-single config-ref="packaged-database" doc:name="Read value">
-            <db:sql>SELECT name FROM packaged_value WHERE id = 1</db:sql>
+            <db:sql>SELECT name FROM packaged_value WHERE id = :id</db:sql>
+            <db:input-parameters>
+                #[{ id: 1 }]
+            </db:input-parameters>
         </db:query-single>
         <set-payload value="#[payload.name]" doc:name="Return database value"/>
     </flow>

@@ -237,7 +237,7 @@ class DbMapperTest {
                             children =
                                 listOf(
                                     raw("in-out-parameter", attrs = mapOf("key" to "result", "value" to "3", "type" to "INTEGER")),
-                                    raw("in-out-parameter", attrs = mapOf("key" to "label", "value" to "abc")),
+                                    raw("in-out-parameter", attrs = mapOf("key" to "label"), text = "\n    abc\n"),
                                 ),
                         ),
                     ),
@@ -265,7 +265,7 @@ class DbMapperTest {
                 children =
                     listOf(
                         raw("sql", text = "{ call add_values(:result) }"),
-                        raw("in-out-parameters", text = "#[{ result: 3 }]"),
+                        raw("in-out-parameters", text = "\n    #[{ result: 3 }]\r\n"),
                     ),
             )
 
@@ -422,7 +422,7 @@ class DbMapperTest {
     }
 
     @Test
-    fun `inline SQL and parameter expressions keep significant leading and trailing whitespace`() {
+    fun `inline SQL keeps boundary whitespace and parameter expressions discard XML indentation`() {
         val sql = "  SELECT '\"\$price' WHERE id = :id\r\n\r\n"
         val expression = "  #[{ id: payload }]\r\n"
         val operation = raw(
@@ -432,7 +432,7 @@ class DbMapperTest {
         )
         val select = DbSelectMapper.map(operation, context)
         assertEquals(sql, select.sql)
-        assertEquals(DbParameterSource.Expression(expression), select.inputParameters)
+        assertEquals(DbParameterSource.Expression("#[{ id: payload }]"), select.inputParameters)
     }
 
     @Test

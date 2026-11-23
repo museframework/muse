@@ -36,7 +36,7 @@ internal fun RawElement.dbMetadata(ctx: MappingContext): DbMappedMetadata =
 
 internal fun RawElement.dbConfigRef(): DbConfigRef = DbConfigRef.ByName(requireAttr("config-ref", location))
 
-private val RawElement.dbText: String? get() = untrimmedTextContent ?: textContent
+private val RawElement.parameterText: String? get() = textContent?.trim()?.takeIf(String::isNotEmpty)
 
 internal fun RawElement.dbSql(): String =
     dbOptionalSql() ?: throw IllegalArgumentException("db:$tag requires SQL text")
@@ -44,23 +44,21 @@ internal fun RawElement.dbSql(): String =
 internal fun RawElement.dbOptionalSql(): String? =
     descendants()
         .firstOrNull { it.tag == "sql" }
-        ?.dbText
+        ?.let { it.untrimmedTextContent ?: it.textContent }
         ?.takeIf(String::isNotBlank)
         ?: attrs["sql"]?.takeIf(String::isNotBlank)
 
 internal fun RawElement.dbInputParameters(default: DbParameterSource = DbParameterSource.EMPTY): DbParameterSource =
     descendants()
         .firstOrNull { it.tag == "input-parameters" }
-        ?.dbText
-        ?.takeIf(String::isNotBlank)
+        ?.parameterText
         ?.let(DbParameterSource::Expression)
         ?: default
 
 internal fun RawElement.dbBatchParameters(): DbBatchParameterSource =
     descendants()
         .firstOrNull { it.tag == "input-parameters" }
-        ?.dbText
-        ?.takeIf(String::isNotBlank)
+        ?.parameterText
         ?.let(DbBatchParameterSource::Expression)
         ?: DbBatchParameterSource.PAYLOAD
 
@@ -117,7 +115,7 @@ internal fun RawElement.dbInOutParameters(): DbMappedInOutParameters {
     val entries = container.children.filter { it.tag == "in-out-parameter" }
     if (entries.isEmpty()) {
         val expression =
-            container.dbText?.takeIf(String::isNotBlank)
+            container.parameterText
                 ?.let(DbParameterSource::Expression)
                 ?: DbParameterSource.EMPTY
         return DbMappedInOutParameters(expression, emptyMap())
@@ -127,7 +125,7 @@ internal fun RawElement.dbInOutParameters(): DbMappedInOutParameters {
     entries.forEach { entry ->
         val name = entry.attrs["key"] ?: entry.attrs["name"]
             ?: throw IllegalArgumentException("db:in-out-parameter requires key")
-        values[name] = entry.attrs["value"] ?: entry.dbText?.takeIf(String::isNotBlank)
+        values[name] = entry.attrs["value"] ?: entry.parameterText
         (entry.attrs["type"] ?: entry.attrs["jdbcType"])?.let { type ->
             types[name] =
                 DbParameterType(

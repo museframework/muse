@@ -56,7 +56,7 @@ class GeneratedDatabaseCompilationIT {
         val select = assertIs<DbSelectConfig>(operations[0])
         assertEquals("  SELECT '\"\$price\"' FROM items\r\nWHERE id = :id\r\n\r\n", select.sql)
         assertEquals(DbConfigRef.ByName("packaged-database"), select.configRef)
-        assertEquals(DbParameterSource.Expression("#[{ id: vars.id }]\r\n"), select.inputParameters)
+        assertEquals(DbParameterSource.Expression("#[{ id: vars.id }]"), select.inputParameters)
         assertEquals(mapOf("id" to DbParameterType(JDBCType.DECIMAL, "amount", 2)), select.parameterTypes)
         assertEquals(TargetConfig("rows", "#[payload[0]]"), select.targetConfig)
         assertEquals(DbQuerySettings(Duration.ofMillis(125), 4, 8, true), select.settings)
@@ -75,7 +75,7 @@ class GeneratedDatabaseCompilationIT {
         assertEquals("DELETE FROM t", assertIs<DbDeleteConfig>(operations[4]).sql)
 
         val bulk = assertIs<DbBulkInsertConfig>(operations[5])
-        assertEquals(DbBatchParameterSource.Expression("#[vars.batch]\r\n"), bulk.batchParameters)
+        assertEquals(DbBatchParameterSource.Expression("#[vars.batch]"), bulk.batchParameters)
         assertEquals(mapOf("id" to DbParameterType(JDBCType.INTEGER)), bulk.parameterTypes)
         assertEquals(DbBatchParameterSource.PAYLOAD, assertIs<DbBulkUpdateConfig>(operations[6]).batchParameters)
         assertEquals("DELETE FROM t WHERE id = :id", assertIs<DbBulkDeleteConfig>(operations[7]).sql)
