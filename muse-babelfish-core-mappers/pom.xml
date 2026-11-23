@@ -34,7 +34,6 @@
         <dependency>
             <groupId>com.squareup</groupId>
             <artifactId>kotlinpoet-jvm</artifactId>
-            <version>2.2.0</version>
         </dependency>
         <!-- Test -->
         <dependency>

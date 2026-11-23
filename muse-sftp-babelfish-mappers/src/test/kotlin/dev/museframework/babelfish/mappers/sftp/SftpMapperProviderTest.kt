@@ -40,8 +40,8 @@ class SftpMapperProviderTest {
             usedConfigs = mapOf("Sftp_Config" to config),
         ), "com.example")
 
-        assertContains(code, "portExpression = \"\\\${sftp.origin.port}\"")
-        assertContains(code, "host = \"\\\${sftp.host}\"")
+        assertContains(code, "portExpression = \"\${'$'}{sftp.origin.port}\"")
+        assertContains(code, "host = \"\${'$'}{sftp.host}\"")
     }
 
     @Test

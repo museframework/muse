@@ -31,6 +31,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class FileTranslationIT {
     @Test
@@ -39,7 +40,11 @@ class FileTranslationIT {
         val read = assertIs<FileReadConfig>(assertIs<MuseFlow.Flow>(result.flows.single()).pipeline.single())
 
         assertEquals(TargetConfig("stateText"), read.targetConfig)
-        assertContains(emit(result), "targetConfig = TargetConfig(\"stateText\")")
+        val code = emit(result)
+        assertEquals("", read.encoding)
+        assertContains(code, "encoding = \"\"")
+        assertContains(code, "targetConfig = TargetConfig(\"stateText\")")
+        assertFalse(code.contains("import java.util.concurrent.TimeUnit"))
     }
 
     @Test
@@ -134,16 +139,12 @@ class FileTranslationIT {
                 .apply { provider.registerEmitters(this) }
                 .emit(result, "dev.museframework.babelfish.generated")
 
-        assertContains(code, "import dev.museframework.file.api.dsl.fileConnection")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileListener")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileRead")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileWrite")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileList")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileCopy")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileMove")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileDelete")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileRename")
-        assertContains(code, "import dev.museframework.file.api.dsl.fileCreateDirectory")
+        val imports = code.lineSequence().filter { it.startsWith("import ") }.map { it.replace("`", "") }.toSet()
+        val members = listOf(
+            "fileConnection", "fileMatcher", "fileListener", "fileRead", "fileWrite", "fileList",
+            "fileCopy", "fileMove", "fileDelete", "fileRename", "fileCreateDirectory",
+        )
+        for (member in members) assertContains(imports, "import dev.museframework.file.api.dsl.$member")
         assertContains(code, "fileConnection {")
         assertContains(code, "workingDirectory = \"/tmp/muse-file\"")
         assertContains(code, "fileListener(\"File_Config\")")
@@ -160,7 +161,7 @@ class FileTranslationIT {
         assertContains(code, "filenamePattern = \"*.txt\"")
         assertContains(code, "maxSize = 100")
         assertContains(code, "directories = FileTypeRequirement.REQUIRE")
-        assertContains(code, "updatedInTheLast = Duration.ofMillis(1000)")
+        assertContains(code, "updatedInTheLast = Duration.ofMillis(1000L)")
         assertContains(code, "fileList(fileConnection(\"File_Config\"))")
         assertContains(code, "subset = LocalSubsetList(")
         assertContains(code, "criteria = FileListSortCriteria.DATE_CREATED")
@@ -169,7 +170,7 @@ class FileTranslationIT {
         assertContains(code, "fileDelete(fileConnection(\"File_Config\"))")
         assertContains(code, "fileRename(fileConnection(\"File_Config\"))")
         assertContains(code, "fileCreateDirectory(fileConnection(\"File_Config\"))")
-        assertFalse(code.contains("dev.museframework.connectors.file"))
+        assertFalse(code.replace("`", "").contains("dev.museframework.connectors.file"))
     }
 
     @Test
@@ -177,6 +178,10 @@ class FileTranslationIT {
         val result = translate("file-common-archive-listener.xml")
         val flow = assertIs<MuseFlow.Flow>(result.flows.single())
         val listener = assertIs<FileListenerConfig>(flow.source)
+        assertNull(listener.sourceFile)
+        assertNull(listener.sourceLine)
+        assertNull(listener.sourceClass)
+        assertNull(listener.docDescription)
         assertEquals("input", listener.directory)
         assertEquals("output", listener.moveToDirectory)
         assertEquals("*.csv", listener.matcher?.filenamePattern)

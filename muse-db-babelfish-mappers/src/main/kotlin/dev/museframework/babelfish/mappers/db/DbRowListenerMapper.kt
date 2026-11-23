@@ -1,8 +1,11 @@
 package dev.museframework.babelfish.mappers.db
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.SourceMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.SourceCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.db.api.source.DbRowListenerConfig
@@ -38,32 +41,19 @@ object DbRowListenerMapper : SourceMapper<DbRowListenerConfig> {
 }
 
 object DbRowListenerCodeEmitter : SourceCodeEmitter<DbRowListenerConfig> {
-    override fun emit(source: DbRowListenerConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.db.api.dsl.dbListener")
-        ctx.addSettingsImports(source.settings)
-        if (source.schedulingStrategy.timeUnit != SchedulerTimeUnit.MILLISECONDS) {
-            ctx.addImport("dev.museframework.dsl.api.config.SchedulerTimeUnit")
+    override fun emit(source: DbRowListenerConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M(%L)", dbDsl("dbListener"), source.configRef.code())
+        addStatement("table = %L", kotlinStringLiteral(source.table))
+        source.watermarkColumn?.let { addStatement("watermarkColumn = %L", kotlinStringLiteral(it)) }
+        source.idColumn?.let { addStatement("idColumn = %L", kotlinStringLiteral(it)) }
+        emitRowSettings(source.settings)
+        val schedule = source.schedulingStrategy
+        if (schedule.frequency != "1000") addStatement("frequency = %L", kotlinStringLiteral(schedule.frequency))
+        if (schedule.startDelay != "0") addStatement("startDelay = %L", kotlinStringLiteral(schedule.startDelay))
+        if (schedule.timeUnit != SchedulerTimeUnit.MILLISECONDS) {
+            addStatement("timeUnit = %T.%N", SchedulerTimeUnit::class, schedule.timeUnit.name)
         }
-        return buildString {
-            appendLine("dbListener(${source.configRef.name().kotlinLiteral()}) {")
-            appendLine("    table = ${source.table.kotlinLiteral()}")
-            source.watermarkColumn?.let { appendLine("    watermarkColumn = ${it.kotlinLiteral()}") }
-            source.idColumn?.let { appendLine("    idColumn = ${it.kotlinLiteral()}") }
-            emitSettings(
-                source.settings,
-                settingNames = setOf("queryTimeout", "fetchSize", "maxRows"),
-            )
-            if (source.schedulingStrategy.frequency != "1000") {
-                appendLine("    frequency = ${source.schedulingStrategy.frequency.kotlinLiteral()}")
-            }
-            if (source.schedulingStrategy.startDelay != "0") {
-                appendLine("    startDelay = ${source.schedulingStrategy.startDelay.kotlinLiteral()}")
-            }
-            if (source.schedulingStrategy.timeUnit != SchedulerTimeUnit.MILLISECONDS) {
-                appendLine("    timeUnit = SchedulerTimeUnit.${source.schedulingStrategy.timeUnit}")
-            }
-            if (source.docName.isNotBlank()) appendLine("    docName = ${source.docName.kotlinLiteral()}")
-            append("}")
-        }
+        if (source.docName.isNotBlank()) addStatement("docName = %L", kotlinStringLiteral(source.docName))
+        endControlFlow()
     }
 }

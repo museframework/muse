@@ -1,12 +1,15 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.WithCorrelationIdConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -33,17 +36,13 @@ object WithCorrelationIdMapper : ElementMapper<WithCorrelationIdConfig> {
  * Emits Kotlin DSL code for WithCorrelationIdConfig.
  */
 object WithCorrelationIdCodeEmitter : ElementCodeEmitter<WithCorrelationIdConfig> {
-    override fun emit(element: WithCorrelationIdConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.builder.withCorrelationId")
-        val codeBlock = CodeBlock.builder().apply {
-            add("withCorrelationId·{\n")
-            addDocumentation(element, ctx)
-            add("    correlationId·=·%S\n", element.correlationId)
-            if (element.pipeline.isNotEmpty()) {
-                add("%L", ctx.emitPipelineElements(element.pipeline, "    "))
-            }
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val withCorrelationId = MemberName("dev.museframework.dsl.builder", "withCorrelationId")
+
+    override fun emit(element: WithCorrelationIdConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", withCorrelationId)
+        addDocumentation(element)
+        addStatement("correlationId = %L", kotlinStringLiteral(element.correlationId))
+        add(ctx.emitPipelineElements(element.pipeline))
+        endControlFlow()
     }
 }

@@ -41,16 +41,39 @@ mvn -f muse-http/pom.xml verify \
   -am
 ```
 
-Run the core, HTTP, APIKit, and Database plugin fixtures:
+### Plugin Invoker fixtures
+
+The central `muse-plugin-it` owner runs core, HTTP, APIKit, and Database plugin
+fixtures, including Quarkus migration output. Quarkus is in a separate Maven
+reactor, so `-am` on the root reactor cannot install its artifacts. Run these
+three commands from the repository root, sharing an isolated Maven repository:
 
 ```bash
-mvn clean verify --batch-mode \
-  -DskipTests \
-  -Dkotlin.daemon.enabled=false \
-  -Pplugin-it \
-  -pl muse-maven-plugin/muse-plugin-it \
-  -am
+verification_root="$(mktemp -d)"
+verification_repo="$verification_root/maven-repo"
+
+# Prepare root reactor artifacts for the central Invoker owner.
+mvn clean install --batch-mode -ntp \
+  -DskipTests -Dkotlin.daemon.enabled=false \
+  -pl :muse-plugin-it -am \
+  -Dmaven.repo.local="$verification_repo"
+
+# Install the separate Quarkus reactor into the same repository.
+mvn clean install --batch-mode -ntp \
+  -DskipTests -Dkotlin.daemon.enabled=false \
+  -f muse-quarkus/pom.xml \
+  -Dmaven.repo.local="$verification_repo"
+
+# Run the Maven Invoker fixtures.
+mvn clean verify --batch-mode -ntp \
+  -DskipTests -Dkotlin.daemon.enabled=false \
+  -Pplugin-it -pl :muse-plugin-it -am \
+  -Dmaven.repo.local="$verification_repo"
 ```
+
+This local procedure needs Maven and a POSIX shell, not Python. The optional
+`scripts/run-verification-owner.py` runner requires Python 3 and adds automated
+report validation and JSON diagnostics.
 
 Run a family provider realm (File shown; use `muse-sftp-plugin-it` or
 `muse-db-plugin-it` the same way):

@@ -1,5 +1,9 @@
 package dev.museframework.babelfish.mappers.db
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.MemberName
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
@@ -9,17 +13,31 @@ import dev.museframework.babelfish.model.SourceLocation
 import dev.museframework.db.api.config.DbConfigRef
 import dev.museframework.db.api.config.DbTransactionIsolation
 import dev.museframework.db.api.config.GenericDbConnectionConfig
+import dev.museframework.db.api.model.DbBatchParameterSource
 import dev.museframework.db.api.model.DbGeneratedKeys
 import dev.museframework.db.api.model.DbParameterSource
 import dev.museframework.db.api.model.DbParameterType
 import dev.museframework.db.api.model.DbQuerySettings
+import dev.museframework.db.api.operation.DbBulkInsertConfig
 import dev.museframework.db.api.operation.DbExecuteScriptConfig
+import dev.museframework.db.api.operation.DbStoredProcedureConfig
 import dev.museframework.db.api.source.DbRowListenerConfig
+import dev.museframework.dsl.api.model.flow.MuseFlow
 import dev.museframework.engine.api.streaming.StreamingStrategy
+import org.jetbrains.kotlin.cli.common.ExitCode
+import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.ResourceLock
+import org.junit.jupiter.api.parallel.Resources
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.net.URLClassLoader
+import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.JDBCType
 import java.time.Duration
+import java.util.Locale
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -63,7 +81,7 @@ class DbMapperTest {
         assertEquals(DbTransactionIsolation.READ_COMMITTED, generic.transactionIsolation)
         assertEquals("secret", generic.password)
 
-        val code = DbConfigCodeEmitter.emit(mapped, CodegenContext("generated"))
+        val code = DbConfigCodeEmitter.emit(mapped, CodegenContext("generated")).toString()
         assertContains(code, "dbConfig(\"database\")")
         assertContains(code, "driverClassName = \"org.postgresql.Driver\"")
         assertContains(code, "DbTransactionIsolation.READ_COMMITTED")
@@ -111,8 +129,8 @@ class DbMapperTest {
         assertEquals("rows", mapped.targetConfig?.target)
 
         val codeContext = CodegenContext("generated")
-        val code = DbSelectCodeEmitter.emit(mapped, codeContext)
-        assertContains(code, "dbSelect(DbConfigRef.ByName(\"database\"))")
+        val code = DbSelectCodeEmitter.emit(mapped, codeContext).toString()
+        assertContains(code, "DbConfigRef.ByName(\"database\")")
         assertContains(code, "inputParameters(\"#[{ id: payload }]\")")
         assertContains(code, "fetchSize = 25")
         assertContains(code, "target = \"rows\"")
@@ -191,7 +209,7 @@ class DbMapperTest {
                     ),
             )
 
-        val code = DbRowListenerCodeEmitter.emit(config, CodegenContext("generated"))
+        val code = DbRowListenerCodeEmitter.emit(config, CodegenContext("generated")).toString()
 
         assertContains(code, "fetchSize = 25")
         assertContains(code, "maxRows = 10")
@@ -213,7 +231,7 @@ class DbMapperTest {
                     ),
             )
 
-        val code = DbExecuteScriptCodeEmitter.emit(config, CodegenContext("generated"))
+        val code = DbExecuteScriptCodeEmitter.emit(config, CodegenContext("generated")).toString()
 
         assertContains(code, "queryTimeout")
         assertFalse(code.contains("fetchSize"), code)
@@ -235,7 +253,7 @@ class DbMapperTest {
                             children =
                                 listOf(
                                     raw("in-out-parameter", attrs = mapOf("key" to "result", "value" to "3", "type" to "INTEGER")),
-                                    raw("in-out-parameter", attrs = mapOf("key" to "label", "value" to "abc")),
+                                    raw("in-out-parameter", attrs = mapOf("key" to "label"), text = "\n    abc\n"),
                                 ),
                         ),
                     ),
@@ -250,8 +268,11 @@ class DbMapperTest {
         assertEquals(DbParameterType(JDBCType.INTEGER), mapped.parameterTypes["result"])
         assertFalse(mapped.parameterTypes.containsKey("label"))
 
-        val code = DbStoredProcedureCodeEmitter.emit(mapped, CodegenContext("generated"))
-        assertContains(code, "inOutParameters(mapOf(\"result\" to \"3\", \"label\" to \"abc\"))")
+        val code = DbStoredProcedureCodeEmitter.emit(mapped, CodegenContext("generated")).toString()
+        assertContains(
+            code,
+            "inOutParameters(mapOf<String, Any?>(\"result\" to \"3\", \"label\" to \"abc\"))",
+        )
     }
 
     @Test
@@ -263,7 +284,7 @@ class DbMapperTest {
                 children =
                     listOf(
                         raw("sql", text = "{ call add_values(:result) }"),
-                        raw("in-out-parameters", text = "#[{ result: 3 }]"),
+                        raw("in-out-parameters", text = "\n    #[{ result: 3 }]\r\n"),
                     ),
             )
 
@@ -307,8 +328,8 @@ class DbMapperTest {
         val mapped = DbSelectMapper.map(selectWith(listOf(strategy)), context)
 
         assertEquals(StreamingStrategy.NonRepeatable, mapped.streamingStrategy)
-        val code = DbSelectCodeEmitter.emit(mapped, CodegenContext("generated"))
-        assertContains(code, "streamingStrategy = StreamingStrategy.NonRepeatable")
+        val code = DbSelectCodeEmitter.emit(mapped, CodegenContext("generated")).toString()
+        assertContains(code, "StreamingStrategy.NonRepeatable")
     }
 
     @Test
@@ -419,6 +440,202 @@ class DbMapperTest {
         assertEquals(DbGeneratedKeys(), mapped.generatedKeys)
     }
 
+    @Test
+    fun `inline SQL keeps boundary whitespace and parameter expressions discard XML indentation`() {
+        val sql = "  SELECT '\"\$price' WHERE id = :id\r\n\r\n"
+        val expression = "  #[{ id: payload }]\r\n"
+        val operation = raw(
+            "select",
+            attrs = mapOf("config-ref" to "database"),
+            children = listOf(raw("sql", text = sql), raw("input-parameters", text = expression)),
+        )
+        val select = DbSelectMapper.map(operation, context)
+        assertEquals(sql, select.sql)
+        assertEquals(DbParameterSource.Expression("#[{ id: payload }]"), select.inputParameters)
+    }
+
+    @Test
+    fun `explicit batch rows preserve null and numeric types and distinguish an empty batch from the payload default`() {
+        val row = mapOf("nullable" to null, "byte" to 1.toByte(), "short" to 2.toShort(), "long" to 3L, "float" to 4.5f)
+        val config = DbBulkInsertConfig(DbConfigRef.ByName("db"), "INSERT INTO t VALUES (:id)")
+        fun emit(rows: List<Map<String, Any?>>): String =
+            DbBulkInsertCodeEmitter.emit(config.copy(batchParameters = DbBatchParameterSource.Values(rows)), CodegenContext("test"))
+                .toString()
+
+        assertContains(emit(emptyList()), "batchParameters(listOf())")
+        val body = emit(listOf(emptyMap(), row))
+        assertContains(body, "mapOf<String, Any?>(),")
+        assertContains(body, "\"nullable\" to null")
+        assertContains(body, "\"byte\" to (1).toByte()")
+        assertContains(body, "\"short\" to (2).toShort()")
+        assertContains(body, "\"long\" to 3L")
+        assertContains(body, "\"float\" to 4.5F")
+    }
+
+    @Test
+    @ResourceLock(Resources.LOCALE)
+    fun `database emitter output compiles and materializes under arabic format locale`() {
+        val originalLocale = Locale.getDefault(Locale.Category.FORMAT)
+        try {
+            Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag("ar-EG"))
+            val config =
+                DbBulkInsertConfig(
+                    configRef = DbConfigRef.ByName("database"),
+                    sql = "INSERT INTO numbers VALUES (:int, :long)",
+                    batchParameters =
+                        DbBatchParameterSource.Values(listOf(numericValuesWithNonFinite(8081, 8082L))),
+                )
+            val source = generatedOperationSource(config)
+
+            withCompiledKotlin(source) { generated ->
+                val flow = generated.getMethod("batchFlow").invoke(null) as MuseFlow.Flow
+                val operation = flow.pipeline.single() as DbBulkInsertConfig
+                val row = (operation.batchParameters as DbBatchParameterSource.Values).values.single()
+                assertEquals(8081, row["int"])
+                assertEquals(8082L, row["long"])
+                assertNumericTypes(row, source)
+                assertEquals(FLOAT_NAN.toRawBits(), (row.getValue("float") as Float).toRawBits())
+                assertEquals(DOUBLE_NAN.toRawBits(), (row.getValue("double") as Double).toRawBits())
+            }
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, originalLocale)
+        }
+    }
+
+    @Test
+    fun `compiled batch and in-out parameter maps preserve integer and long value types`() {
+        val values = numericValues(1, 2L)
+        val batchConfig =
+            DbBulkInsertConfig(
+                configRef = DbConfigRef.ByName("database"),
+                sql = "INSERT INTO numbers VALUES (:int, :long)",
+                batchParameters = DbBatchParameterSource.Values(listOf(values)),
+            )
+        val storedProcedureConfig =
+            DbStoredProcedureConfig(
+                configRef = DbConfigRef.ByName("database"),
+                sql = "CALL numeric_values(:int, :long)",
+                inOutParameters = DbParameterSource.Values(values),
+            )
+        val source = generatedOperationSource(batchConfig, storedProcedureConfig)
+
+        withCompiledKotlin(source) { generated ->
+            val batchFlow = generated.getMethod("batchFlow").invoke(null) as MuseFlow.Flow
+            val batchOperation = batchFlow.pipeline.single() as DbBulkInsertConfig
+            val batchValues = (batchOperation.batchParameters as DbBatchParameterSource.Values).values.single()
+            val procedureFlow = generated.getMethod("procedureFlow").invoke(null) as MuseFlow.Flow
+            val procedure = procedureFlow.pipeline.single() as DbStoredProcedureConfig
+            val inOutValues = (procedure.inOutParameters as DbParameterSource.Values).values
+
+            assertAll(
+                { assertNumericTypes(batchValues, source) },
+                { assertNumericTypes(inOutValues, source) },
+            )
+        }
+    }
+
+    private fun assertNumericTypes(values: Map<*, *>, source: String) {
+        assertAll(
+            { assertEquals(Int::class.javaObjectType.name, values["int"]?.javaClass?.name, source) },
+            { assertEquals(Long::class.javaObjectType.name, values["long"]?.javaClass?.name, source) },
+        )
+    }
+
+    private fun numericValues(
+        intValue: Int,
+        longValue: Long,
+    ): Map<String, Any?> =
+        linkedMapOf<String, Any?>().apply {
+            put("int", intValue)
+            put("long", longValue)
+        }
+
+    private fun numericValuesWithNonFinite(
+        intValue: Int,
+        longValue: Long,
+    ): Map<String, Any?> =
+        numericValues(intValue, longValue).toMutableMap().apply {
+            put("float", FLOAT_NAN)
+            put("double", DOUBLE_NAN)
+        }
+
+    private fun generatedOperationSource(
+        batch: DbBulkInsertConfig,
+        storedProcedure: DbStoredProcedureConfig? = null,
+    ): String =
+        FileSpec.builder(GENERATED_PACKAGE, "GeneratedNumericValues")
+            .addFunction(
+                operationFlow(
+                    "batchFlow",
+                    DbBulkInsertCodeEmitter.emit(batch, CodegenContext(GENERATED_PACKAGE)),
+                ),
+            ).apply {
+                storedProcedure?.let { procedure ->
+                    addFunction(
+                        operationFlow(
+                            "procedureFlow",
+                            DbStoredProcedureCodeEmitter.emit(procedure, CodegenContext(GENERATED_PACKAGE)),
+                        ),
+                    )
+                }
+            }
+            .build()
+            .toString()
+
+    private fun operationFlow(
+        functionName: String,
+        operation: CodeBlock,
+    ): FunSpec =
+        FunSpec.builder(functionName)
+            .returns(MuseFlow.Flow::class)
+            .addCode("return %M(%S) {\n", MemberName("dev.museframework.dsl.dsl", "flow"), functionName)
+            .addCode(operation)
+            .addCode("}\n")
+            .build()
+
+    private fun withCompiledKotlin(
+        source: String,
+        verify: (Class<*>) -> Unit,
+    ) {
+        val temporaryDirectory = Files.createTempDirectory("db-generated-kotlin-")
+        try {
+            val sourceFile = temporaryDirectory.resolve("GeneratedNumericValues.kt")
+            val outputDirectory = Files.createDirectory(temporaryDirectory.resolve("classes"))
+            Files.writeString(sourceFile, source)
+
+            val compilerOutput = ByteArrayOutputStream()
+            val compilerClasspath =
+                System.getProperty("surefire.test.class.path")
+                    ?: System.getProperty("java.class.path")
+            val result =
+                K2JVMCompiler().exec(
+                    PrintStream(compilerOutput),
+                    "-no-stdlib",
+                    "-no-reflect",
+                    "-classpath",
+                    requireNotNull(compilerClasspath),
+                    "-jvm-target",
+                    "21",
+                    "-d",
+                    outputDirectory.toString(),
+                    sourceFile.toString(),
+                )
+            assertEquals(ExitCode.OK, result, compilerOutput.toString(Charsets.UTF_8.name()))
+
+            URLClassLoader(arrayOf(outputDirectory.toUri().toURL()), javaClass.classLoader).use { classLoader ->
+                val generated =
+                    Class.forName(
+                        "$GENERATED_PACKAGE.GeneratedNumericValuesKt",
+                        true,
+                        classLoader,
+                    )
+                verify(generated)
+            }
+        } finally {
+            temporaryDirectory.toFile().deleteRecursively()
+        }
+    }
+
     private fun raw(
         tag: String,
         attrs: Map<String, String> = emptyMap(),
@@ -449,4 +666,10 @@ class DbMapperTest {
         attrs = mapOf("config-ref" to "database") + attrs,
         children = listOf(raw("sql", text = "INSERT INTO t(a) VALUES (1)")) + children,
     )
+
+    private companion object {
+        const val GENERATED_PACKAGE = "dev.museframework.babelfish.mappers.db.generated"
+        val FLOAT_NAN: Float = Float.fromBits(0x7fc00001)
+        val DOUBLE_NAN: Double = Double.fromBits(0x7ff8000000000001L)
+    }
 }

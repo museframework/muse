@@ -1,11 +1,15 @@
 package dev.museframework.babelfish.mappers.db
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
-import dev.museframework.db.api.config.DbConfigRef
+import dev.museframework.db.api.model.DbGeneratedKeys
 import dev.museframework.db.api.model.DbOutputParameter
 import dev.museframework.db.api.model.DbParameterSource
 import dev.museframework.db.api.operation.DbBulkDeleteConfig
@@ -194,20 +198,13 @@ object DbExecuteScriptMapper : ElementMapper<DbExecuteScriptConfig> {
             setOf("fetchSize", "maxRows", "useColumnNumbers"),
         )
         val metadata = element.dbMetadata(ctx)
-        val sql =
-            element.descendants()
-                .firstOrNull { it.tag == "sql" }
-                ?.textContent
-                ?.trim()
-                ?.takeIf(String::isNotEmpty)
-                ?: element.attrs["sql"]?.takeIf(String::isNotBlank)
         val scriptPath =
             element.attrs["file"]
                 ?: element.attrs["path"]
                 ?: element.attrs["scriptPath"]
         return DbExecuteScriptConfig(
             configRef = element.dbConfigRef(),
-            sql = sql,
+            sql = element.dbOptionalSql(),
             scriptPath = scriptPath,
             settings = element.dbSettings(),
             targetConfig = element.dbTarget(),
@@ -258,158 +255,139 @@ object DbStoredProcedureMapper : ElementMapper<DbStoredProcedureConfig> {
 }
 
 object DbSelectCodeEmitter : ElementCodeEmitter<DbSelectConfig> {
-    override fun emit(element: DbSelectConfig, ctx: CodegenContext): String =
-        emitOperation("dbSelect", element, ctx) {
-            emitParameterized(element, ctx)
+    override fun emit(element: DbSelectConfig, ctx: CodegenContext): CodeBlock =
+        emitOperation("dbSelect", element) {
+            emitParameterized(element)
             if (element.streamingStrategy != StreamingStrategy.RepeatableInMemory()) {
-                ctx.addImport("dev.museframework.engine.api.streaming.StreamingStrategy")
-                appendLine("    streamingStrategy = ${element.streamingStrategy.kotlinCode()}")
+                addStatement("streamingStrategy = %L", element.streamingStrategy.kotlinCode())
             }
         }
 }
 
 object DbQuerySingleCodeEmitter : ElementCodeEmitter<DbQuerySingleConfig> {
-    override fun emit(element: DbQuerySingleConfig, ctx: CodegenContext): String =
-        emitOperation("dbQuerySingle", element, ctx) { emitParameterized(element, ctx) }
+    override fun emit(element: DbQuerySingleConfig, ctx: CodegenContext): CodeBlock =
+        emitOperation("dbQuerySingle", element) { emitParameterized(element) }
 }
 
 object DbInsertCodeEmitter : ElementCodeEmitter<DbInsertConfig> {
-    override fun emit(element: DbInsertConfig, ctx: CodegenContext): String =
-        emitOperation("dbInsert", element, ctx) {
-            emitParameterized(element, ctx)
-            if (element.generatedKeys.enabled) appendLine("    autoGenerateKeys = true")
-            element.generatedKeys.columnNames.forEach { appendLine("    generatedKeyColumn(${it.kotlinLiteral()})") }
-            element.generatedKeys.columnIndexes.forEach { appendLine("    generatedKeyColumn($it)") }
+    override fun emit(element: DbInsertConfig, ctx: CodegenContext): CodeBlock =
+        emitOperation("dbInsert", element) {
+            emitParameterized(element)
+            emitGeneratedKeys(element.generatedKeys)
         }
 }
 
 object DbUpdateCodeEmitter : ElementCodeEmitter<DbUpdateConfig> {
-    override fun emit(element: DbUpdateConfig, ctx: CodegenContext): String =
-        emitOperation("dbUpdate", element, ctx) {
-            emitParameterized(element, ctx)
-            if (element.generatedKeys.enabled) appendLine("    autoGenerateKeys = true")
-            element.generatedKeys.columnNames.forEach { appendLine("    generatedKeyColumn(${it.kotlinLiteral()})") }
-            element.generatedKeys.columnIndexes.forEach { appendLine("    generatedKeyColumn($it)") }
+    override fun emit(element: DbUpdateConfig, ctx: CodegenContext): CodeBlock =
+        emitOperation("dbUpdate", element) {
+            emitParameterized(element)
+            emitGeneratedKeys(element.generatedKeys)
         }
 }
 
 object DbDeleteCodeEmitter : ElementCodeEmitter<DbDeleteConfig> {
-    override fun emit(element: DbDeleteConfig, ctx: CodegenContext): String =
-        emitOperation("dbDelete", element, ctx) { emitParameterized(element, ctx) }
+    override fun emit(element: DbDeleteConfig, ctx: CodegenContext): CodeBlock =
+        emitOperation("dbDelete", element) { emitParameterized(element) }
 }
 
 object DbBulkInsertCodeEmitter : ElementCodeEmitter<DbBulkInsertConfig> {
-    override fun emit(element: DbBulkInsertConfig, ctx: CodegenContext): String =
-        emitBulkOperation("dbBulkInsert", element, ctx)
+    override fun emit(element: DbBulkInsertConfig, ctx: CodegenContext): CodeBlock =
+        emitBulkOperation("dbBulkInsert", element)
 }
 
 object DbBulkUpdateCodeEmitter : ElementCodeEmitter<DbBulkUpdateConfig> {
-    override fun emit(element: DbBulkUpdateConfig, ctx: CodegenContext): String =
-        emitBulkOperation("dbBulkUpdate", element, ctx)
+    override fun emit(element: DbBulkUpdateConfig, ctx: CodegenContext): CodeBlock =
+        emitBulkOperation("dbBulkUpdate", element)
 }
 
 object DbBulkDeleteCodeEmitter : ElementCodeEmitter<DbBulkDeleteConfig> {
-    override fun emit(element: DbBulkDeleteConfig, ctx: CodegenContext): String =
-        emitBulkOperation("dbBulkDelete", element, ctx)
+    override fun emit(element: DbBulkDeleteConfig, ctx: CodegenContext): CodeBlock =
+        emitBulkOperation("dbBulkDelete", element)
 }
 
 object DbExecuteDdlCodeEmitter : ElementCodeEmitter<DbExecuteDdlConfig> {
-    override fun emit(element: DbExecuteDdlConfig, ctx: CodegenContext): String =
-        emitOperation("dbExecuteDdl", element, ctx) {
-            appendLine("    sql = ${element.sql.kotlinLiteral()}")
-            ctx.addSettingsImports(element.settings)
+    override fun emit(element: DbExecuteDdlConfig, ctx: CodegenContext): CodeBlock =
+        emitOperation("dbExecuteDdl", element) {
+            addStatement("sql = %L", kotlinStringLiteral(element.sql))
             emitSettings(element.settings)
         }
 }
 
 object DbExecuteScriptCodeEmitter : ElementCodeEmitter<DbExecuteScriptConfig> {
-    override fun emit(element: DbExecuteScriptConfig, ctx: CodegenContext): String =
-        emitOperation("dbExecuteScript", element, ctx) {
-            element.sql?.let { appendLine("    sql = ${it.kotlinLiteral()}") }
-            element.scriptPath?.let { appendLine("    scriptPath = ${it.kotlinLiteral()}") }
-            ctx.addSettingsImports(element.settings)
-            emitSettings(element.settings, settingNames = setOf("queryTimeout"))
+    override fun emit(element: DbExecuteScriptConfig, ctx: CodegenContext): CodeBlock =
+        emitOperation("dbExecuteScript", element) {
+            element.sql?.let { addStatement("sql = %L", kotlinStringLiteral(it)) }
+            element.scriptPath?.let { addStatement("scriptPath = %L", kotlinStringLiteral(it)) }
+            emitTimeout(element.settings)
         }
 }
 
 object DbStoredProcedureCodeEmitter : ElementCodeEmitter<DbStoredProcedureConfig> {
-    override fun emit(element: DbStoredProcedureConfig, ctx: CodegenContext): String =
-        emitOperation("dbStoredProcedure", element, ctx) {
-            emitParameterized(element, ctx)
+    override fun emit(element: DbStoredProcedureConfig, ctx: CodegenContext): CodeBlock =
+        emitOperation("dbStoredProcedure", element) {
+            emitParameterized(element)
             when (val source = element.inOutParameters) {
-                is DbParameterSource.Expression -> appendLine("    inOutParameters(${source.expression.kotlinLiteral()})")
-                is DbParameterSource.Values -> {
-                    val entries = source.values.entries.joinToString { (name, value) ->
-                        "${name.kotlinLiteral()} to ${value.toString().kotlinLiteral()}"
-                    }
-                    if (entries.isNotEmpty()) appendLine("    inOutParameters(mapOf($entries))")
+                is DbParameterSource.Expression -> addStatement("inOutParameters(%L)", kotlinStringLiteral(source.expression))
+                is DbParameterSource.Values -> if (source.values.isNotEmpty()) {
+                    addStatement("inOutParameters(%L)", source.values.parameterMap())
                 }
             }
-            if (element.outputParameters.isNotEmpty()) ctx.addImport("java.sql.JDBCType")
-            element.outputParameters.forEach { output ->
-                append("    outputParameter(${output.name.kotlinLiteral()}, JDBCType.${output.type.jdbcType}")
-                output.type.typeName?.let { append(", typeName = ${it.kotlinLiteral()}") }
-                output.type.scale?.let { append(", scale = $it") }
-                appendLine(")")
-            }
+            element.outputParameters.forEach { output -> emitTypedParameter("outputParameter", output.name, output.type) }
         }
 }
 
-private fun emitBulkOperation(
-    functionName: String,
-    element: DbBulkOperationConfig,
-    ctx: CodegenContext,
-): String =
-    emitOperation(functionName, element, ctx) {
-        appendLine("    sql = ${element.sql.kotlinLiteral()}")
+private fun emitBulkOperation(functionName: String, element: DbBulkOperationConfig): CodeBlock =
+    emitOperation(functionName, element) {
+        addStatement("sql = %L", kotlinStringLiteral(element.sql))
         emitBatchParameters(element.batchParameters)
-        emitParameterTypes(element.parameterTypes, ctx)
-        ctx.addSettingsImports(element.settings)
+        element.parameterTypes.forEach { (name, type) -> emitTypedParameter("parameterType", name, type) }
         emitSettings(element.settings)
     }
 
-private fun StringBuilder.emitParameterized(
-    element: DbParameterizedOperationConfig,
-    ctx: CodegenContext,
-) {
-    appendLine("    sql = ${element.sql.kotlinLiteral()}")
+private fun CodeBlock.Builder.emitParameterized(element: DbParameterizedOperationConfig) {
+    addStatement("sql = %L", kotlinStringLiteral(element.sql))
     emitInputParameters(element.inputParameters)
-    emitParameterTypes(element.parameterTypes, ctx)
-    ctx.addSettingsImports(element.settings)
+    element.parameterTypes.forEach { (name, type) -> emitTypedParameter("parameterType", name, type) }
     emitSettings(element.settings)
 }
 
-private fun <T : DbOperationConfig> emitOperation(
-    functionName: String,
-    element: T,
-    ctx: CodegenContext,
-    body: StringBuilder.() -> Unit,
-): String {
-    ctx.addImport("dev.museframework.db.api.dsl.$functionName")
-    ctx.addImport("dev.museframework.db.api.config.DbConfigRef")
-    return buildString {
-        appendLine("$functionName(DbConfigRef.ByName(${element.configRef.name().kotlinLiteral()})) {")
-        body()
-        if (element.docName.isNotBlank()) appendLine("    docName = ${element.docName.kotlinLiteral()}")
-        emitTarget(element.targetConfig)
-        append("}")
-    }
+private fun CodeBlock.Builder.emitGeneratedKeys(keys: DbGeneratedKeys) {
+    if (keys.enabled) addStatement("autoGenerateKeys = true")
+    keys.columnNames.forEach { addStatement("generatedKeyColumn(%L)", kotlinStringLiteral(it)) }
+    keys.columnIndexes.forEach { addStatement("generatedKeyColumn(%L)", kotlinNumericLiteral(it)) }
 }
 
-private fun StreamingStrategy.kotlinCode(): String =
+private fun emitOperation(
+    functionName: String,
+    element: DbOperationConfig,
+    body: CodeBlock.Builder.() -> Unit,
+): CodeBlock = buildCodeBlock {
+    beginControlFlow("%M(%L)", dbDsl(functionName), element.configRef.code())
+    body()
+    if (element.docName.isNotBlank()) addStatement("docName = %L", kotlinStringLiteral(element.docName))
+    emitTarget(element.targetConfig)
+    endControlFlow()
+}
+
+private fun StreamingStrategy.kotlinCode(): CodeBlock =
     when (this) {
-        is StreamingStrategy.RepeatableInMemory ->
-            "StreamingStrategy.RepeatableInMemory(" +
-                "initialBufferSizeBytes = $initialBufferSizeBytes, " +
-                "bufferSizeIncrementBytes = $bufferSizeIncrementBytes, " +
-                "maxBufferSizeBytes = $maxBufferSizeBytes, " +
-                "initialObjectBufferSize = $initialObjectBufferSize, " +
-                "objectBufferSizeIncrement = $objectBufferSizeIncrement, " +
-                "maxObjectBufferSize = $maxObjectBufferSize)"
-        is StreamingStrategy.RepeatableFileStore ->
-            "StreamingStrategy.RepeatableFileStore(" +
-                "inMemorySizeBytes = $inMemorySizeBytes, " +
-                "tempDirectory = ${tempDirectory?.kotlinLiteral() ?: "null"}, " +
-                "deleteFilesOnClose = $deleteFilesOnClose)"
-        StreamingStrategy.NonRepeatable -> "StreamingStrategy.NonRepeatable"
+        is StreamingStrategy.RepeatableInMemory -> CodeBlock.of(
+            "%T.RepeatableInMemory(initialBufferSizeBytes = %L, bufferSizeIncrementBytes = %L, maxBufferSizeBytes = %L, " +
+                "initialObjectBufferSize = %L, objectBufferSizeIncrement = %L, maxObjectBufferSize = %L)",
+            StreamingStrategy::class,
+            kotlinNumericLiteral(initialBufferSizeBytes),
+            kotlinNumericLiteral(bufferSizeIncrementBytes),
+            kotlinNumericLiteral(maxBufferSizeBytes),
+            kotlinNumericLiteral(initialObjectBufferSize),
+            kotlinNumericLiteral(objectBufferSizeIncrement),
+            kotlinNumericLiteral(maxObjectBufferSize),
+        )
+        is StreamingStrategy.RepeatableFileStore -> CodeBlock.of(
+            "%T.RepeatableFileStore(inMemorySizeBytes = %L, tempDirectory = %L, deleteFilesOnClose = %L)",
+            StreamingStrategy::class,
+            kotlinNumericLiteral(inMemorySizeBytes),
+            tempDirectory?.let(::kotlinStringLiteral),
+            deleteFilesOnClose,
+        )
+        StreamingStrategy.NonRepeatable -> CodeBlock.of("%T.NonRepeatable", StreamingStrategy::class)
     }

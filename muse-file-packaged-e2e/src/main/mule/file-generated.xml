@@ -11,6 +11,8 @@
         <file:connection workingDir="generated"/>
     </file:config>
 
+    <file:matcher name="text-files" filenamePattern="*.txt"/>
+
     <flow name="generated-file-flow" doc:id="generated-file-flow">
         <file:listener config-ref="generated-files"
                        directory="incoming"
@@ -29,4 +31,18 @@
             <file:content><![CDATA[#[payload]]]></file:content>
         </file:write>
     </flow>
+    <sub-flow name="file-options" doc:id="file-options-id">
+        <file:read config-ref="generated-files" path="inbox\$batch\input.csv"
+                   outputMimeType="application/csv; streaming=true" outputEncoding=""
+                   target="rows" targetValue="#[payload]"/>
+        <file:list config-ref="generated-files" directoryPath="inbox" matcher="text-files">
+            <file:matcher minSize="2"/>
+            <file:subset limit="3" order="ASCENDING"/>
+        </file:list>
+        <file:copy config-ref="generated-files" sourcePath="original" targetPath="copy" renameTo=""/>
+        <file:move config-ref="generated-files" sourcePath="copy" targetPath="archive"/>
+        <file:delete config-ref="generated-files" path="obsolete"/>
+        <file:rename config-ref="generated-files" path="old" to="new"/>
+        <file:create-directory config-ref="generated-files" directoryPath="created"/>
+    </sub-flow>
 </mule>

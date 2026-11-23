@@ -1,6 +1,8 @@
 package dev.museframework.babelfish.mappers.sftp
 
-import dev.museframework.babelfish.emitter.CodegenContext
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.TargetConfig
 import dev.museframework.sftp.api.config.SftpConnectionRef
@@ -12,18 +14,6 @@ internal fun RawElement.mapTargetConfig(): TargetConfig? =
     attr("target")?.let { target ->
         TargetConfig(target = target, targetValue = attr("targetValue"))
     }
-
-internal fun StringBuilder.appendTargetConfig(
-    targetConfig: TargetConfig?,
-    ctx: CodegenContext,
-    indent: String = "    ",
-) {
-    val target = targetConfig ?: return
-    ctx.addImport("dev.museframework.dsl.api.config.TargetConfig")
-    append("${indent}targetConfig = TargetConfig(\"${ctx.escapeKotlinString(target.target)}\"")
-    target.targetValue?.let { append(", \"${ctx.escapeKotlinString(it)}\"") }
-    appendLine(")")
-}
 
 internal inline fun <reified T : Enum<T>> String.toSftpEnum(): T = enumValueOf(trim().uppercase())
 
@@ -39,84 +29,21 @@ internal fun durationToMillis(
     return unit.toMillis(amount)
 }
 
-internal fun connectionRefExpression(
-    ref: SftpConnectionRef,
-    ctx: CodegenContext,
-): String =
+internal fun sftpDsl(name: String): MemberName = MemberName("dev.museframework.sftp.api.dsl", name)
+
+internal fun connectionName(ref: SftpConnectionRef): CodeBlock = kotlinStringLiteral(
     when (ref) {
-        is SftpConnectionRef.ByName -> "sftpConnection(\"${ctx.escapeKotlinString(ref.name)}\")"
-        is SftpConnectionRef.ByReference -> {
-            val config = ref.config
-            val name = config.name.ifBlank { config.docName }
-            "sftpConnection(\"${ctx.escapeKotlinString(name)}\")"
-        }
-    }
+        is SftpConnectionRef.ByName -> ref.name
+        is SftpConnectionRef.ByReference -> ref.config.name.ifBlank { ref.config.docName }
+    },
+)
 
-internal fun connectionNameExpression(
-    ref: SftpConnectionRef,
-    ctx: CodegenContext,
-): String =
-    when (ref) {
-        is SftpConnectionRef.ByName -> "\"${ctx.escapeKotlinString(ref.name)}\""
-        is SftpConnectionRef.ByReference -> {
-            val config = ref.config
-            val name = config.name.ifBlank { config.docName }
-            "\"${ctx.escapeKotlinString(name)}\""
-        }
-    }
-
-internal fun StringBuilder.appendNonDefaultBoolean(
-    property: String,
-    value: Boolean,
-    default: Boolean,
-    indent: String = "    ",
-) {
-    if (value != default) appendLine("$indent$property = $value")
+internal fun CodeBlock.Builder.addString(property: String, value: String?) {
+    value?.let { addStatement("%N = %L", property, kotlinStringLiteral(it)) }
 }
 
-internal fun StringBuilder.appendOptionalString(
-    property: String,
-    value: String?,
-    ctx: CodegenContext,
-    indent: String = "    ",
-) {
-    value?.let { appendLine("$indent$property = \"${ctx.escapeKotlinString(it)}\"") }
-}
-
-internal fun StringBuilder.appendOptionalLong(
-    property: String,
-    value: Long?,
-    indent: String = "    ",
-) {
-    value?.let { appendLine("$indent$property = $it") }
-}
-
-internal fun StringBuilder.appendNonDefaultLong(
-    property: String,
-    value: Long,
-    default: Long,
-    indent: String = "    ",
-) {
-    if (value != default) appendLine("$indent$property = $value")
-}
-
-internal fun StringBuilder.appendNonDefaultInt(
-    property: String,
-    value: Int,
-    default: Int,
-    indent: String = "    ",
-) {
-    if (value != default) appendLine("$indent$property = $value")
-}
-
-internal fun StringBuilder.appendNonDefaultString(
-    property: String,
-    value: String,
-    default: String,
-    ctx: CodegenContext,
-    indent: String = "    ",
-) {
-    if (value != default) appendLine("$indent$property = \"${ctx.escapeKotlinString(value)}\"")
+internal fun CodeBlock.Builder.addNonDefaultBoolean(property: String, value: Boolean, default: Boolean) {
+    if (value != default) addStatement("%N = %L", property, value)
 }
 
 internal fun pollIntervalMs(element: RawElement): Long {

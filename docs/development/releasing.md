@@ -9,6 +9,15 @@ Muse follows a lightweight GitFlow model. The normal development branch carries 
 - A release branch uses the exact target version without the `-SNAPSHOT` suffix. Once that release is complete, update `develop` to the following development version, e.g. `0.3.0-SNAPSHOT` after `0.2.0`.
 - Treat SNAPSHOT artifacts as development artifacts. The tag-based Maven Central workflow is for stable releases; snapshot publishing requires a separate explicitly configured destination and must not happen implicitly.
 
+## Muse 0.3.0 provider compatibility
+
+Muse 0.3.0 changes the public Babelfish emitter SPI from `String` to KotlinPoet
+`CodeBlock`. Include this source and binary compatibility change in the 0.3.0
+release notes. Third-party provider authors must update their emitters,
+recompile, and publish a compatible version. Users should upgrade the Maven
+plugin and its provider JARs together. See the
+[Babelfish provider migration guide](../../ARCHITECTURE.md#writing-and-upgrading-a-provider).
+
 ## Release procedure
 
 1. Verify `develop` is ready: review its intended changes, CI status, dependency and module versions, and pending pull requests.

@@ -1,8 +1,12 @@
 package dev.museframework.babelfish.mappers.file
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
+import com.squareup.kotlinpoet.joinToCode
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.TargetConfig
@@ -145,157 +149,108 @@ object FileCreateDirectoryMapper : ElementMapper<FileCreateDirectoryConfig> {
 }
 
 object FileReadCodeEmitter : ElementCodeEmitter<FileReadConfig> {
-    override fun emit(
-        element: FileReadConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.file.api.dsl.fileConnection")
-        ctx.addImport("dev.museframework.file.api.dsl.fileRead")
-        ctx.addImport("java.util.concurrent.TimeUnit")
-        return buildString {
-            appendLine("fileRead(${connectionRefExpression(element.connectionConfig, ctx)}) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            appendNonDefaultBoolean("lock", element.lock, default = false)
-            appendOptionalLong("timeBetweenSizeCheck", element.timeBetweenSizeCheck)
-            appendTimeUnit("timeBetweenSizeCheckUnit", element.timeBetweenSizeCheckUnit)
-            appendOptionalString("outputMimeType", element.outputMimeType, ctx)
-            appendOptionalString("encoding", element.encoding, ctx)
+    override fun emit(element: FileReadConfig, ctx: CodegenContext): CodeBlock =
+        fileOperation("fileRead", element.connectionConfig) {
+            addString("path", element.path)
+            addNonDefaultBoolean("lock", element.lock, default = false)
+            addLong("timeBetweenSizeCheck", element.timeBetweenSizeCheck)
+            addTimeUnit("timeBetweenSizeCheckUnit", element.timeBetweenSizeCheckUnit)
+            addString("outputMimeType", element.outputMimeType)
+            addString("encoding", element.encoding)
             element.targetConfig?.let { target ->
-                ctx.addImport("dev.museframework.dsl.api.config.TargetConfig")
-                append("    targetConfig = TargetConfig(\"${ctx.escapeKotlinString(target.target)}\"")
-                target.targetValue?.let { append(", \"${ctx.escapeKotlinString(it)}\"") }
-                appendLine(")")
+                val arguments = listOfNotNull(target.target, target.targetValue).map(::kotlinStringLiteral).joinToCode()
+                addStatement("targetConfig = %T(%L)", TargetConfig::class, arguments)
             }
-            append("}")
         }
-    }
 }
 
 object FileWriteCodeEmitter : ElementCodeEmitter<FileWriteConfig> {
-    override fun emit(
-        element: FileWriteConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.file.api.dsl.fileConnection")
-        ctx.addImport("dev.museframework.file.api.dsl.fileWrite")
-        ctx.addImport("dev.museframework.file.api.model.FileWriteMode")
-        return buildString {
-            appendLine("fileWrite(${connectionRefExpression(element.connectionConfig, ctx)}) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            appendOptionalString("content", element.content, ctx)
-            appendNonDefaultBoolean("createParentDirectories", element.createParentDirectories, default = true)
-            appendNonDefaultBoolean("lock", element.lock, default = false)
+    override fun emit(element: FileWriteConfig, ctx: CodegenContext): CodeBlock =
+        fileOperation("fileWrite", element.connectionConfig) {
+            addString("path", element.path)
+            addString("content", element.content)
+            addNonDefaultBoolean("createParentDirectories", element.createParentDirectories, default = true)
+            addNonDefaultBoolean("lock", element.lock, default = false)
             if (element.mode != FileWriteMode.OVERWRITE) {
-                appendLine("    mode = FileWriteMode.${element.mode}")
+                addStatement("mode = %T.%N", FileWriteMode::class, element.mode.name)
             }
-            append("}")
         }
-    }
 }
 
 object FileListCodeEmitter : ElementCodeEmitter<FileListConfig> {
-    override fun emit(
-        element: FileListConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.file.api.dsl.fileConnection")
-        ctx.addImport("dev.museframework.file.api.dsl.fileList")
-        ctx.addImport("java.util.concurrent.TimeUnit")
-        return buildString {
-            appendLine("fileList(${connectionRefExpression(element.connectionConfig, ctx)}) {")
-            appendLine("    directoryPath = \"${ctx.escapeKotlinString(element.directoryPath)}\"")
-            appendNonDefaultBoolean("recursive", element.recursive, default = false)
-            appendOptionalLong("timeBetweenSizeCheck", element.timeBetweenSizeCheck)
-            appendTimeUnit("timeBetweenSizeCheckUnit", element.timeBetweenSizeCheckUnit)
-            appendLocalFileMatcherAssignment("matcher", element.matcher, ctx)
-            appendSubset(element.subset, ctx)
-            append("}")
+    override fun emit(element: FileListConfig, ctx: CodegenContext): CodeBlock =
+        fileOperation("fileList", element.connectionConfig) {
+            addString("directoryPath", element.directoryPath)
+            addNonDefaultBoolean("recursive", element.recursive, default = false)
+            addLong("timeBetweenSizeCheck", element.timeBetweenSizeCheck)
+            addTimeUnit("timeBetweenSizeCheckUnit", element.timeBetweenSizeCheckUnit)
+            addMatcher(element.matcher)
+            addSubset(element.subset)
         }
-    }
 }
 
 object FileCopyCodeEmitter : ElementCodeEmitter<FileCopyConfig> {
-    override fun emit(
-        element: FileCopyConfig,
-        ctx: CodegenContext,
-    ): String = emitTransfer("fileCopy", element.connectionConfig, element.sourcePath, element.targetPath,
-        element.createParentDirectories, element.overwrite, element.renameTo, ctx)
+    override fun emit(element: FileCopyConfig, ctx: CodegenContext): CodeBlock =
+        fileOperation("fileCopy", element.connectionConfig) {
+            addTransferOptions(
+                element.sourcePath, element.targetPath, element.createParentDirectories, element.overwrite, element.renameTo,
+            )
+        }
 }
 
 object FileMoveCodeEmitter : ElementCodeEmitter<FileMoveConfig> {
-    override fun emit(
-        element: FileMoveConfig,
-        ctx: CodegenContext,
-    ): String = emitTransfer("fileMove", element.connectionConfig, element.sourcePath, element.targetPath,
-        element.createParentDirectories, element.overwrite, element.renameTo, ctx)
+    override fun emit(element: FileMoveConfig, ctx: CodegenContext): CodeBlock =
+        fileOperation("fileMove", element.connectionConfig) {
+            addTransferOptions(
+                element.sourcePath, element.targetPath, element.createParentDirectories, element.overwrite, element.renameTo,
+            )
+        }
 }
 
 object FileDeleteCodeEmitter : ElementCodeEmitter<FileDeleteConfig> {
-    override fun emit(
-        element: FileDeleteConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.file.api.dsl.fileConnection")
-        ctx.addImport("dev.museframework.file.api.dsl.fileDelete")
-        return buildString {
-            appendLine("fileDelete(${connectionRefExpression(element.connectionConfig, ctx)}) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            append("}")
+    override fun emit(element: FileDeleteConfig, ctx: CodegenContext): CodeBlock =
+        fileOperation("fileDelete", element.connectionConfig) {
+            addString("path", element.path)
         }
-    }
 }
 
 object FileRenameCodeEmitter : ElementCodeEmitter<FileRenameConfig> {
-    override fun emit(
-        element: FileRenameConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.file.api.dsl.fileConnection")
-        ctx.addImport("dev.museframework.file.api.dsl.fileRename")
-        return buildString {
-            appendLine("fileRename(${connectionRefExpression(element.connectionConfig, ctx)}) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            appendLine("    to = \"${ctx.escapeKotlinString(element.to)}\"")
-            appendNonDefaultBoolean("overwrite", element.overwrite, default = false)
-            append("}")
+    override fun emit(element: FileRenameConfig, ctx: CodegenContext): CodeBlock =
+        fileOperation("fileRename", element.connectionConfig) {
+            addString("path", element.path)
+            addString("to", element.to)
+            addNonDefaultBoolean("overwrite", element.overwrite, default = false)
         }
-    }
 }
 
 object FileCreateDirectoryCodeEmitter : ElementCodeEmitter<FileCreateDirectoryConfig> {
-    override fun emit(
-        element: FileCreateDirectoryConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.file.api.dsl.fileConnection")
-        ctx.addImport("dev.museframework.file.api.dsl.fileCreateDirectory")
-        return buildString {
-            appendLine("fileCreateDirectory(${connectionRefExpression(element.connectionConfig, ctx)}) {")
-            appendLine("    directoryPath = \"${ctx.escapeKotlinString(element.directoryPath)}\"")
-            append("}")
+    override fun emit(element: FileCreateDirectoryConfig, ctx: CodegenContext): CodeBlock =
+        fileOperation("fileCreateDirectory", element.connectionConfig) {
+            addString("directoryPath", element.directoryPath)
         }
-    }
 }
 
-private fun emitTransfer(
-    dslName: String,
+private fun fileOperation(
+    name: String,
     connectionConfig: ConfigRef,
+    options: CodeBlock.Builder.() -> Unit,
+): CodeBlock = buildCodeBlock {
+    val ref = CodeBlock.of("%M(%L)", fileDsl("fileConnection"), connectionName(connectionConfig))
+    beginControlFlow("%M(%L)", fileDsl(name), ref)
+    options()
+    endControlFlow()
+}
+
+private fun CodeBlock.Builder.addTransferOptions(
     sourcePath: String,
     targetPath: String,
     createParentDirectories: Boolean,
     overwrite: Boolean,
     renameTo: String?,
-    ctx: CodegenContext,
-): String {
-    ctx.addImport("dev.museframework.file.api.dsl.fileConnection")
-    ctx.addImport("dev.museframework.file.api.dsl.$dslName")
-    return buildString {
-        appendLine("$dslName(${connectionRefExpression(connectionConfig, ctx)}) {")
-        appendLine("    sourcePath = \"${ctx.escapeKotlinString(sourcePath)}\"")
-        appendLine("    targetPath = \"${ctx.escapeKotlinString(targetPath)}\"")
-        appendNonDefaultBoolean("createParentDirectories", createParentDirectories, default = true)
-        appendNonDefaultBoolean("overwrite", overwrite, default = false)
-        appendOptionalString("renameTo", renameTo, ctx)
-        append("}")
-    }
+) {
+    addString("sourcePath", sourcePath)
+    addString("targetPath", targetPath)
+    addNonDefaultBoolean("createParentDirectories", createParentDirectories, default = true)
+    addNonDefaultBoolean("overwrite", overwrite, default = false)
+    addString("renameTo", renameTo)
 }

@@ -1,6 +1,9 @@
 package dev.museframework.babelfish.mappers.file
 
-import dev.museframework.babelfish.emitter.CodegenContext
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.model.config.ConfigRef
 import dev.museframework.file.api.config.FileConnectionConfig
@@ -12,51 +15,33 @@ internal inline fun <reified T : Enum<T>> String.toFileEnum(): T = enumValueOf(t
 
 internal fun String.toTimeUnit(): TimeUnit = TimeUnit.valueOf(trim().uppercase())
 
-internal fun connectionRefExpression(ref: ConfigRef, ctx: CodegenContext): String =
-    when (ref) {
-        is ConfigRef.ByName -> "fileConnection(\"${ctx.escapeKotlinString(ref.name)}\")"
+internal fun fileDsl(name: String): MemberName = MemberName("dev.museframework.file.api.dsl", name)
+
+internal fun connectionName(ref: ConfigRef): CodeBlock {
+    val name = when (ref) {
+        is ConfigRef.ByName -> ref.name
         is ConfigRef.ByReference -> {
             val config = ref.config as? FileConnectionConfig
-            val name = config?.name?.ifBlank { config.docName } ?: config?.docName.orEmpty()
-            "fileConnection(\"${ctx.escapeKotlinString(name)}\")"
+            config?.name?.ifBlank { config.docName }.orEmpty()
         }
     }
-
-internal fun StringBuilder.appendNonDefaultBoolean(
-    property: String,
-    value: Boolean,
-    default: Boolean,
-    indent: String = "    ",
-) {
-    if (value != default) appendLine("$indent$property = $value")
+    return kotlinStringLiteral(name)
 }
 
-internal fun StringBuilder.appendOptionalString(
-    property: String,
-    value: String?,
-    ctx: CodegenContext,
-    indent: String = "    ",
-) {
-    value?.let { appendLine("$indent$property = \"${ctx.escapeKotlinString(it)}\"") }
+internal fun CodeBlock.Builder.addString(property: String, value: String?) {
+    value?.let { addStatement("%N = %L", property, kotlinStringLiteral(it)) }
 }
 
-internal fun StringBuilder.appendOptionalLong(
-    property: String,
-    value: Long?,
-    indent: String = "    ",
-) {
-    value?.let { appendLine("$indent$property = $it") }
+internal fun CodeBlock.Builder.addLong(property: String, value: Long?) {
+    value?.let { addStatement("%N = %L", property, kotlinNumericLiteral(it)) }
 }
 
-internal fun StringBuilder.appendTimeUnit(
-    property: String,
-    value: TimeUnit?,
-    default: TimeUnit? = null,
-    indent: String = "    ",
-) {
-    if (value != null && value != default) {
-        appendLine("$indent$property = TimeUnit.$value")
-    }
+internal fun CodeBlock.Builder.addNonDefaultBoolean(property: String, value: Boolean, default: Boolean) {
+    if (value != default) addStatement("%N = %L", property, value)
+}
+
+internal fun CodeBlock.Builder.addTimeUnit(property: String, value: TimeUnit?, default: TimeUnit? = null) {
+    if (value != null && value != default) addStatement("%N = %T.%N", property, TimeUnit::class, value.name)
 }
 
 internal fun pollingFrequencyMillis(element: RawElement): Long {

@@ -24,6 +24,8 @@ import kotlin.test.assertTrue
 
 @DisplayName("HttpRequestMapper")
 class HttpRequestMapperTest {
+    private val codegenContext = CodegenContext("com.example")
+
     private fun mappingContext(): MappingContext = MappingContext(BabelfishRegistry(), Path.of("test.xml"))
 
     @Test
@@ -164,7 +166,7 @@ class HttpRequestMapperTest {
         assertEquals(SendCorrelationId.ALWAYS, request.sendCorrelationId)
         assertEquals("#[vars.correlationId]", request.correlationId)
 
-        val code = HttpRequestCodeEmitter.emit(request, CodegenContext("com.example"))
+        val code = renderFixture(HttpRequestCodeEmitter.emit(request, codegenContext))
         assertTrue(code.contains("url = \"https://api.example.test/orders/{id}\""))
         assertTrue(code.contains("headersExpression = \"#[vars.headers]\""))
         assertTrue(code.contains("sendBodyMode = HttpSendBodyMode.ALWAYS"))
@@ -185,9 +187,10 @@ class HttpRequestMapperTest {
         )
 
         val request = HttpRequestMapper.map(rawElement, mappingContext())
-        val code = HttpRequestCodeEmitter.emit(request, CodegenContext("com.example"))
+        val code = renderFixture(HttpRequestCodeEmitter.emit(request, codegenContext))
 
         assertEquals(TargetConfig("httpReply", "#[message]"), request.targetConfig)
+        assertTrue(code.contains("import dev.museframework.dsl.api.config.TargetConfig"))
         assertTrue(code.contains("targetConfig = TargetConfig(\"httpReply\", \"#[{payload: payload, attributes: attributes}]\")"))
     }
 
@@ -225,7 +228,7 @@ class HttpRequestMapperTest {
                 port = 443,
             )
 
-        val code = HttpRequestConnectionConfigCodeEmitter.emit(connection, CodegenContext("com.example"))
+        val code = renderFixture(HttpRequestConnectionConfigCodeEmitter.emit(connection, codegenContext))
 
         assertTrue(code.contains("port = 443"))
     }
@@ -250,10 +253,10 @@ class HttpRequestMapperTest {
         )
 
         val connection = HttpRequestConnectionConfigMapper.map(rawConfig, mappingContext())
-        val code = HttpRequestConnectionConfigCodeEmitter.emit(connection, CodegenContext("com.example"))
+        val code = renderFixture(HttpRequestConnectionConfigCodeEmitter.emit(connection, codegenContext))
 
         assertEquals("\${receiver.target.port}", connection.portExpression)
-        assertTrue(code.contains("portExpression = \"\\\${receiver.target.port}\""))
+        assertTrue(code.contains("""portExpression = "${'$'}{'$'}{receiver.target.port}""" + '"'))
     }
 
     @Test
@@ -267,8 +270,7 @@ class HttpRequestMapperTest {
                 protocol = HttpProtocol.HTTPS,
                 basePath = "/v2",
             )
-        val connectionContext = CodegenContext("com.example")
-        val connectionCode = HttpRequestConnectionConfigCodeEmitter.emit(connection, connectionContext)
+        val connectionCode = renderFixture(HttpRequestConnectionConfigCodeEmitter.emit(connection, codegenContext))
 
         val request =
             HttpRequestConfig(
@@ -276,18 +278,42 @@ class HttpRequestMapperTest {
                 path = "/orders",
                 method = HttpMethod.POST,
             )
-        val requestContext = CodegenContext("com.example")
-        val requestCode = HttpRequestCodeEmitter.emit(request, requestContext)
+        val requestCode = renderFixture(HttpRequestCodeEmitter.emit(request, codegenContext))
 
         assertTrue(connectionCode.contains("name = \"HTTP_Request_config\""))
         assertTrue(connectionCode.contains("docName = \"HTTP Request config\""))
         assertTrue(requestCode.contains("httpRequest(httpRequestConnection(\"HTTP_Request_config\"))"))
         assertTrue(requestCode.contains("method = HttpMethod.POST"))
 
-        val imports = connectionContext.resolvedImports() + requestContext.resolvedImports()
-        assertTrue(imports.contains("dev.museframework.http.api.dsl.httpRequestConnection"))
-        assertTrue(imports.contains("dev.museframework.http.api.dsl.httpRequest"))
-        assertFalse(imports.any { it.startsWith("dev.museframework.connectors.http") })
+        assertTrue(connectionCode.contains("import dev.museframework.http.api.dsl.httpRequestConnection"))
+        assertTrue(connectionCode.contains("import dev.museframework.http.api.model.HttpProtocol"))
+        assertTrue(requestCode.contains("import dev.museframework.http.api.dsl.httpRequest\n"))
+        assertTrue(requestCode.contains("import dev.museframework.http.api.model.HttpMethod"))
+    }
+
+    @Test
+    fun `emits a directly referenced request connection as a typed inline config`() {
+        val request = HttpRequestConfig(
+            connectionConfig = ConfigRef.ByReference(
+                HttpRequestConnectionConfig(
+                    name = "mule-request",
+                    docName = "Display name",
+                    host = "127.0.0.1",
+                    port = 9002,
+                ),
+            ),
+            path = "/inline",
+            method = HttpMethod.PATCH,
+        )
+
+        val code = renderFixture(HttpRequestCodeEmitter.emit(request, codegenContext))
+
+        assertTrue(code.contains("httpRequest(httpRequestConnection {"))
+        assertTrue(code.contains("name = \"mule-request\""))
+        assertTrue(code.contains("docName = \"Display name\""))
+        assertTrue(code.contains("host = \"127.0.0.1\""))
+        assertTrue(code.contains("port = 9002"))
+        assertTrue(code.contains("method = HttpMethod.PATCH"))
     }
 
     private fun keyValueGroup(

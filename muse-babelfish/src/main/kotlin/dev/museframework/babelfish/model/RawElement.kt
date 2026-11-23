@@ -7,6 +7,8 @@ data class RawElement(
     val children: List<RawElement>,
     val location: SourceLocation,
     val textContent: String? = null,
+    /** Full XML leaf text where leading and trailing whitespace is data. */
+    val untrimmedTextContent: String? = null,
 ) {
     fun attr(name: String): String? = attrs[name]
 

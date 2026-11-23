@@ -19,13 +19,13 @@ class ApikitTranslationIT {
         val fixture = Path.of("src/test/resources/mule/apikit/apikit-router.xml")
         val provider = ApikitMapperProvider()
         val registry = BabelfishRegistry().apply { provider.registerMappings(this) }
-        val result = MuseBabelfish.translateXmlToMuseKotlinDsl(fixture, registry)
+        val result = MuseBabelfish.translateXmlToMuseKotlinDsl(fixture, registry, lenient = true)
 
         val config = assertIs<ApikitConfig>(result.usedConfigs.getValue("orders-api"))
         assertEquals("orders-api", config.name)
         assertEquals("Orders API", config.docName)
         assertEquals("apikit-config-001", config.docId)
-        assertEquals("api/orders.raml", config.spec)
+        assertEquals("api\\\"orders\".raml", config.spec)
         assertEquals(fixture.toString(), config.sourceFile)
 
         val subFlow = assertIs<MuseFlow.SubFlow>(result.flows.single())
@@ -43,7 +43,7 @@ class ApikitTranslationIT {
         assertContains(code, "import dev.museframework.apikit.api.dsl.apikit")
         assertContains(code, "import dev.museframework.apikit.api.dsl.apikitConfig")
         assertContains(code, "apikitConfig {")
-        assertContains(code, "spec = \"api/orders.raml\"")
+        assertContains(code, "spec = \"api\\\\\\\"orders\\\".raml\"")
         assertContains(code, "apikit(\"orders-api\") {")
     }
 }

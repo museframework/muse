@@ -1,112 +1,78 @@
 package dev.museframework.babelfish.emitter
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.NameAllocator
+import com.squareup.kotlinpoet.buildCodeBlock
+import dev.museframework.babelfish.exception.MissingEmitterException
 import dev.museframework.dsl.api.model.component.PipelineElement
 import dev.museframework.dsl.api.model.component.Source
 import dev.museframework.dsl.api.model.config.MuseConfiguration
-import kotlin.reflect.KClass
+import java.nio.file.Path
 
-open class CodegenContext(
+class CodegenContext internal constructor(
     val packageName: String,
+    private val sourceFile: Path?,
+    private val elementEmitters: Map<String, ElementCodeEmitter<*>>,
 ) {
-    private val imports = mutableSetOf<String>()
-    internal var elementEmitters: Map<String, ElementCodeEmitter<*>> = emptyMap()
+    constructor(packageName: String) : this(packageName, null, emptyMap())
 
-    open fun addImport(fqn: String) {
-        imports.add(fqn)
+    private val names = NameAllocator()
+    private val configNames = mutableMapOf<String, String>()
+    private val flowNames = mutableMapOf<String, String>()
+    internal var currentFlow: String? = null
+
+    internal fun reserveProviderNames() {
+        names.newName("configs")
+        names.newName("flows")
     }
 
-    open fun resolvedImports(): List<String> = imports.sorted()
-
     fun configValName(muleId: String): String =
-        muleId
-            .split("_", "-", " ")
-            .filter { it.isNotEmpty() }
-            .mapIndexed { i, part ->
-                if (i == 0) {
-                    part.lowercase()
-                } else {
-                    part.lowercase().replaceFirstChar { it.uppercase() }
-                }
-            }.joinToString("")
+        configNames.getOrPut(muleId) { names.newName(propertyName(muleId, "config")) }
 
     fun flowValName(flowName: String): String =
-        flowName
-            .split("-", "_", " ", ":", "\\", "/", ".")
-            .filter { it.isNotEmpty() }
-            .mapIndexed { i, part ->
-                if (i == 0) {
-                    part.lowercase()
-                } else {
-                    part.lowercase().replaceFirstChar { it.uppercase() }
-                }
-            }.joinToString("")
+        flowNames.getOrPut(flowName) { names.newName(propertyName(flowName, "flow")) }
 
-    /**
-     * Look up the emitter for a PipelineElement by its qualified class name.
-     * Uses class name instead of KClass to avoid classloader issues.
-     */
-    fun getElementEmitter(element: PipelineElement): ElementCodeEmitter<*>? = elementEmitters[element::class.qualifiedName]
+    private fun propertyName(value: String, fallback: String): String =
+        value.split(IDENTIFIER_SEPARATORS)
+            .filter(String::isNotEmpty)
+            .mapIndexed { index, part ->
+                if (index == 0) part.lowercase() else part.lowercase().replaceFirstChar(Char::uppercaseChar)
+            }.joinToString("").ifEmpty { fallback }
 
-    /**
-     * Emit a list of PipelineElements, delegating to registered element emitters.
-     * Used by router emitters to recursively emit child elements.
-     */
-    open fun emitPipelineElements(
-        elements: List<PipelineElement>,
-        indent: String = "        ",
-    ): String =
-        buildString {
-            elements.forEach { el ->
-                val emitter = getElementEmitter(el)
-                if (emitter != null) {
-                    @Suppress("UNCHECKED_CAST")
-                    val code = (emitter as ElementCodeEmitter<Any>).emit(el, this@CodegenContext)
-                    appendLine(code.prependIndent(indent))
-                }
+    /** Emit the child calls of a router or error strategy in execution order. */
+    fun emitPipelineElements(elements: List<PipelineElement>): CodeBlock =
+        buildCodeBlock {
+            for (element in elements) {
+                @Suppress("UNCHECKED_CAST")
+                val emitter = elementEmitters[element::class.qualifiedName] as? ElementCodeEmitter<PipelineElement>
+                    ?: missingEmitter("element", element)
+                add("%L\n", emitter.emit(element, this@CodegenContext))
             }
         }
 
-    /**
-     * Escapes a string for use in Kotlin double-quoted string literals.
-     * This also handles whitespace preserved by XML character references.
-     */
-    open fun escapeKotlinString(value: String): String {
-        return value
-            .replace("\\", "\\\\")  // Backslash first!
-            .replace("\"", "\\\"")   // Double quote
-            .replace("$", "\\$")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-    }
-
-    /**
-     * Escapes for triple-quoted strings (""".*"""): only backslash and dollar.
-     */
-    open fun escapeTripleQuotedString(value: String): String {
-        return value
-            .replace("\\", "\\\\")
-            .replace("$", "\\$")
-    }
+    internal fun missingEmitter(category: String, model: Any): Nothing =
+        throw MissingEmitterException(category, model.javaClass, sourceFile, currentFlow)
 }
+
+internal val IDENTIFIER_SEPARATORS = Regex("[^\\p{L}\\p{N}]+")
 
 fun interface ElementCodeEmitter<in T : PipelineElement> {
     fun emit(
         element: T,
         ctx: CodegenContext,
-    ): String
+    ): CodeBlock
 }
 
 fun interface SourceCodeEmitter<in T : Source> {
     fun emit(
         source: T,
         ctx: CodegenContext,
-    ): String
+    ): CodeBlock
 }
 
 fun interface ConfigCodeEmitter<in T : MuseConfiguration> {
     fun emit(
         config: T,
         ctx: CodegenContext,
-    ): String
+    ): CodeBlock
 }

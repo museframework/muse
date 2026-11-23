@@ -1,12 +1,15 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.AsyncConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -33,19 +36,13 @@ object AsyncMapper : ElementMapper<AsyncConfig> {
  * Emits Kotlin DSL code for AsyncConfig.
  */
 object AsyncCodeEmitter : ElementCodeEmitter<AsyncConfig> {
-    override fun emit(element: AsyncConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.async")
-        val codeBlock = CodeBlock.builder().apply {
-            add("async·{\n")
-            addDocumentation(element, ctx)
-            if (element.maxConcurrency != null || element.pipeline.isNotEmpty()) {
-                element.maxConcurrency?.let { add("    maxConcurrency·=·%L\n", it) }
-                if (element.pipeline.isNotEmpty()) {
-                    add("%L", ctx.emitPipelineElements(element.pipeline, "    "))
-                }
-            }
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val async = MemberName("dev.museframework.dsl.dsl", "async")
+
+    override fun emit(element: AsyncConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", async)
+        addDocumentation(element)
+        element.maxConcurrency?.let { addStatement("maxConcurrency = %L", kotlinNumericLiteral(it)) }
+        add(ctx.emitPipelineElements(element.pipeline))
+        endControlFlow()
     }
 }

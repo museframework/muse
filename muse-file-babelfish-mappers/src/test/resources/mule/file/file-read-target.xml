@@ -5,6 +5,6 @@
         <file:connection workingDir="/tmp/muse-file"/>
     </file:config>
     <flow name="load-state">
-        <file:read config-ref="output" path="state.json" target="stateText" outputMimeType="text/plain"/>
+        <file:read config-ref="output" path="state.json" target="stateText" outputEncoding="" outputMimeType="text/plain"/>
     </flow>
 </mule>

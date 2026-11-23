@@ -5,11 +5,13 @@ import dev.museframework.babelfish.emitter.KotlinCodeEmitter
 import dev.museframework.babelfish.emitter.ConfigurationClassSpec
 import dev.museframework.babelfish.exception.BabelfishParseException
 import dev.museframework.babelfish.exception.BabelfishTranslationException
+import dev.museframework.babelfish.exception.MissingEmitterException
 import dev.museframework.babelfish.exception.UnmappedElementException
 import dev.museframework.plugin.core.codegen.GeneratedFile
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
+import java.util.TreeMap
 
 class TranslatorFacade(
     private val registry: TranslatorRegistry = TranslatorRegistry.load(),
@@ -40,7 +42,20 @@ class TranslatorFacade(
         }
 
         log.info("Translating ${xmlFiles.size} XML file(s) from $sourceDirectory")
-        return xmlFiles.map { translateFile(it, packageName, configurationClassSpec, nativeBuild, lenient) }
+        val outputOwners = TreeMap<String, File>(String.CASE_INSENSITIVE_ORDER)
+        return xmlFiles.sorted().map { source ->
+            val result = translateFile(source, packageName, configurationClassSpec, nativeBuild, lenient)
+            for (output in result.generatedFiles) {
+                val portablePath = output.relativePath.replace('\\', '/')
+                val previous = outputOwners.putIfAbsent(portablePath, source)
+                if (previous != null) {
+                    throw MuseTranslationException(
+                        "Both '${previous.path}' and '${source.path}' generate '${output.relativePath}'",
+                    )
+                }
+            }
+            result
+        }
     }
 
     private fun translateFile(
@@ -61,26 +76,25 @@ class TranslatorFacade(
             val emitter = KotlinCodeEmitter()
             registry.registerEmitters(emitter, nativeBuild)
 
-            val kotlinCode =
-                emitter.emit(
+            val kotlinFile =
+                emitter.emitFile(
                     babelfishResult,
                     packageName,
                     nativeBuild,
                     configurationClassSpec,
                 )
 
-            val className = deriveClassName(file)
-            val relativePath = "${packageName.replace('.', '/')}/$className.kt"
-
             TranslationResult(
                 sourceFile = file,
-                generatedFiles = listOf(GeneratedFile(relativePath, kotlinCode)),
+                generatedFiles = listOf(GeneratedFile(kotlinFile.relativePath, kotlinFile.toString())),
                 warnings = emptyList(),
             )
         } catch (e: UnmappedElementException) {
             handleUnmappedElement(file, e, lenient)
         } catch (e: BabelfishTranslationException) {
             handleBabelfishTranslationException(file, e, lenient)
+        } catch (e: MissingEmitterException) {
+            throw MuseTranslationException(requireNotNull(e.message), e)
         } catch (e: BabelfishParseException) {
             throw MuseTranslationException(
                 "Failed to parse '${file.absolutePath}': ${e.message}",
@@ -117,11 +131,6 @@ class TranslatorFacade(
             throw MissingMapperTranslationException(message, cause)
         }
     }
-
-    internal fun deriveClassName(file: File): String =
-        file.nameWithoutExtension
-            .split("-", "_", " ")
-            .joinToString("") { it.replaceFirstChar(Char::uppercaseChar) } + "Config"
 }
 
 internal fun formatMissingMapperDiagnostic(

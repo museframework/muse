@@ -1,8 +1,11 @@
 package dev.museframework.babelfish.mappers.sftp
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.sftp.api.config.SftpConnectionConfig
@@ -76,29 +79,31 @@ object SftpConnectionConfigCodeEmitter : ConfigCodeEmitter<SftpConnectionConfig>
     override fun emit(
         config: SftpConnectionConfig,
         ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpConnection")
-        ctx.addImport("dev.museframework.sftp.api.config.SftpHostKeyChecking")
-        return buildString {
-            appendLine("sftpConnection {")
-            appendLine("    name = \"${ctx.escapeKotlinString(config.name)}\"")
-            appendLine("    docName = \"${ctx.escapeKotlinString(config.docName)}\"")
-            appendLine("    host = \"${ctx.escapeKotlinString(config.host)}\"")
-            appendNonDefaultInt("port", config.port, default = 22)
-            appendOptionalString("portExpression", config.portExpression, ctx)
-            appendLine("    username = \"${ctx.escapeKotlinString(config.username)}\"")
-            appendOptionalString("password", config.password, ctx)
-            appendOptionalString("privateKeyPath", config.privateKeyPath, ctx)
-            appendOptionalString("privateKeyPassphrase", config.privateKeyPassphrase, ctx)
-            appendNonDefaultString("knownHostsFile", config.knownHostsFile, "~/.ssh/known_hosts", ctx)
-            if (config.hostKeyChecking != SftpHostKeyChecking.STRICT) {
-                appendLine("    hostKeyChecking = SftpHostKeyChecking.${config.hostKeyChecking}")
-            }
-            appendNonDefaultString("workingDirectory", config.workingDirectory, "/", ctx)
-            appendNonDefaultLong("connectionTimeoutMs", config.connectionTimeoutMs, 10_000L)
-            appendNonDefaultLong("authenticationTimeoutMs", config.authenticationTimeoutMs, 10_000L)
-            appendNonDefaultLong("operationTimeoutMs", config.operationTimeoutMs, 30_000L)
-            append("}")
+    ): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", sftpDsl("sftpConnection"))
+        addString("name", config.name)
+        addString("docName", config.docName)
+        addString("host", config.host)
+        if (config.port != 22) addStatement("port = %L", kotlinNumericLiteral(config.port))
+        addString("portExpression", config.portExpression)
+        addString("username", config.username)
+        addString("password", config.password)
+        addString("privateKeyPath", config.privateKeyPath)
+        addString("privateKeyPassphrase", config.privateKeyPassphrase)
+        if (config.knownHostsFile != "~/.ssh/known_hosts") addString("knownHostsFile", config.knownHostsFile)
+        if (config.hostKeyChecking != SftpHostKeyChecking.STRICT) {
+            addStatement("hostKeyChecking = %T.%N", SftpHostKeyChecking::class, config.hostKeyChecking.name)
         }
+        if (config.workingDirectory != "/") addString("workingDirectory", config.workingDirectory)
+        if (config.connectionTimeoutMs != 10_000L) {
+            addStatement("connectionTimeoutMs = %L", kotlinNumericLiteral(config.connectionTimeoutMs))
+        }
+        if (config.authenticationTimeoutMs != 10_000L) {
+            addStatement("authenticationTimeoutMs = %L", kotlinNumericLiteral(config.authenticationTimeoutMs))
+        }
+        if (config.operationTimeoutMs != 30_000L) {
+            addStatement("operationTimeoutMs = %L", kotlinNumericLiteral(config.operationTimeoutMs))
+        }
+        endControlFlow()
     }
 }

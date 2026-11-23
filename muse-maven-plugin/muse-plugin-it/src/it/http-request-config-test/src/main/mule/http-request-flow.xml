@@ -8,6 +8,8 @@
   
   <flow name="http-request-flow" doc:name="HTTP Request Test">
     <set-payload value="Request Body" doc:name="Set Request"/>
+    <http:request config-ref="http-request-config" path="/v2/orders" method="POST" target="reply"
+                  targetValue="#[message]"/>
     <logger message="#[payload]" level="INFO" doc:name="Log Request"/>
   </flow>
 </mule>

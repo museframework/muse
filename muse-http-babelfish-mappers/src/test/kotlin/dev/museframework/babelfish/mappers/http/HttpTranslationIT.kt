@@ -3,6 +3,7 @@ package dev.museframework.babelfish.mappers.http
 import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
+import dev.museframework.dsl.api.config.TargetConfig
 import dev.museframework.dsl.api.model.config.ConfigRef
 import dev.museframework.dsl.api.model.flow.MuseFlow
 import dev.museframework.http.api.config.ConnectionConfigRef
@@ -57,8 +58,15 @@ class HttpTranslationIT {
         assertFalse(requestConnection.usePersistentConnections)
         assertEquals(4, requestConnection.maxConnections)
         assertFalse(requestConnection.enableCookies)
-        assertEquals(mapOf("Accept" to "application/json"), requestConnection.defaultHeaders)
-        assertEquals(mapOf("locale" to "en"), requestConnection.defaultQueryParams)
+        val escapedValue = "value-\"-\$-\\\r\nnext"
+        assertEquals(
+            mapOf("Accept" to "application/json", "header-\"-\$-\\" to escapedValue),
+            requestConnection.defaultHeaders,
+        )
+        assertEquals(
+            mapOf("locale" to "en", "query-\"-\$-\\" to escapedValue),
+            requestConnection.defaultQueryParams,
+        )
         assertEquals(SendCorrelationId.NEVER, requestConnection.sendCorrelationId)
         assertEquals(HttpSendBodyMode.NEVER, requestConnection.sendBodyMode)
         assertEquals(HttpStreamingMode.NEVER, requestConnection.requestStreamingMode)
@@ -94,15 +102,18 @@ class HttpTranslationIT {
         assertEquals(HttpStreamingMode.ALWAYS, request.requestStreamingMode)
         assertEquals(SendCorrelationId.ALWAYS, request.sendCorrelationId)
         assertEquals("#[correlationId]", request.correlationId)
+        assertEquals(TargetConfig("httpReply", "#[message]"), request.targetConfig)
 
         val code =
             KotlinCodeEmitter()
                 .apply { provider.registerEmitters(this) }
                 .emit(result, "dev.museframework.babelfish.generated")
 
-        assertContains(code, "import dev.museframework.http.api.dsl.httpListener")
+        assertContains(code, "import dev.museframework.dsl.api.config.TargetConfig")
+        assertContains(code, "import dev.museframework.http.api.model.HttpProtocol")
+        assertContains(code, "import dev.museframework.http.api.dsl.httpListener\n")
         assertContains(code, "import dev.museframework.http.api.dsl.httpListenerConnection")
-        assertContains(code, "import dev.museframework.http.api.dsl.httpRequest")
+        assertContains(code, "import dev.museframework.http.api.dsl.httpRequest\n")
         assertContains(code, "import dev.museframework.http.api.dsl.httpRequestConnection")
         assertContains(code, "httpListener(\"HTTP_Listener_config\")")
         assertContains(code, "allowedMethods = listOf(HttpMethod.POST)")

@@ -9,32 +9,18 @@ import dev.museframework.babelfish.mappers.core.CoreMapperProvider
 import dev.museframework.babelfish.mappers.core.SetPayloadMapper
 import dev.museframework.babelfish.model.SourceLocation
 import dev.museframework.babelfish.spi.BabelfishMapperProvider
+import dev.museframework.plugin.core.runtime.quarkus.QuarkusRuntimeStrategy
+import dev.museframework.plugin.core.runtime.spring.SpringBootRuntimeStrategy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class TranslatorFacadeTest {
-    private val nativeConfigurationSpec =
-        ConfigurationClassSpec(
-            definition =
-                ConfigurationClassSpec.Declaration(
-                    annotationTypes = listOf("dev.museframework.springboot.MuseConfigComponent"),
-                ),
-            native =
-                ConfigurationClassSpec.Declaration(
-                    annotationTypes =
-                        listOf(
-                            "dev.museframework.dsl.annotation.MuseConfig",
-                            "org.springframework.stereotype.Component",
-                        ),
-                    providerInterface = "dev.museframework.springboot.MuseConfigProvider",
-                ),
-        )
-
     @Test
     fun `translateAll returns empty list when sourceDirectory does not exist`() {
         val facade = TranslatorFacade()
@@ -51,12 +37,23 @@ class TranslatorFacadeTest {
     }
 
     @Test
-    fun `deriveClassName converts kebab-case to PascalCase with Config suffix`() {
-        val facade = TranslatorFacade()
-        assertEquals("MyOrderFlowConfig", facade.deriveClassName(java.io.File("my-order-flow.xml")))
-        assertEquals("SimpleConfig", facade.deriveClassName(java.io.File("simple.xml")))
-        assertEquals("HttpListenerConfig", facade.deriveClassName(java.io.File("http-listener.xml")))
-        assertEquals("HttpListenerConfig", facade.deriveClassName(java.io.File("http_listener.xml")))
+    fun `generated file path and declaration use the same name`(@TempDir dir: Path) {
+        val facade = TranslatorFacade(TranslatorRegistry.of(emptyList()))
+        dir.resolve("3-order.API__flow.XML").toFile().writeText("<mule/>")
+        val file = facade.translateAll(dir.toFile(), "com.example").single().generatedFiles.single()
+        assertEquals("com/example/_3OrderAPIFlowConfig.kt", file.relativePath)
+        assertContains(file.content, "class _3OrderAPIFlowConfig")
+    }
+
+    @Test
+    fun `two input files with the same output path report both sources`(@TempDir dir: Path) {
+        val facade = TranslatorFacade(TranslatorRegistry.of(emptyList()))
+        dir.resolve("customer-order.xml").toFile().writeText("<mule/>")
+        dir.resolve("customer_order.xml").toFile().writeText("<mule/>")
+        val error = assertFailsWith<MuseTranslationException> { facade.translateAll(dir.toFile(), "com.example") }
+        assertContains(error.message!!, "customer-order.xml")
+        assertContains(error.message!!, "customer_order.xml")
+        assertContains(error.message!!, "com/example/CustomerOrderConfig.kt")
     }
 
     @Test
@@ -70,6 +67,18 @@ class TranslatorFacadeTest {
         assertEquals(1, results[0].generatedFiles.size)
         assertContains(results[0].generatedFiles[0].content, "setPayload")
         assertTrue(results[0].warnings.isEmpty())
+    }
+
+    @Test
+    fun `a mapping-only provider cannot produce incomplete Kotlin in lenient mode`(@TempDir dir: Path) {
+        writeCoreFlow(dir, "mapped.xml")
+        val facade = TranslatorFacade(TranslatorRegistry.of(listOf(DuplicateCoreMappingProvider())))
+        val failure = assertFailsWith<MuseTranslationException> {
+            facade.translateAll(dir.toFile(), "com.example", lenient = true)
+        }
+        assertContains(failure.message!!, "mapped.xml")
+        assertContains(failure.message!!, "hello-flow")
+        assertContains(failure.message!!, "SetPayloadConfig")
     }
 
     @Test
@@ -211,7 +220,7 @@ class TranslatorFacadeTest {
         facade.translateAll(
             dir.toFile(),
             "com.example",
-            configurationClassSpec = nativeConfigurationSpec,
+            configurationClassSpec = SpringBootRuntimeStrategy().configurationClassSpec(),
             nativeBuild = true,
         )
 
@@ -219,23 +228,77 @@ class TranslatorFacadeTest {
     }
 
     @Test
-    fun `nativeBuild emits reflection-free runtime provider output`(@TempDir dir: Path) {
-        val facade = TranslatorFacade(registry = TranslatorRegistry.of(listOf(CoreMapperProvider())))
+    fun `standard generation emits the discovery annotations for each runtime`(@TempDir dir: Path) {
+        val facade = TranslatorFacade(TranslatorRegistry.of(listOf(CoreMapperProvider())))
         writeCoreFlow(dir, "core-flow.xml")
 
-        val results =
-            facade.translateAll(
-                dir.toFile(),
-                "com.example",
-                configurationClassSpec = nativeConfigurationSpec,
-                nativeBuild = true,
-            )
+        val declarations = listOf(
+            ConfigurationClassSpec.Plain to listOf("dev.museframework.dsl.annotation.MuseConfig"),
+            SpringBootRuntimeStrategy().configurationClassSpec() to
+                listOf("dev.museframework.springboot.MuseConfigComponent"),
+            QuarkusRuntimeStrategy().configurationClassSpec() to
+                listOf("dev.museframework.dsl.annotation.MuseConfig", "jakarta.enterprise.context.ApplicationScoped"),
+        )
+        for ((spec, annotations) in declarations) {
+            val content = facade.translateAll(dir.toFile(), "com.example", spec).single().generatedFiles.single().content
+            assertEquals(annotations.map { "@" + it.substringAfterLast('.') }, content.lines().filter { it.startsWith('@') })
+            annotations.forEach { assertImport(content, it) }
+            assertContains(content, "class CoreFlowConfig : MuseConfigDefinition()")
+            assertFalse(content.contains("MuseConfigProvider"))
+        }
+    }
 
-        assertEquals(1, results.size)
-        val content = results[0].generatedFiles.single().content
-        assertContains(content, "class CoreFlowConfig : MuseConfigProvider")
-        assertContains(content, "override fun flows(): List<MuseFlow>")
-        assertTrue(!content.contains("MuseConfigDefinition"))
+    @Test
+    fun `native generation exposes ordered configs and flows and inherits empty defaults`(@TempDir dir: Path) {
+        val facade = TranslatorFacade(TranslatorRegistry.of(listOf(CoreMapperProvider())))
+        dir.resolve("empty.xml").toFile().writeText("""<mule xmlns="http://www.mulesoft.org/schema/mule/core"/>""")
+        dir.resolve("ordered.xml").toFile().writeText(
+            """
+            <mule xmlns="http://www.mulesoft.org/schema/mule/core">
+                <configuration-properties name="second-config" file="second.properties"/>
+                <configuration-properties name="first-config" file="first.properties"/>
+                <flow name="second-flow"><flow-ref name="first-flow"/></flow>
+                <sub-flow name="first-flow"><set-payload value="done"/></sub-flow>
+            </mule>
+            """.trimIndent()
+        )
+
+        val declarations = listOf(
+            Triple(
+                SpringBootRuntimeStrategy().configurationClassSpec(),
+                "dev.museframework.springboot",
+                "org.springframework.stereotype.Component",
+            ),
+            Triple(
+                QuarkusRuntimeStrategy().configurationClassSpec(),
+                "dev.museframework.quarkus",
+                "jakarta.enterprise.context.ApplicationScoped",
+            ),
+        )
+        for ((spec, providerPackage, hostAnnotation) in declarations) {
+            val outputs = facade.translateAll(dir.toFile(), "com.example", spec, nativeBuild = true)
+                .associate { it.sourceFile.name to it.generatedFiles.single().content }
+            val empty = outputs.getValue("empty.xml")
+            val ordered = outputs.getValue("ordered.xml")
+            for (content in outputs.values) {
+                assertImport(content, "dev.museframework.dsl.annotation.MuseConfig")
+                assertImport(content, hostAnnotation)
+                assertImport(content, "$providerPackage.MuseConfigProvider")
+                assertEquals(
+                    listOf("@MuseConfig", "@" + hostAnnotation.substringAfterLast('.')),
+                    content.lines().filter { it.startsWith('@') },
+                )
+                assertFalse(content.contains("MuseConfigDefinition"))
+            }
+            assertContains(empty, "class EmptyConfig : MuseConfigProvider")
+            assertFalse(empty.contains("override fun"))
+            assertContains(ordered, "class OrderedConfig : MuseConfigProvider")
+            val propertyNames = Regex("""\bval (\w+):""")
+                .findAll(ordered).map { it.groupValues[1] }.toList()
+            assertEquals(listOf("secondConfig", "firstConfig", "secondFlow", "firstFlow"), propertyNames)
+            assertContains(ordered, "flows(): List<MuseFlow> = listOf(secondFlow, firstFlow)")
+            assertContains(ordered, "configs(): List<MuseConfiguration> = listOf(secondConfig, firstConfig)")
+        }
     }
 
     private fun writeCoreFlow(dir: Path, name: String): java.io.File {
@@ -325,5 +388,14 @@ class TranslatorFacadeTest {
             emitter: KotlinCodeEmitter,
             nativeBuild: Boolean,
         ) {}
+    }
+
+    private fun assertImport(content: String, importedType: String) {
+        assertTrue(
+            content.lines().any { line ->
+                line.startsWith("import ") && line.replace("`", "") == "import $importedType"
+            },
+            "Expected import $importedType in generated Kotlin",
+        )
     }
 }

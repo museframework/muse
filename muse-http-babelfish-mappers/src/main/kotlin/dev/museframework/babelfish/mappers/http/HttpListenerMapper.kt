@@ -1,10 +1,16 @@
 package dev.museframework.babelfish.mappers.http
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
+import com.squareup.kotlinpoet.joinToCode
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.api.SourceMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
 import dev.museframework.babelfish.emitter.SourceCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.babelfish.model.RawElement
@@ -89,36 +95,37 @@ object HttpListenerMapper : SourceMapper<HttpListenerConfig> {
     }
 }
 
+private val httpListenerConnection = MemberName("dev.museframework.http.api.dsl", "httpListenerConnection")
+private val httpListener = MemberName("dev.museframework.http.api.dsl", "httpListener", isExtension = true)
+private val listOfFunction = MemberName("kotlin.collections", "listOf")
+
 object HttpListenerConnectionConfigCodeEmitter : ConfigCodeEmitter<HttpListenerConnectionConfig> {
     override fun emit(
         config: HttpListenerConnectionConfig,
         ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.http.api.dsl.httpListenerConnection")
-        ctx.addImport("dev.museframework.http.api.model.HttpProtocol")
-
-        return buildString {
-            appendLine("httpListenerConnection(\"${ctx.escapeKotlinString(config.name)}\") {")
-            appendLine("    docName = \"${ctx.escapeKotlinString(config.docName)}\"")
-            appendLine("    host = \"${ctx.escapeKotlinString(config.host)}\"")
-            appendLine("    port = ${config.port}")
-            if (config.protocol != HttpProtocol.HTTP) {
-                appendLine("    protocol = HttpProtocol.${config.protocol}")
-            }
-            if (config.basePath != "/") {
-                appendLine("    basePath = \"${ctx.escapeKotlinString(config.basePath)}\"")
-            }
-            if (!config.usePersistentConnections) {
-                appendLine("    usePersistentConnections = false")
-            }
-            if (config.connectionIdleTimeoutMs != 40000L) {
-                appendLine("    connectionIdleTimeoutMs = ${config.connectionIdleTimeoutMs}")
-            }
-            if (config.readTimeoutMs != 30000L) {
-                appendLine("    readTimeoutMs = ${config.readTimeoutMs}")
-            }
-            append("}")
+    ): CodeBlock = buildCodeBlock {
+        add("%M(%L) {\n", httpListenerConnection, kotlinStringLiteral(config.name))
+        indent()
+        addStatement("docName = %L", kotlinStringLiteral(config.docName))
+        addStatement("host = %L", kotlinStringLiteral(config.host))
+        addStatement("port = %L", kotlinNumericLiteral(config.port))
+        if (config.protocol != HttpProtocol.HTTP) {
+            addStatement("protocol = %T.%N", HttpProtocol::class, config.protocol.name)
         }
+        if (config.basePath != "/") {
+            addStatement("basePath = %L", kotlinStringLiteral(config.basePath))
+        }
+        if (!config.usePersistentConnections) {
+            addStatement("usePersistentConnections = false")
+        }
+        if (config.connectionIdleTimeoutMs != 40000L) {
+            addStatement("connectionIdleTimeoutMs = %L", kotlinNumericLiteral(config.connectionIdleTimeoutMs))
+        }
+        if (config.readTimeoutMs != 30000L) {
+            addStatement("readTimeoutMs = %L", kotlinNumericLiteral(config.readTimeoutMs))
+        }
+        unindent()
+        add("}")
     }
 }
 
@@ -126,51 +133,31 @@ object HttpListenerCodeEmitter : SourceCodeEmitter<HttpListenerConfig> {
     override fun emit(
         source: HttpListenerConfig,
         ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.http.api.config.HttpStreamingMode")
-        ctx.addImport("dev.museframework.http.api.dsl.httpListener")
-        ctx.addImport("dev.museframework.http.api.model.HttpMethod")
-
-        val listenerArg =
-            when (val ref = source.connectionConfigRef) {
-                is ConnectionConfigRef.ByReference ->
-                    "\"${ctx.configValName(ref.config.docName)}\""
-                is ConnectionConfigRef.ByName ->
-                    "\"${ctx.escapeKotlinString(ref.name)}\""
-            }
-
-        return buildString {
-            appendLine("httpListener($listenerArg) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(source.path)}\"")
-            if (source.allowedMethods != listOf(HttpMethod.ANY)) {
-                val methods = source.allowedMethods.joinToString(", ") { "HttpMethod.$it" }
-                appendLine("    allowedMethods = listOf($methods)")
-            }
-            if (source.responseStreamingMode != HttpStreamingMode.AUTO) {
-                appendLine("    responseStreamingMode = HttpStreamingMode.${source.responseStreamingMode}")
-            }
-            emitResponse(
-                blockName = "successResponse",
-                response = source.successResponse,
-                defaults = SuccessHttpResponseConfig(),
-                ctx = ctx,
-            )
-            emitResponse(
-                blockName = "errorResponse",
-                response = source.errorResponse,
-                defaults = ErrorHttpResponseConfig(),
-                ctx = ctx,
-            )
-            append("}")
+    ): CodeBlock = buildCodeBlock {
+        val listenerArg = when (val ref = source.connectionConfigRef) {
+            is ConnectionConfigRef.ByReference -> HttpListenerConnectionConfigCodeEmitter.emit(ref.config, ctx)
+            is ConnectionConfigRef.ByName -> kotlinStringLiteral(ref.name)
         }
+
+        beginControlFlow("%M(%L)", httpListener, listenerArg)
+        addStatement("path = %L", kotlinStringLiteral(source.path))
+        if (source.allowedMethods != listOf(HttpMethod.ANY)) {
+            val methods = source.allowedMethods.map { CodeBlock.of("%T.%N", HttpMethod::class, it.name) }
+            addStatement("allowedMethods = %M(%L)", listOfFunction, methods.joinToCode())
+        }
+        if (source.responseStreamingMode != HttpStreamingMode.AUTO) {
+            addStatement("responseStreamingMode = %T.%N", HttpStreamingMode::class, source.responseStreamingMode.name)
+        }
+        emitResponse("successResponse", source.successResponse, SuccessHttpResponseConfig())
+        emitResponse("errorResponse", source.errorResponse, ErrorHttpResponseConfig())
+        endControlFlow()
     }
 }
 
-private fun StringBuilder.emitResponse(
+private fun CodeBlock.Builder.emitResponse(
     blockName: String,
     response: HttpResponseConfig,
     defaults: HttpResponseConfig,
-    ctx: CodegenContext,
 ) {
     if (
         response.statusCode == defaults.statusCode &&
@@ -182,23 +169,17 @@ private fun StringBuilder.emitResponse(
         return
     }
 
-    appendLine("    $blockName {")
+    beginControlFlow("%N", blockName)
     if (response.statusCode != defaults.statusCode) {
-        appendLine("        statusCode = \"${ctx.escapeKotlinString(response.statusCode)}\"")
+        addStatement("statusCode = %L", kotlinStringLiteral(response.statusCode))
     }
-    response.reasonPhrase?.let {
-        appendLine("        reasonPhrase = \"${ctx.escapeKotlinString(it)}\"")
-    }
-    response.headersExpression?.let {
-        appendLine("        headersExpression = \"${ctx.escapeKotlinString(it)}\"")
-    }
+    response.reasonPhrase?.let { addStatement("reasonPhrase = %L", kotlinStringLiteral(it)) }
+    response.headersExpression?.let { addStatement("headersExpression = %L", kotlinStringLiteral(it)) }
     response.headers.forEach { (name, value) ->
-        appendLine("        header(\"${ctx.escapeKotlinString(name)}\", \"${ctx.escapeKotlinString(value)}\")")
+        addStatement("header(%L, %L)", kotlinStringLiteral(name), kotlinStringLiteral(value))
     }
-    response.body?.let {
-        appendLine("        body = \"${ctx.escapeKotlinString(it)}\"")
-    }
-    appendLine("    }")
+    response.body?.let { addStatement("body = %L", kotlinStringLiteral(it)) }
+    endControlFlow()
 }
 
 private inline fun <reified T : Enum<T>> String.toHttpEnum(): T = enumValueOf(trim().uppercase())

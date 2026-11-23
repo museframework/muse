@@ -1,0 +1,3 @@
+<mule xmlns="http://www.mulesoft.org/schema/mule/core">
+    <sub-flow name="finish-order"><set-payload value="done"/></sub-flow>
+</mule>

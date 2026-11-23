@@ -1,10 +1,15 @@
 package dev.museframework.babelfish.mappers.sftp
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
+import com.squareup.kotlinpoet.joinToCode
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
+import dev.museframework.dsl.api.config.TargetConfig
 import dev.museframework.sftp.api.config.SftpConnectionRef
 import dev.museframework.sftp.api.config.SftpCopyConfig
 import dev.museframework.sftp.api.config.SftpCreateDirectoryConfig
@@ -146,120 +151,71 @@ object SftpCreateDirectoryMapper : ElementMapper<SftpCreateDirectoryConfig> {
 }
 
 object SftpReadCodeEmitter : ElementCodeEmitter<SftpReadConfig> {
-    override fun emit(
-        element: SftpReadConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpConnection")
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpRead")
-        return buildString {
-            appendLine("sftpRead(${connectionRefExpression(element.connection, ctx)}) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            appendTargetConfig(element.targetConfig, ctx)
-            append("}")
+    override fun emit(element: SftpReadConfig, ctx: CodegenContext): CodeBlock =
+        sftpOperation("sftpRead", element.connection) {
+            addString("path", element.path)
+            addTargetConfig(element.targetConfig)
         }
-    }
 }
 
 object SftpWriteCodeEmitter : ElementCodeEmitter<SftpWriteConfig> {
-    override fun emit(
-        element: SftpWriteConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpConnection")
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpWrite")
-        ctx.addImport("dev.museframework.sftp.api.model.SftpWriteMode")
-        return buildString {
-            appendLine("sftpWrite(${connectionRefExpression(element.connection, ctx)}) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            appendOptionalString("content", element.content, ctx)
-            appendOptionalString("modeExpression", element.modeExpression, ctx)
-            appendNonDefaultBoolean("createParentDirectories", element.createParentDirectories, default = true)
+    override fun emit(element: SftpWriteConfig, ctx: CodegenContext): CodeBlock =
+        sftpOperation("sftpWrite", element.connection) {
+            addString("path", element.path)
+            addString("content", element.content)
+            addString("modeExpression", element.modeExpression)
+            addNonDefaultBoolean("createParentDirectories", element.createParentDirectories, default = true)
             if (element.mode != SftpWriteMode.OVERWRITE) {
-                appendLine("    mode = SftpWriteMode.${element.mode}")
+                addStatement("mode = %T.%N", SftpWriteMode::class, element.mode.name)
             }
-            append("}")
         }
-    }
 }
 
 object SftpListCodeEmitter : ElementCodeEmitter<SftpListConfig> {
-    override fun emit(
-        element: SftpListConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpConnection")
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpList")
-        return buildString {
-            appendLine("sftpList(${connectionRefExpression(element.connection, ctx)}) {")
-            appendNonDefaultString("directoryPath", element.directoryPath, "/", ctx)
-            appendNonDefaultBoolean("recursive", element.recursive, default = false)
-            appendSftpMatcherAssignment("matcher", element.matcher, SftpFileMatcher(), ctx)
-            appendTargetConfig(element.targetConfig, ctx)
-            append("}")
+    override fun emit(element: SftpListConfig, ctx: CodegenContext): CodeBlock =
+        sftpOperation("sftpList", element.connection) {
+            if (element.directoryPath != "/") addString("directoryPath", element.directoryPath)
+            addNonDefaultBoolean("recursive", element.recursive, default = false)
+            addMatcher(element.matcher, SftpFileMatcher())
+            addTargetConfig(element.targetConfig)
         }
-    }
 }
 
 object SftpCopyCodeEmitter : ElementCodeEmitter<SftpCopyConfig> {
-    override fun emit(
-        element: SftpCopyConfig,
-        ctx: CodegenContext,
-    ): String = emitTransfer("sftpCopy", element.connection, element.transfer, ctx)
+    override fun emit(element: SftpCopyConfig, ctx: CodegenContext): CodeBlock =
+        sftpOperation("sftpCopy", element.connection) {
+            addTransfer(element.transfer)
+        }
 }
 
 object SftpMoveCodeEmitter : ElementCodeEmitter<SftpMoveConfig> {
-    override fun emit(
-        element: SftpMoveConfig,
-        ctx: CodegenContext,
-    ): String = emitTransfer("sftpMove", element.connection, element.transfer, ctx)
+    override fun emit(element: SftpMoveConfig, ctx: CodegenContext): CodeBlock =
+        sftpOperation("sftpMove", element.connection) {
+            addTransfer(element.transfer)
+        }
 }
 
 object SftpDeleteCodeEmitter : ElementCodeEmitter<SftpDeleteConfig> {
-    override fun emit(
-        element: SftpDeleteConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpConnection")
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpDelete")
-        return buildString {
-            appendLine("sftpDelete(${connectionRefExpression(element.connection, ctx)}) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            append("}")
+    override fun emit(element: SftpDeleteConfig, ctx: CodegenContext): CodeBlock =
+        sftpOperation("sftpDelete", element.connection) {
+            addString("path", element.path)
         }
-    }
 }
 
 object SftpRenameCodeEmitter : ElementCodeEmitter<SftpRenameConfig> {
-    override fun emit(
-        element: SftpRenameConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpConnection")
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpRename")
-        return buildString {
-            appendLine("sftpRename(${connectionRefExpression(element.connection, ctx)}) {")
-            appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            appendLine("    newName = \"${ctx.escapeKotlinString(element.newName)}\"")
-            appendNonDefaultBoolean("overwrite", element.overwrite, default = false)
-            append("}")
+    override fun emit(element: SftpRenameConfig, ctx: CodegenContext): CodeBlock =
+        sftpOperation("sftpRename", element.connection) {
+            addString("path", element.path)
+            addString("newName", element.newName)
+            addNonDefaultBoolean("overwrite", element.overwrite, default = false)
         }
-    }
 }
 
 object SftpCreateDirectoryCodeEmitter : ElementCodeEmitter<SftpCreateDirectoryConfig> {
-    override fun emit(
-        element: SftpCreateDirectoryConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpConnection")
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpCreateDirectory")
-        return buildString {
-            appendLine("sftpCreateDirectory(${connectionRefExpression(element.connection, ctx)}) {")
-            appendLine("    directoryPath = \"${ctx.escapeKotlinString(element.directoryPath)}\"")
-            append("}")
+    override fun emit(element: SftpCreateDirectoryConfig, ctx: CodegenContext): CodeBlock =
+        sftpOperation("sftpCreateDirectory", element.connection) {
+            addString("directoryPath", element.directoryPath)
         }
-    }
 }
 
 private fun mapTransferRequest(element: RawElement): SftpTransferRequest =
@@ -274,21 +230,26 @@ private fun mapTransferRequest(element: RawElement): SftpTransferRequest =
         renameTo = element.attrs["renameTo"],
     )
 
-private fun emitTransfer(
-    dslName: String,
+private fun sftpOperation(
+    name: String,
     connection: SftpConnectionRef,
-    transfer: SftpTransferRequest,
-    ctx: CodegenContext,
-): String {
-    ctx.addImport("dev.museframework.sftp.api.dsl.sftpConnection")
-    ctx.addImport("dev.museframework.sftp.api.dsl.$dslName")
-    return buildString {
-        appendLine("$dslName(${connectionRefExpression(connection, ctx)}) {")
-        appendLine("    sourcePath = \"${ctx.escapeKotlinString(transfer.sourcePath)}\"")
-        appendLine("    targetDirectory = \"${ctx.escapeKotlinString(transfer.targetDirectory)}\"")
-        appendNonDefaultBoolean("createParentDirectories", transfer.createParentDirectories, default = true)
-        appendNonDefaultBoolean("overwrite", transfer.overwrite, default = false)
-        appendOptionalString("renameTo", transfer.renameTo, ctx)
-        append("}")
-    }
+    body: CodeBlock.Builder.() -> Unit,
+): CodeBlock = buildCodeBlock {
+    beginControlFlow("%M(%M(%L))", sftpDsl(name), sftpDsl("sftpConnection"), connectionName(connection))
+    body()
+    endControlFlow()
+}
+
+private fun CodeBlock.Builder.addTransfer(transfer: SftpTransferRequest) {
+    addString("sourcePath", transfer.sourcePath)
+    addString("targetDirectory", transfer.targetDirectory)
+    addNonDefaultBoolean("createParentDirectories", transfer.createParentDirectories, default = true)
+    addNonDefaultBoolean("overwrite", transfer.overwrite, default = false)
+    addString("renameTo", transfer.renameTo)
+}
+
+private fun CodeBlock.Builder.addTargetConfig(target: TargetConfig?) {
+    if (target == null) return
+    val arguments = listOfNotNull(target.target, target.targetValue).map(::kotlinStringLiteral).joinToCode()
+    addStatement("targetConfig = %T(%L)", TargetConfig::class, arguments)
 }

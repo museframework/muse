@@ -100,6 +100,19 @@
     <profiles>
         <profile>
             <id>plugin-it</id>
+            <dependencies>
+                <!-- Required to compile Quarkus-native configuration output in the migrate Invoker fixture. -->
+                <dependency>
+                    <groupId>dev.museframework.connectors</groupId>
+                    <artifactId>muse-quarkus</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>dev.museframework.connectors</groupId>
+                    <artifactId>muse-quarkus-deployment</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
             <build>
                 <plugins>
                     <plugin>

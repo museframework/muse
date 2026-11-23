@@ -1,12 +1,15 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.RaiseErrorConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -31,17 +34,15 @@ object RaiseErrorMapper : ElementMapper<RaiseErrorConfig> {
  * Generates: raiseError { type = "MULE:EXPRESSION"; description = "Intentional failure" }
  */
 object RaiseErrorCodeEmitter : ElementCodeEmitter<RaiseErrorConfig> {
-    override fun emit(element: RaiseErrorConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.raiseError")
-        val codeBlock = CodeBlock.builder().apply {
-            add("raiseError·{\n")
-            addDocumentation(element, ctx)
-            add("    type·=·%S\n", element.type)
-            if (element.description.isNotEmpty()) {
-                add("    description·=·%S\n", element.description)
-            }
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val raiseError = MemberName("dev.museframework.dsl.dsl", "raiseError")
+
+    override fun emit(element: RaiseErrorConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", raiseError)
+        addDocumentation(element)
+        addStatement("type = %L", kotlinStringLiteral(element.type))
+        if (element.description.isNotEmpty()) {
+            addStatement("description = %L", kotlinStringLiteral(element.description))
+        }
+        endControlFlow()
     }
 }

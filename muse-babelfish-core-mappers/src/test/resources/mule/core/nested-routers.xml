@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core">
+    <flow name="nested-routers">
+        <async maxConcurrency="3">
+            <until-successful maxRetries="2" millisBetweenRetries="75">
+                <try>
+                    <set-payload value="attempt"/>
+                    <error-handler>
+                        <on-error-propagate type="MULE:EXPRESSION">
+                            <set-payload value="retry"/>
+                        </on-error-propagate>
+                    </error-handler>
+                </try>
+            </until-successful>
+        </async>
+    </flow>
+</mule>

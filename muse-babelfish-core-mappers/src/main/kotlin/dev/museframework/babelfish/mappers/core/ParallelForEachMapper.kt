@@ -1,13 +1,17 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.ParallelForEachConfig
 import dev.museframework.dsl.api.config.TargetConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -40,31 +44,19 @@ object ParallelForEachMapper : ElementMapper<ParallelForEachConfig> {
  * Emits Kotlin DSL code for ParallelForEachConfig.
  */
 object ParallelForEachCodeEmitter : ElementCodeEmitter<ParallelForEachConfig> {
-    override fun emit(element: ParallelForEachConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.parallelForEach")
-        val codeBlock = CodeBlock.builder().apply {
-            add("parallelForEach·{\n")
-            addDocumentation(element, ctx)
-            if (
-                element.collection != null ||
-                element.timeout != null ||
-                element.maxConcurrency != null ||
-                element.targetConfig != null ||
-                element.pipeline.isNotEmpty()
-            ) {
-                element.collection?.let { add("    collection·=·%S\n", it) }
-                element.timeout?.let { add("    timeout·=·%L\n", it) }
-                element.maxConcurrency?.let { add("    maxConcurrency·=·%L\n", it) }
-                element.targetConfig?.let { target ->
-                    add("    target·=·%S\n", target.target)
-                    target.targetValue?.let { add("    targetValue·=·%S\n", it) }
-                }
-                if (element.pipeline.isNotEmpty()) {
-                    add("%L", ctx.emitPipelineElements(element.pipeline, "    "))
-                }
-            }
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val parallelForEach = MemberName("dev.museframework.dsl.dsl", "parallelForEach")
+
+    override fun emit(element: ParallelForEachConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", parallelForEach)
+        addDocumentation(element)
+        element.collection?.let { addStatement("collection = %L", kotlinStringLiteral(it)) }
+        element.timeout?.let { addStatement("timeout = %L", kotlinNumericLiteral(it)) }
+        element.maxConcurrency?.let { addStatement("maxConcurrency = %L", kotlinNumericLiteral(it)) }
+        element.targetConfig?.let { target ->
+            addStatement("target = %L", kotlinStringLiteral(target.target))
+            target.targetValue?.let { addStatement("targetValue = %L", kotlinStringLiteral(it)) }
+        }
+        add(ctx.emitPipelineElements(element.pipeline))
+        endControlFlow()
     }
 }

@@ -16,6 +16,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.squareup</groupId>
+            <artifactId>kotlinpoet-jvm</artifactId>
+        </dependency>
+        <dependency>
             <groupId>dev.museframework</groupId>
             <artifactId>muse-babelfish</artifactId>
         </dependency>

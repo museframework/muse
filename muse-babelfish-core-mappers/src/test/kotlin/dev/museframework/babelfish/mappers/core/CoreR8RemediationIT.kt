@@ -2,7 +2,6 @@ package dev.museframework.babelfish.mappers.core
 
 import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
-import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.dsl.api.config.ParallelForEachConfig
 import dev.museframework.dsl.api.config.ScatterGatherConfig
 import dev.museframework.dsl.api.config.TargetConfig
@@ -62,7 +61,7 @@ class CoreR8RemediationIT {
                 targetConfig = TargetConfig("count", "#[sizeOf(payload)]"),
             )
 
-        val code = ScatterGatherCodeEmitter.emit(config, CodegenContext("review"))
+        val code = emitCore(config)
 
         assertContains(code, "target = \"count\"")
         assertContains(code, "targetValue = \"#[sizeOf(payload)]\"")
@@ -79,7 +78,7 @@ class CoreR8RemediationIT {
                 targetConfig = TargetConfig("count", "#[sizeOf(payload)]"),
             )
 
-        val code = ParallelForEachCodeEmitter.emit(config, CodegenContext("review"))
+        val code = emitCore(config)
 
         assertContains(code, "target = \"count\"")
         assertContains(code, "targetValue = \"#[sizeOf(payload)]\"")
@@ -95,7 +94,7 @@ class CoreR8RemediationIT {
                 targetConfig = TargetConfig("count", "#[sizeOf(payload)]"),
             )
 
-        val code = FlowRefCodeEmitter.emit(config, CodegenContext("review"))
+        val code = emitCore(config)
 
         assertContains(code, "flowRef(\"child\") {")
         assertContains(code, "targetConfig = TargetConfig(\"count\", \"#[sizeOf(payload)]\")")
@@ -103,34 +102,30 @@ class CoreR8RemediationIT {
 
     @Test
     fun `try emitter uses the Kotlin DSL try symbol`() {
-        val context = CodegenContext("review")
         val code =
-            TryCodeEmitter.emit(
+            emitCore(
                 TryConfig(
                     docName = "try",
                     docId = "try",
                     pipeline = emptyList(),
                     errorHandler = null,
                 ),
-                context,
             )
 
         assertContains(code, "`try` {")
-        assertContains(context.resolvedImports().single(), "dev.museframework.dsl.dsl.`try`")
+        assertContains(code, "import dev.museframework.dsl.dsl.`try`")
     }
 
     @Test
     fun `parallel router emitters escape target expressions as Kotlin strings`() {
         val target = TargetConfig("result\"\$name", "#[\"line one\\n\$payload\"]")
         val scatterCode =
-            ScatterGatherCodeEmitter.emit(
+            emitCore(
                 ScatterGatherConfig(docName = "sg", docId = "sg", routes = emptyList(), targetConfig = target),
-                CodegenContext("review"),
             )
         val parallelCode =
-            ParallelForEachCodeEmitter.emit(
+            emitCore(
                 ParallelForEachConfig(docName = "pfe", docId = "pfe", collection = null, pipeline = emptyList(), targetConfig = target),
-                CodegenContext("review"),
             )
 
         listOf(scatterCode, parallelCode).forEach { code ->

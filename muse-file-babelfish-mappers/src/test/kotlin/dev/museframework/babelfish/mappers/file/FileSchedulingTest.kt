@@ -102,7 +102,7 @@ class FileSchedulingTest {
         assertEquals(2_000L, listener.pollingFrequencyMillis)
         assertEquals(5_000L, listener.startDelayMillis)
 
-        val code = FileListenerCodeEmitter.emit(listener, CodegenContext("dev.example"))
+        val code = FileListenerCodeEmitter.emit(listener, CodegenContext("dev.example")).toString()
         assertContains(code, "pollingFrequencyMillis = 2000")
         assertContains(code, "startDelayMillis = 5000")
     }
@@ -113,7 +113,7 @@ class FileSchedulingTest {
             FileListenerCodeEmitter.emit(
                 FileListenerConfig(connectionConfig = ConfigRef.ByName("files")),
                 CodegenContext("dev.example"),
-            )
+            ).toString()
         assertFalse(code.contains("startDelayMillis"))
     }
 

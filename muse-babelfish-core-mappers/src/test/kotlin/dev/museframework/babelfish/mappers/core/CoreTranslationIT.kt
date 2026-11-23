@@ -4,6 +4,7 @@ import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
 import dev.museframework.babelfish.mapper.TranslationResult
+import dev.museframework.dsl.api.config.AsyncConfig
 import dev.museframework.dsl.api.config.ChoiceConfig
 import dev.museframework.dsl.api.config.ConfigurationPropertiesConfig
 import dev.museframework.dsl.api.config.FixedFrequencyStrategy
@@ -15,7 +16,10 @@ import dev.museframework.dsl.api.config.SchedulerConfig
 import dev.museframework.dsl.api.config.SchedulerTimeUnit
 import dev.museframework.dsl.api.config.ScatterGatherConfig
 import dev.museframework.dsl.api.config.SetPayloadConfig
+import dev.museframework.dsl.api.config.TryConfig
+import dev.museframework.dsl.api.config.UntilSuccessfulConfig
 import dev.museframework.dsl.api.model.error.ErrorHandlerStrategy
+import dev.museframework.dsl.api.model.flow.FlowRef
 import dev.museframework.dsl.api.model.flow.FlowRefConfig
 import dev.museframework.dsl.api.model.flow.MuseFlow
 import org.junit.jupiter.api.Test
@@ -38,8 +42,8 @@ class CoreTranslationIT {
         assertEquals(listOf("", ""), configs.map { it.docId })
 
         val code = emit(result)
-        assertContains(code, "val unnamedConfig1 = ConfigurationPropertiesConfig(")
-        assertContains(code, "val unnamedConfig2 = ConfigurationPropertiesConfig(")
+        assertContains(code, "val unnamedConfig1: ConfigurationPropertiesConfig =")
+        assertContains(code, "val unnamedConfig2: ConfigurationPropertiesConfig =")
         assertContains(code, "file = \"application.properties\"")
         assertContains(code, "file = \"secondary.properties\"")
     }
@@ -194,6 +198,7 @@ class CoreTranslationIT {
         assertEquals("choice-original", choice.docId)
         assertEquals("payload-original", payload.docId)
         assertEquals("ref-original", reference.docId)
+        assertEquals(FlowRef.ByName(subFlow.name), reference.ref)
         assertEquals("subflow-original", subFlow.docId)
         assertEquals("variable-original", subFlow.pipeline.single().docId)
 
@@ -209,6 +214,34 @@ class CoreTranslationIT {
         ).forEach { id -> assertContains(code, "docId = \"$id\"") }
         assertContains(code, "docName = \"Prepare payload\"")
         assertEquals(code, emit(translate("component-identity.xml")))
+    }
+
+    @Test
+    fun `translates and emits async retry and try handler pipelines`() {
+        val result = translate("nested-routers.xml")
+        val async = assertIs<AsyncConfig>(result.flows.single().pipeline.single())
+        val retry = assertIs<UntilSuccessfulConfig>(async.pipeline.single())
+        val attempt = assertIs<TryConfig>(retry.pipeline.single())
+        val strategy = assertIs<ErrorHandlerStrategy.OnErrorPropagate>(
+            assertNotNull(attempt.errorHandler).strategies.single(),
+        )
+
+        assertEquals(3, async.maxConcurrency)
+        assertEquals(2, retry.maxRetries)
+        assertEquals(75L, retry.millisBetweenRetries)
+        assertEquals("attempt", assertIs<SetPayloadConfig>(attempt.pipeline.single()).value)
+        assertEquals("retry", assertIs<SetPayloadConfig>(strategy.pipeline.single()).value)
+
+        val code = emit(result)
+        assertContains(code, "import dev.museframework.dsl.dsl.async")
+        assertContains(code, "import dev.museframework.dsl.dsl.untilSuccessful")
+        assertContains(code, "import dev.museframework.dsl.dsl.`try`")
+        assertContains(code, "maxConcurrency = 3")
+        assertContains(code, "maxRetries = 2")
+        assertContains(code, "millisBetweenRetries = 75")
+        assertContains(code, "onErrorPropagate(ErrorType(\"MULE\", \"EXPRESSION\"))")
+        assertContains(code, "value = \"attempt\"")
+        assertContains(code, "value = \"retry\"")
     }
 
     private fun translate(fixtureName: String): TranslationResult {

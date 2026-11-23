@@ -1,13 +1,16 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.ChoiceConfig
 import dev.museframework.dsl.api.config.ChoiceRoute
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -53,25 +56,21 @@ object ChoiceMapper : ElementMapper<ChoiceConfig> {
  * Emits Kotlin DSL code for ChoiceConfig.
  */
 object ChoiceCodeEmitter : ElementCodeEmitter<ChoiceConfig> {
-    override fun emit(element: ChoiceConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.choice")
-        val codeBlock = CodeBlock.builder().apply {
-            add("choice·{\n")
-            addDocumentation(element, ctx)
-            element.whenRoutes.forEach { route ->
-                add("    `when`(%S)·{\n", route.expression)
-                add("%L", ctx.emitPipelineElements(route.pipeline, "        "))
-                add("    }\n")
-            }
-            element.otherwise?.let { otherwisePipeline ->
-                if (otherwisePipeline.isNotEmpty()) {
-                    add("    otherwise·{\n")
-                    add("%L", ctx.emitPipelineElements(otherwisePipeline, "        "))
-                    add("    }\n")
-                }
-            }
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val choice = MemberName("dev.museframework.dsl.dsl", "choice")
+
+    override fun emit(element: ChoiceConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", choice)
+        addDocumentation(element)
+        for (route in element.whenRoutes) {
+            beginControlFlow("%N(%L)", "when", kotlinStringLiteral(route.expression))
+            add(ctx.emitPipelineElements(route.pipeline))
+            endControlFlow()
+        }
+        element.otherwise?.takeIf { it.isNotEmpty() }?.let { pipeline ->
+            beginControlFlow("otherwise")
+            add(ctx.emitPipelineElements(pipeline))
+            endControlFlow()
+        }
+        endControlFlow()
     }
 }

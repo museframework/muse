@@ -1,5 +1,6 @@
 package dev.museframework.babelfish.mappers.apikit
 
+import dev.museframework.apikit.api.config.ApikitConfig
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
@@ -10,6 +11,7 @@ import java.nio.file.Path
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 class ApikitConfigMapperTest {
     @Test
@@ -61,20 +63,36 @@ class ApikitConfigMapperTest {
     }
 
     @Test
-    fun `emits APIKit config DSL and public API import`() {
-        val config =
-            ApikitConfigMapper.map(
-                rawConfig(mapOf("name" to "orders-api", "raml" to "api/orders.raml")),
-                mappingContext(),
-            )
-        val context = CodegenContext("com.example")
+    fun `emits the default validation mode without optional provenance`() {
+        val config = ApikitConfig(name = "orders-api", spec = "api/orders.raml")
+        val code = ApikitConfigCodeEmitter.emit(config, CodegenContext("com.example")).toString()
 
-        val code = ApikitConfigCodeEmitter.emit(config, context)
+        assertFalse(config.disableValidations)
+        assertFalse("disableValidations" in code)
+        assertFalse("sourceFile" in code)
+        assertFalse("sourceLine" in code)
+        assertFalse("sourceClass" in code)
+        assertFalse("docDescription" in code)
+    }
 
-        assertContains(code, "apikitConfig {")
-        assertContains(code, "name = \"orders-api\"")
-        assertContains(code, "spec = \"api/orders.raml\"")
-        assertEquals(listOf("dev.museframework.apikit.api.dsl.apikitConfig"), context.resolvedImports())
+    @Test
+    fun `emits disabled validations and preserves provided provenance`() {
+        val config = ApikitConfig(
+            name = "orders-api",
+            spec = "api/orders.raml",
+            disableValidations = true,
+            docDescription = "Orders \"API\"",
+            sourceFile = "source\\orders.xml",
+            sourceLine = 17,
+            sourceClass = "Orders",
+        )
+        val code = ApikitConfigCodeEmitter.emit(config, CodegenContext("com.example")).toString()
+
+        assertContains(code, "disableValidations = true")
+        assertContains(code, "docDescription = \"Orders \\\"API\\\"\"")
+        assertContains(code, "sourceFile = \"source\\\\orders.xml\"")
+        assertContains(code, "sourceLine = 17")
+        assertContains(code, "sourceClass = \"Orders\"")
     }
 
     private fun rawConfig(attrs: Map<String, String>): RawConfig =

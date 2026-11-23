@@ -1,12 +1,15 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.UntilSuccessfulConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -34,22 +37,16 @@ object UntilSuccessfulMapper : ElementMapper<UntilSuccessfulConfig> {
  * Emits Kotlin DSL code for UntilSuccessfulConfig.
  */
 object UntilSuccessfulCodeEmitter : ElementCodeEmitter<UntilSuccessfulConfig> {
-    override fun emit(element: UntilSuccessfulConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.untilSuccessful")
-        val codeBlock = CodeBlock.builder().apply {
-            add("untilSuccessful·{\n")
-            addDocumentation(element, ctx)
-            if (element.maxRetries != 5 || element.millisBetweenRetries != 1000L || element.pipeline.isNotEmpty()) {
-                if (element.maxRetries != 5) add("    maxRetries·=·%L\n", element.maxRetries)
-                if (element.millisBetweenRetries != 1000L) {
-                    add("    millisBetweenRetries·=·%L\n", element.millisBetweenRetries)
-                }
-                if (element.pipeline.isNotEmpty()) {
-                    add("%L", ctx.emitPipelineElements(element.pipeline, "    "))
-                }
-            }
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val untilSuccessful = MemberName("dev.museframework.dsl.dsl", "untilSuccessful")
+
+    override fun emit(element: UntilSuccessfulConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", untilSuccessful)
+        addDocumentation(element)
+        if (element.maxRetries != 5) addStatement("maxRetries = %L", kotlinNumericLiteral(element.maxRetries))
+        if (element.millisBetweenRetries != 1000L) {
+            addStatement("millisBetweenRetries = %L", kotlinNumericLiteral(element.millisBetweenRetries))
+        }
+        add(ctx.emitPipelineElements(element.pipeline))
+        endControlFlow()
     }
 }

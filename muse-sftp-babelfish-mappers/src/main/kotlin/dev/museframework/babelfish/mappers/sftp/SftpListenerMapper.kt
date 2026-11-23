@@ -1,8 +1,12 @@
 package dev.museframework.babelfish.mappers.sftp
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.SourceMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.SourceCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.sftp.api.config.SftpConnectionRef
@@ -67,37 +71,33 @@ object SftpListenerCodeEmitter : SourceCodeEmitter<SftpListenerConfig> {
     override fun emit(
         source: SftpListenerConfig,
         ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.sftp.api.dsl.sftpListener")
-        ctx.addImport("dev.museframework.sftp.api.model.SftpPostAction")
-        val defaultMatcher = SftpFileMatcher(fileType = SftpFileType.REGULAR_FILE)
-        return buildString {
-            appendLine("sftpListener(${connectionNameExpression(source.connection, ctx)}) {")
-            appendNonDefaultString("docName", source.docName, "", ctx)
-            appendOptionalString("docId", source.docId, ctx)
-            appendOptionalString("outputMimeType", source.outputMimeType, ctx)
-            appendNonDefaultBoolean("nonRepeatable", source.nonRepeatable, default = false)
-            appendNonDefaultString("directory", source.directory, "/", ctx)
-            appendNonDefaultBoolean("recursive", source.recursive, default = true)
-            appendSftpMatcherAssignment("matcher", source.matcher, defaultMatcher, ctx)
-            appendNonDefaultLong("pollIntervalMs", source.pollIntervalMs, 1_000L)
-            appendOptionalLong("sizeCheckDelayMs", source.sizeCheckDelayMs)
-            appendNonDefaultBoolean("watermarkEnabled", source.watermarkEnabled, default = true)
-            when (val action = source.postAction) {
-                SftpPostAction.None -> Unit
-                SftpPostAction.Delete -> appendLine("    deleteAfterProcessing()")
-                is SftpPostAction.Move -> {
-                    append("    moveAfterProcessing(\"${ctx.escapeKotlinString(action.targetDirectory)}\"")
-                    if (action.overwrite) append(", overwrite = true")
-                    appendLine(")")
+    ): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M(%L)", sftpDsl("sftpListener"), connectionName(source.connection))
+        if (source.docName.isNotEmpty()) addString("docName", source.docName)
+        addString("docId", source.docId)
+        addString("outputMimeType", source.outputMimeType)
+        addNonDefaultBoolean("nonRepeatable", source.nonRepeatable, default = false)
+        if (source.directory != "/") addString("directory", source.directory)
+        addNonDefaultBoolean("recursive", source.recursive, default = true)
+        addMatcher(source.matcher, SftpFileMatcher(fileType = SftpFileType.REGULAR_FILE))
+        if (source.pollIntervalMs != 1_000L) {
+            addStatement("pollIntervalMs = %L", kotlinNumericLiteral(source.pollIntervalMs))
+        }
+        source.sizeCheckDelayMs?.let { addStatement("sizeCheckDelayMs = %L", kotlinNumericLiteral(it)) }
+        addNonDefaultBoolean("watermarkEnabled", source.watermarkEnabled, default = true)
+        when (val action = source.postAction) {
+            SftpPostAction.None -> Unit
+            SftpPostAction.Delete -> addStatement("deleteAfterProcessing()")
+            is SftpPostAction.Move -> {
+                val directory = kotlinStringLiteral(action.targetDirectory)
+                if (action.overwrite) {
+                    addStatement("moveAfterProcessing(%L, overwrite = true)", directory)
+                } else {
+                    addStatement("moveAfterProcessing(%L)", directory)
                 }
             }
-            appendNonDefaultBoolean(
-                "applyPostActionOnFailure",
-                source.applyPostActionOnFailure,
-                default = false,
-            )
-            append("}")
         }
+        addNonDefaultBoolean("applyPostActionOnFailure", source.applyPostActionOnFailure, default = false)
+        endControlFlow()
     }
 }

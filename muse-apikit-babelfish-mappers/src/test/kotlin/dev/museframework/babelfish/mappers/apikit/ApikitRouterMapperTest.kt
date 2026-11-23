@@ -1,6 +1,8 @@
 package dev.museframework.babelfish.mappers.apikit
 
+import dev.museframework.apikit.api.config.ApikitConfig
 import dev.museframework.apikit.api.config.ApikitRef
+import dev.museframework.apikit.api.config.ApikitRouter
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
@@ -46,25 +48,16 @@ class ApikitRouterMapperTest {
     }
 
     @Test
-    fun `emits APIKit router DSL and public API import`() {
-        val router =
-            ApikitRouterMapper.map(
-                rawRouter(
-                    mapOf(
-                        "config-ref" to "orders-api",
-                        "doc:name" to "Orders Router",
-                        "doc:id" to "apikit-router-001",
-                    ),
-                ),
-                mappingContext(),
-            )
-        val context = CodegenContext("com.example")
+    fun `emits the original config name for direct and named router references`() {
+        val config = ApikitConfig(name = "orders-\"primary\"")
+        for (ref in listOf(ApikitRef.ByReference(config), ApikitRef.ByName(config.name))) {
+            val router = ApikitRouter(configRef = ref, docName = "Orders Router", docId = "router-id")
+            val code = ApikitRouterCodeEmitter.emit(router, CodegenContext("com.example")).toString()
 
-        val code = ApikitRouterCodeEmitter.emit(router, context)
-
-        assertContains(code, "apikit(\"orders-api\") {")
-        assertContains(code, "docName = \"Orders Router\"")
-        assertEquals(listOf("dev.museframework.apikit.api.dsl.apikit"), context.resolvedImports())
+            assertContains(code, "apikit(\"orders-\\\"primary\\\"\") {")
+            assertContains(code, "docName = \"Orders Router\"")
+            assertContains(code, "docId = \"router-id\"")
+        }
     }
 
     private fun rawRouter(attrs: Map<String, String>): RawElement =

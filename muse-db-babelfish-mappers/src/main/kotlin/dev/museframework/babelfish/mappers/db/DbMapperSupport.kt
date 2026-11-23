@@ -1,6 +1,11 @@
 package dev.museframework.babelfish.mappers.db
 
-import dev.museframework.babelfish.emitter.CodegenContext
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
+import com.squareup.kotlinpoet.joinToCode
+import dev.museframework.babelfish.emitter.kotlinNumericLiteral
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.db.api.config.DbConfigRef
@@ -32,30 +37,29 @@ internal fun RawElement.dbMetadata(ctx: MappingContext): DbMappedMetadata =
 
 internal fun RawElement.dbConfigRef(): DbConfigRef = DbConfigRef.ByName(requireAttr("config-ref", location))
 
+private val RawElement.parameterText: String? get() = textContent?.trim()?.takeIf(String::isNotEmpty)
+
 internal fun RawElement.dbSql(): String =
+    dbOptionalSql() ?: throw IllegalArgumentException("db:$tag requires SQL text")
+
+internal fun RawElement.dbOptionalSql(): String? =
     descendants()
         .firstOrNull { it.tag == "sql" }
-        ?.textContent
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
+        ?.let { it.untrimmedTextContent ?: it.textContent }
+        ?.takeIf(String::isNotBlank)
         ?: attrs["sql"]?.takeIf(String::isNotBlank)
-        ?: throw IllegalArgumentException("db:$tag requires SQL text")
 
 internal fun RawElement.dbInputParameters(default: DbParameterSource = DbParameterSource.EMPTY): DbParameterSource =
     descendants()
         .firstOrNull { it.tag == "input-parameters" }
-        ?.textContent
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
+        ?.parameterText
         ?.let(DbParameterSource::Expression)
         ?: default
 
 internal fun RawElement.dbBatchParameters(): DbBatchParameterSource =
     descendants()
         .firstOrNull { it.tag == "input-parameters" }
-        ?.textContent
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
+        ?.parameterText
         ?.let(DbBatchParameterSource::Expression)
         ?: DbBatchParameterSource.PAYLOAD
 
@@ -112,9 +116,7 @@ internal fun RawElement.dbInOutParameters(): DbMappedInOutParameters {
     val entries = container.children.filter { it.tag == "in-out-parameter" }
     if (entries.isEmpty()) {
         val expression =
-            container.textContent
-                ?.trim()
-                ?.takeIf(String::isNotEmpty)
+            container.parameterText
                 ?.let(DbParameterSource::Expression)
                 ?: DbParameterSource.EMPTY
         return DbMappedInOutParameters(expression, emptyMap())
@@ -124,7 +126,7 @@ internal fun RawElement.dbInOutParameters(): DbMappedInOutParameters {
     entries.forEach { entry ->
         val name = entry.attrs["key"] ?: entry.attrs["name"]
             ?: throw IllegalArgumentException("db:in-out-parameter requires key")
-        values[name] = entry.attrs["value"] ?: entry.textContent?.trim()?.takeIf(String::isNotEmpty)
+        values[name] = entry.attrs["value"] ?: entry.parameterText
         (entry.attrs["type"] ?: entry.attrs["jdbcType"])?.let { type ->
             types[name] =
                 DbParameterType(
@@ -206,29 +208,6 @@ internal fun parseJdbcType(value: String): JDBCType =
 internal fun String?.csv(): List<String> =
     this?.split(',')?.map(String::trim)?.filter(String::isNotEmpty).orEmpty()
 
-internal fun String.kotlinLiteral(): String =
-    buildString(length + 2) {
-        append('"')
-        this@kotlinLiteral.forEach { char ->
-            when (char) {
-                '\\' -> append("\\\\")
-                '"' -> append("\\\"")
-                '$' -> append("\\$")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> append(char)
-            }
-        }
-        append('"')
-    }
-
-internal fun DbConfigRef.name(): String =
-    when (this) {
-        is DbConfigRef.ByName -> name
-        is DbConfigRef.ByReference -> config.name
-    }
-
 internal fun RawElement.rejectUnsupportedAttributes(
     component: String,
     names: Set<String>,
@@ -240,93 +219,82 @@ internal fun RawElement.rejectUnsupportedAttributes(
     }
 }
 
-private val allDbSettingNames = setOf("queryTimeout", "fetchSize", "maxRows", "useColumnNumbers")
+internal fun dbDsl(name: String) = MemberName("dev.museframework.db.api.dsl", name)
 
-internal fun StringBuilder.emitSettings(
-    settings: DbQuerySettings,
-    indent: String = "    ",
-    settingNames: Set<String> = allDbSettingNames,
-) {
-    if ("queryTimeout" in settingNames && !settings.queryTimeout.isZero) {
-        appendLine("${indent}queryTimeout = Duration.ofNanos(${settings.queryTimeout.toNanos()}L)")
+internal fun DbConfigRef.code(): CodeBlock {
+    val name = when (this) {
+        is DbConfigRef.ByName -> name
+        is DbConfigRef.ByReference -> config.name
     }
-    if ("fetchSize" in settingNames) {
-        settings.fetchSize?.let { appendLine("${indent}fetchSize = $it") }
-    }
-    if ("maxRows" in settingNames) {
-        settings.maxRows?.let { appendLine("${indent}maxRows = $it") }
-    }
-    if ("useColumnNumbers" in settingNames && settings.useColumnNumbers) {
-        appendLine("${indent}useColumnNumbers = true")
+    return CodeBlock.of("%T.ByName(%L)", DbConfigRef::class, kotlinStringLiteral(name))
+}
+
+internal fun CodeBlock.Builder.emitTimeout(settings: DbQuerySettings) {
+    if (!settings.queryTimeout.isZero) {
+        addStatement(
+            "queryTimeout = %T.ofSeconds(%L, %L)",
+            Duration::class,
+            kotlinNumericLiteral(settings.queryTimeout.seconds),
+            kotlinNumericLiteral(settings.queryTimeout.nano.toLong()),
+        )
     }
 }
 
-internal fun CodegenContext.addSettingsImports(settings: DbQuerySettings) {
-    if (!settings.queryTimeout.isZero) addImport("java.time.Duration")
+internal fun CodeBlock.Builder.emitRowSettings(settings: DbQuerySettings) {
+    emitTimeout(settings)
+    settings.fetchSize?.let { addStatement("fetchSize = %L", kotlinNumericLiteral(it)) }
+    settings.maxRows?.let { addStatement("maxRows = %L", kotlinNumericLiteral(it)) }
 }
 
-internal fun StringBuilder.emitTarget(
-    target: TargetConfig?,
-    indent: String = "    ",
-) {
+internal fun CodeBlock.Builder.emitSettings(settings: DbQuerySettings) {
+    emitRowSettings(settings)
+    if (settings.useColumnNumbers) addStatement("useColumnNumbers = true")
+}
+
+internal fun CodeBlock.Builder.emitTarget(target: TargetConfig?) {
     target ?: return
-    appendLine("${indent}target = ${target.target.kotlinLiteral()}")
-    target.targetValue?.let { appendLine("${indent}targetValue = ${it.kotlinLiteral()}") }
+    addStatement("target = %L", kotlinStringLiteral(target.target))
+    target.targetValue?.let { addStatement("targetValue = %L", kotlinStringLiteral(it)) }
 }
 
-internal fun StringBuilder.emitParameterTypes(
-    parameterTypes: Map<String, DbParameterType>,
-    ctx: CodegenContext,
-    indent: String = "    ",
-) {
-    if (parameterTypes.isEmpty()) return
-    ctx.addImport("java.sql.JDBCType")
-    parameterTypes.forEach { (name, type) ->
-        append("${indent}parameterType(${name.kotlinLiteral()}, JDBCType.${type.jdbcType}")
-        type.typeName?.let { append(", typeName = ${it.kotlinLiteral()}") }
-        type.scale?.let { append(", scale = $it") }
-        appendLine(")")
+internal fun CodeBlock.Builder.emitTypedParameter(functionName: String, name: String, type: DbParameterType) {
+    val arguments = buildCodeBlock {
+        add("%L, %T.%N", kotlinStringLiteral(name), JDBCType::class, type.jdbcType.name)
+        type.typeName?.let { add(", typeName = %L", kotlinStringLiteral(it)) }
+        type.scale?.let { add(", scale = %L", kotlinNumericLiteral(it)) }
     }
+    addStatement("%N(%L)", functionName, arguments)
 }
 
-internal fun StringBuilder.emitInputParameters(
-    source: DbParameterSource,
-    indent: String = "    ",
-) {
+internal fun CodeBlock.Builder.emitInputParameters(source: DbParameterSource) {
     when (source) {
-        is DbParameterSource.Expression -> appendLine("${indent}inputParameters(${source.expression.kotlinLiteral()})")
-        is DbParameterSource.Values ->
-            source.values.forEach { (name, value) ->
-                appendLine("${indent}inputParameter(${name.kotlinLiteral()}, ${value.kotlinValue()})")
-            }
-    }
-}
-
-internal fun StringBuilder.emitBatchParameters(
-    source: DbBatchParameterSource,
-    indent: String = "    ",
-) {
-    when (source) {
-        is DbBatchParameterSource.Expression -> appendLine("${indent}batchParameters(${source.expression.kotlinLiteral()})")
-        is DbBatchParameterSource.Values -> {
-            appendLine("${indent}batchParameters(listOf(")
-            source.values.forEach { row ->
-                val values =
-                    row.entries.joinToString { (key, value) ->
-                        "${key.kotlinLiteral()} to ${value.kotlinValue()}"
-                    }
-                appendLine("$indent    mapOf($values),")
-            }
-            appendLine("${indent}))")
+        is DbParameterSource.Expression -> addStatement("inputParameters(%L)", kotlinStringLiteral(source.expression))
+        is DbParameterSource.Values -> source.values.forEach { (name, value) ->
+            addStatement("inputParameter(%L, %L)", kotlinStringLiteral(name), value.parameterValue())
         }
     }
 }
 
-private fun Any?.kotlinValue(): String =
+internal fun CodeBlock.Builder.emitBatchParameters(source: DbBatchParameterSource) {
+    when (source) {
+        is DbBatchParameterSource.Expression -> addStatement("batchParameters(%L)", kotlinStringLiteral(source.expression))
+        is DbBatchParameterSource.Values -> {
+            val rows = source.values.map { it.parameterMap() }
+            addStatement("batchParameters(listOf(%L))", rows.joinToCode())
+        }
+    }
+}
+
+internal fun Map<String, Any?>.parameterMap(): CodeBlock {
+    val entries = map { (key, value) -> CodeBlock.of("%L to %L", kotlinStringLiteral(key), value.parameterValue()) }
+    return CodeBlock.of("mapOf<String, Any?>(%L)", entries.joinToCode())
+}
+
+private fun Any?.parameterValue(): CodeBlock =
     when (this) {
-        null -> "null"
-        is String -> kotlinLiteral()
-        is Char -> toString().kotlinLiteral() + ".single()"
-        is Boolean, is Byte, is Short, is Int, is Long, is Float, is Double -> toString()
+        null, is Boolean -> CodeBlock.of("%L", this)
+        is String -> kotlinStringLiteral(this)
+        is Char -> CodeBlock.of("%L.single()", kotlinStringLiteral(toString()))
+        is Number -> kotlinNumericLiteral(this)
         else -> throw IllegalArgumentException("Cannot emit database parameter value of type ${this::class.java.name}")
     }

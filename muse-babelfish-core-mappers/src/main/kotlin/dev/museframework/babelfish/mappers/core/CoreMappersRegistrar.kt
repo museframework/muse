@@ -10,6 +10,7 @@ import dev.museframework.dsl.api.config.LoggerConfig
 import dev.museframework.dsl.api.config.ParallelForEachConfig
 import dev.museframework.dsl.api.config.RaiseErrorConfig
 import dev.museframework.dsl.api.config.RemoveVariableConfig
+import dev.museframework.dsl.api.config.SchedulerConfig
 import dev.museframework.dsl.api.config.ScatterGatherConfig
 import dev.museframework.dsl.api.config.SetPayloadConfig
 import dev.museframework.dsl.api.config.SetVariableConfig
@@ -18,8 +19,6 @@ import dev.museframework.dsl.api.config.TryConfig
 import dev.museframework.dsl.api.config.UntilSuccessfulConfig
 import dev.museframework.dsl.api.config.WithCorrelationIdConfig
 import dev.museframework.dsl.api.model.flow.FlowRefConfig
-import dev.museframework.dsl.api.config.SchedulerConfig
-import dev.museframework.babelfish.mappers.core.SchedulerSourceMapper
 
 object CoreMappersRegistrar {
     fun register(registry: BabelfishRegistry) {
@@ -47,7 +46,7 @@ object CoreMappersRegistrar {
         // Configuration Properties
         registry.registerConfig("", "configuration-properties", ConfigurationPropertiesMapper)
 
-        // Sources — emitter registered separately in registerEmitters
+        // Sources
         registry.registerSource("", "scheduler", SchedulerSourceMapper)
     }
 

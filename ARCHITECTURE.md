@@ -256,6 +256,89 @@ File→SFTP→Database runtime composition. Discovery uses `muse.verification.*`
 POM tags and `scripts/verification-owners.py`. See
 [ADR-019](docs/adr/ADR-019-babelfish-provider-owned-testing.md).
 
+### Writing and upgrading a provider
+
+Register each Kotlin emitter against the model type returned by its mapper.
+The Core provider registers the `SetPayloadConfig` emitter this way.
+
+```kotlin
+override fun registerEmitters(emitter: KotlinCodeEmitter, nativeBuild: Boolean) {
+    emitter.registerElementEmitter(SetPayloadConfig::class, SetPayloadCodeEmitter)
+}
+```
+
+`ElementCodeEmitter<T>`, `SourceCodeEmitter<T>`, and `ConfigCodeEmitter<T>`
+return KotlinPoet `CodeBlock` in Muse 0.3.0. Upgrade a 0.2.1 provider by returning
+structured blocks from these methods. Use `%M` with `MemberName` for DSL calls,
+`%T` for type references, and `%N` for generated identifiers. Use `%L` to insert
+a child block, including the output of `ctx.emitPipelineElements(...)` from
+routers. Use `kotlinStringLiteral(value)` with `%L` for model strings. Keep the
+provider ID, service descriptor, and registration entry points. Replace
+`CodegenContext.escapeKotlinString` and manual import registration with these
+structured references. Babelfish composes the blocks into one KotlinPoet file
+and resolves their imports.
+
+Declare a direct `com.squareup:kotlinpoet-jvm` dependency in the provider module.
+The Muse BOM manages the version. Recompile and republish third-party provider
+JARs against Muse 0.3.0, then upgrade the Maven plugin and its provider
+dependencies together. The three emitter return types change the JVM method
+descriptors, so a provider built against 0.2.1 can register and then fail when
+an emitter is invoked. Put provider dependencies under the plugin's
+`<dependencies>` section. Generated applications depend on the Muse DSL and
+their runtime and connector libraries.
+
+Run translation and compilation in a Spring Boot Maven project with the plugin's
+`generate` goal bound to `generate-sources` and the Kotlin Maven plugin configured
+to compile the generated source root.
+
+```bash
+mvn -B verify -Dmuse.packageName=org.example.integrations
+```
+
+With an input at `src/main/mule/order-API.XML`, translation produces
+`target/generated-sources/muse/org/example/integrations/OrderAPIConfig.kt`.
+For a one-time migration, run these commands as separate Maven invocations so
+the compilation reads the replacement POM. Before compiling, align the
+generated POM's Muse BOM and every Muse runtime or connector dependency with the
+migration plugin version. The Spring Boot POM generator currently writes
+`0.1.0` for `muse-bom`, `muse-spring-boot`, and included connector adapters; for
+this example, update those versions to `0.3.0-SNAPSHOT`.
+
+```bash
+mvn -B dev.museframework.maven:muse-maven-plugin:0.3.0-SNAPSHOT:migrate \
+  -Dmuse.runtime=spring-boot -Dmuse.packageName=org.example.integrations
+```
+
+After updating the generated POM versions, compile the migrated project:
+
+```bash
+mvn -B compile
+```
+
+### Generated source and model compatibility
+
+KotlinPoet can change import order, escaping syntax, indentation, numeric
+grouping, and line wrapping. Verify the generated Kotlin by compiling it and
+checking the resulting Muse model and runtime behavior.
+
+The literal helper preserves the exact string delivered to the emitter,
+including LF, CR, CRLF, trailing line breaks, and blank lines. XML parsing
+still applies XML line-ending normalization to physical line endings. Use XML
+character references such as `&#13;&#10;` where an exact CRLF value is needed
+in parsed character data or attributes. Database SQL uses the parsed untrimmed
+leaf text. Database parameter expressions continue to use trimmed text.
+
+The legacy renderer also inserted indentation spaces into multiline DataWeave
+expression values after line breaks. In the APIKit comparison fixture, it added
+five spaces after each newline; the KotlinPoet output preserves the parsed XML
+text exactly. This changes the expression value, not only whitespace in the
+generated Kotlin source.
+
+The Maven translation goals use the allocated Kotlin class name for the source
+file and reject generated paths that collide, including paths that differ only
+by case, before writing any output. A mapped component without an emitter fails
+with a diagnostic identifying the missing model type.
+
 ## Maven plugin
 
 ```text

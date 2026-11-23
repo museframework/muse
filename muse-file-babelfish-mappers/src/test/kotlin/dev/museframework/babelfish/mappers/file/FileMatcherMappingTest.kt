@@ -1,5 +1,6 @@
 package dev.museframework.babelfish.mappers.file
 
+import com.squareup.kotlinpoet.FileSpec
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
@@ -76,11 +77,12 @@ class FileMatcherMappingTest {
         assertEquals(FileListSortCriteria.DATE_CREATED, list.subset?.criteria)
         assertEquals(SortOrder.ASCENDING, list.subset?.order)
 
-        val code = FileListCodeEmitter.emit(list, CodegenContext("dev.example"))
+        val fragment = FileListCodeEmitter.emit(list, CodegenContext("dev.example"))
+        val code = FileSpec.scriptBuilder("Matcher", "dev.example").addCode(fragment).build().toString()
         assertContains(code, "filenamePattern = \"*.txt\"")
         assertContains(code, "pathPattern = \"inbox/*\"")
         assertContains(code, "symbolicLinks = FileTypeRequirement.EXCLUDE")
-        assertContains(code, "updatedInTheLast = Duration.ofMillis(1000)")
+        assertContains(code, "updatedInTheLast = Duration.ofMillis(1000L)")
         assertContains(code, "criteria = FileListSortCriteria.DATE_CREATED")
         assertContains(code, "order = SortOrder.ASCENDING")
     }

@@ -16,8 +16,9 @@
                          responseTimeoutUnit="SECONDS"/>
     </sftp:config>
 
-    <flow name="sftp-provider-flow">
+    <flow name="sftp-provider-flow" doc:id="flow-id">
         <sftp:listener config-ref="Sftp_Config"
+                       doc:id="poll-$id" doc:name="CSV &quot;poll&quot;"
                        directory="inbox"
                        recursive="false"
                        watermarkEnabled="true"

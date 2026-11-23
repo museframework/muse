@@ -273,14 +273,11 @@ mvn -f muse-http/pom.xml verify \
 
 Maven plugin Invoker fixtures:
 
-```bash
-mvn clean verify --batch-mode \
-  -DskipTests \
-  -Dkotlin.daemon.enabled=false \
-  -Pplugin-it \
-  -pl muse-maven-plugin/muse-plugin-it \
-  -am
-```
+The central `muse-plugin-it` owner includes Quarkus migration output, but the
+Quarkus reactor is separate from the root reactor. Use the Maven-only
+[three-stage procedure](docs/development/verification.md#plugin-invoker-fixtures)
+for local verification with one isolated Maven repository. The automated owner
+runner additionally validates the test reports.
 
 File provider realm fixtures:
 

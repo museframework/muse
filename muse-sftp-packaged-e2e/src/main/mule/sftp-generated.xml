@@ -31,4 +31,18 @@
         </sftp:write>
         <sftp:read config-ref="generated-sftp" path="/outbound/generated-request.bin" doc:name="Read generated request"/>
     </flow>
+    <sub-flow name="sftp-options" doc:id="sftp-options-id">
+        <sftp:list config-ref="generated-sftp" directoryPath="/incoming\$batch" target="listing">
+            <sftp:matcher pathPattern="regex:in\d+" symLinks="REQUIRE" caseSensitive="false" minSize="1" maxSize="17"/>
+        </sftp:list>
+        <sftp:write config-ref="generated-sftp" path="#[vars.remotePath]" mode="#[vars.mode]">
+            <sftp:content><![CDATA[#[vars.body ++ "$suffix"]]]></sftp:content>
+        </sftp:write>
+        <sftp:read config-ref="generated-sftp" path="/in/&quot;quoted&quot;" target="bytes" targetValue="#[payload]"/>
+        <sftp:copy config-ref="generated-sftp" sourcePath="/in/a" targetPath="/copy" renameTo="copy-$batch"/>
+        <sftp:move config-ref="generated-sftp" sourcePath="/copy/a" targetDirectory="/archive" overwrite="true"/>
+        <sftp:rename config-ref="generated-sftp" path="/archive/a" to="new-$name"/>
+        <sftp:delete config-ref="generated-sftp" path="/archive/old"/>
+        <sftp:create-directory config-ref="generated-sftp" directoryPath="/next"/>
+    </sub-flow>
 </mule>

@@ -215,6 +215,46 @@ class RunVerificationOwnerTest(unittest.TestCase):
         self.assertNotRegex(source, r'if\s+owner\.family\s*==\s*[\'"]sftp[\'"]')
         self.assertIsInstance(module, Path)
 
+    def test_central_plugin_owner_seeds_quarkus_after_root_prepare_before_verify(self):
+        self.write_pom("", "root", modules=("muse-plugin-it",))
+        module_dir = self.write_pom(
+            "muse-plugin-it",
+            "muse-plugin-it",
+            kind="plugin-realm",
+            family="core",
+            codegen=None,
+            invoker_local_repo="${project.build.directory}/local-repo",
+        )
+        quarkus_reactor = self.root / "muse-quarkus"
+        quarkus_reactor.mkdir()
+        (quarkus_reactor / "pom.xml").write_text("<project><artifactId>muse-quarkus</artifactId></project>")
+        self.write_invoker_fixture(module_dir, "core-fixture")
+        self.track()
+        owner = owners_module.discover_owners(self.root)[0]
+        calls: list[list[str]] = []
+
+        def fake_run(argv, **kwargs):
+            calls.append(list(argv))
+            return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+        result = self.runner.run_owner(
+            owner,
+            self.root,
+            self.scratch,
+            repository=self.repository,
+            execute=fake_run,
+        )
+
+        self.assertEqual("passed", result.status)
+        self.assertEqual(3, len(calls))
+        owner_prepare, quarkus_seed, owner_verify = calls
+        self.assertIn("-pl=:muse-plugin-it", owner_prepare)
+        self.assertIn("install", quarkus_seed)
+        self.assertIn("-DskipTests", quarkus_seed)
+        self.assertEqual("muse-quarkus/pom.xml", quarkus_seed[quarkus_seed.index("-f") + 1])
+        self.assertIn(f"-Dmaven.repo.local={self.repository.resolve()}", quarkus_seed)
+        self.assertIn("-Pplugin-it", owner_verify)
+
     def test_path_with_spaces_uses_argv_arrays(self):
         self.write_pom("", "root", modules=("owner mod",))
         self.write_pom(

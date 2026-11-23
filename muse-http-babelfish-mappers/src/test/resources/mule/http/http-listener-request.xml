@@ -29,9 +29,11 @@
                                  maxConnections="4"/>
         <http:default-headers>
             <http:default-header key="Accept" value="application/json"/>
+            <http:default-header key="header-&quot;-$-\" value="value-&quot;-$-\&#13;&#10;next"/>
         </http:default-headers>
         <http:default-query-params>
             <http:query-param key="locale" value="en"/>
+            <http:query-param key="query-&quot;-$-\" value="value-&quot;-$-\&#13;&#10;next"/>
         </http:default-query-params>
     </http:request-config>
 
@@ -57,7 +59,9 @@
                       sendBodyMode="ALWAYS"
                       requestStreamingMode="ALWAYS"
                       sendCorrelationId="ALWAYS"
-                      correlationId="#[correlationId]">
+                      correlationId="#[correlationId]"
+                      target="httpReply"
+                      targetValue="#[message]">
             <http:body>#[payload]</http:body>
             <http:headers>#[vars.headers]</http:headers>
             <http:query-params>#[vars.queryParams]</http:query-params>
