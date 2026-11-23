@@ -1,5 +1,6 @@
 package dev.museframework.plugin.core.translation
 
+import com.squareup.kotlinpoet.CodeBlock
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.api.ElementMapper
@@ -317,12 +318,12 @@ class TranslatorRegistryTest {
     }
 
     private object FirstElementEmitter : ElementCodeEmitter<SetPayloadConfig> {
-        override fun emit(element: SetPayloadConfig, ctx: dev.museframework.babelfish.emitter.CodegenContext): String =
-            "firstEmitter()"
+        override fun emit(element: SetPayloadConfig, ctx: dev.museframework.babelfish.emitter.CodegenContext) =
+            CodeBlock.of("firstEmitter()")
     }
 
     private object SecondElementEmitter : ElementCodeEmitter<SetPayloadConfig> {
-        override fun emit(element: SetPayloadConfig, ctx: dev.museframework.babelfish.emitter.CodegenContext): String =
-            "secondEmitter()"
+        override fun emit(element: SetPayloadConfig, ctx: dev.museframework.babelfish.emitter.CodegenContext) =
+            CodeBlock.of("secondEmitter()")
     }
 }

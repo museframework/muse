@@ -16,7 +16,7 @@ import dev.museframework.dsl.api.model.flow.MuseFlow
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
-import kotlin.io.path.writeText
+import kotlin.io.path.bufferedWriter
 
 data class TranslationResult(
     val sourceFile: Path,
@@ -26,12 +26,17 @@ data class TranslationResult(
     fun writeTo(
         outputDir: Path,
         packageName: String,
+    ): List<Path> = writeTo(outputDir, packageName, KotlinCodeEmitter())
+
+    fun writeTo(
+        outputDir: Path,
+        packageName: String,
+        emitter: KotlinCodeEmitter,
     ): List<Path> {
-        val emitter = KotlinCodeEmitter()
-        val code = emitter.emit(this, packageName)
-        val outputFile = outputDir.resolve(sourceFile.fileName.toString().replace(".xml", ".kt"))
-        Files.createDirectories(outputFile.parent)
-        outputFile.writeText(code)
+        val file = emitter.emitFile(this, packageName)
+        val outputFile = outputDir.resolve(sourceFile.fileName.toString().substringBeforeLast('.') + ".kt")
+        Files.createDirectories(outputDir)
+        outputFile.bufferedWriter().use { file.writeTo(it) }
         return listOf(outputFile)
     }
 }

@@ -106,7 +106,8 @@ class KotlinCodeEmitterTest {
 
         val code = KotlinCodeEmitter().emit(result, "com.acme")
 
-        assertContains(code, "docId = \"flow-\\\"quoted\\nline\"")
+        assertContains(code, "\"flow-\\\"quoted\"")
+        assertContains(code, "\"line\"")
         assertContains(code, "docId = \"sub-\\\"quoted\\r\\tend\"")
     }
 
@@ -123,16 +124,29 @@ class KotlinCodeEmitterTest {
     }
 
     @Test
-    fun `imports are sorted and deduplicated`() {
+    fun `class and property names have one stable allocation per file`() {
+        val result = TranslationResult(
+            Path.of("3-order.API__flow.XML"),
+            listOf("a-b", "a_b", "when", "99", "", "---").map { MuseFlow.SubFlow(it, it) },
+            emptyMap(),
+        )
         val emitter = KotlinCodeEmitter()
-        val ctx = CodegenContext("com.acme")
-        ctx.addImport("dev.museframework.dsl.dsl.setPayload")
-        ctx.addImport("dev.museframework.dsl.dsl.setVariable")
-        ctx.addImport("dev.museframework.dsl.dsl.setPayload") // duplicate
+        val file = emitter.emitFile(result, "com.acme")
+        assertEquals("_3OrderAPIFlowConfig", file.name)
+        assertEquals(listOf("aB", "aB_", "when_", "_99", "flow", "flow_"),
+            file.typeSpecs.single().propertySpecs.map { it.name })
+        assertContains(file.toString(), "subFlow(\"a_b\")")
+        assertEquals(file.toString(), emitter.emit(result, "com.acme"))
+    }
 
-        val imports = ctx.resolvedImports()
-        assertEquals(2, imports.size)
-        assertEquals(imports.sorted(), imports)
+    @Test
+    fun `keyword and punctuation filenames have stable legal class names`() {
+        val emitter = KotlinCodeEmitter()
+        for ((input, expected) in mapOf("when.xml" to "WhenConfig", "---.xml" to "Config", "99.xml" to "_99Config")) {
+            val file = emitter.emitFile(TranslationResult(Path.of(input), emptyList(), emptyMap()), "com.example")
+            assertEquals(expected, file.name)
+            assertEquals(expected, file.typeSpecs.single().name)
+        }
     }
 
     @Test

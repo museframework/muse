@@ -51,12 +51,23 @@ class TranslatorFacadeTest {
     }
 
     @Test
-    fun `deriveClassName converts kebab-case to PascalCase with Config suffix`() {
-        val facade = TranslatorFacade()
-        assertEquals("MyOrderFlowConfig", facade.deriveClassName(java.io.File("my-order-flow.xml")))
-        assertEquals("SimpleConfig", facade.deriveClassName(java.io.File("simple.xml")))
-        assertEquals("HttpListenerConfig", facade.deriveClassName(java.io.File("http-listener.xml")))
-        assertEquals("HttpListenerConfig", facade.deriveClassName(java.io.File("http_listener.xml")))
+    fun `generated file path and declaration use the same name`(@TempDir dir: Path) {
+        val facade = TranslatorFacade(TranslatorRegistry.of(listOf(CoreMapperProvider())))
+        writeCoreFlow(dir, "3-order.API__flow.XML")
+        val file = facade.translateAll(dir.toFile(), "com.example").single().generatedFiles.single()
+        assertEquals("com/example/_3OrderAPIFlowConfig.kt", file.relativePath)
+        assertContains(file.content, "class _3OrderAPIFlowConfig")
+    }
+
+    @Test
+    fun `two input files with the same output path report both sources`(@TempDir dir: Path) {
+        val facade = TranslatorFacade(TranslatorRegistry.of(listOf(CoreMapperProvider())))
+        writeCoreFlow(dir, "customer-order.xml")
+        writeCoreFlow(dir, "customer_order.xml")
+        val error = assertFailsWith<MuseTranslationException> { facade.translateAll(dir.toFile(), "com.example") }
+        assertContains(error.message!!, "customer-order.xml")
+        assertContains(error.message!!, "customer_order.xml")
+        assertContains(error.message!!, "com/example/CustomerOrderConfig.kt")
     }
 
     @Test
@@ -70,6 +81,18 @@ class TranslatorFacadeTest {
         assertEquals(1, results[0].generatedFiles.size)
         assertContains(results[0].generatedFiles[0].content, "setPayload")
         assertTrue(results[0].warnings.isEmpty())
+    }
+
+    @Test
+    fun `a mapping-only provider cannot produce incomplete Kotlin in lenient mode`(@TempDir dir: Path) {
+        writeCoreFlow(dir, "mapped.xml")
+        val facade = TranslatorFacade(TranslatorRegistry.of(listOf(DuplicateCoreMappingProvider())))
+        val failure = assertFailsWith<MuseTranslationException> {
+            facade.translateAll(dir.toFile(), "com.example", lenient = true)
+        }
+        assertContains(failure.message!!, "mapped.xml")
+        assertContains(failure.message!!, "hello-flow")
+        assertContains(failure.message!!, "SetPayloadConfig")
     }
 
     @Test

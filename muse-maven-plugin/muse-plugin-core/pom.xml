@@ -25,6 +25,10 @@
             <groupId>dev.museframework</groupId>
             <artifactId>muse-babelfish-core-mappers</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.squareup</groupId>
+            <artifactId>kotlinpoet-jvm</artifactId>
+        </dependency>
         <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

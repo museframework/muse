@@ -3,8 +3,8 @@ package dev.museframework.babelfish.integration
 import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.api.ElementMapper
-import dev.museframework.babelfish.emitter.CodegenContext
-import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
@@ -20,6 +20,7 @@ import java.nio.file.Path
 import java.util.*
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -64,26 +65,16 @@ class MuseBabelfishIT {
         }
     }
 
-    private fun createTestEmitter(): KotlinCodeEmitter {
-        return KotlinCodeEmitter().apply {
-            registerElementEmitter(SetPayloadConfig::class, object : ElementCodeEmitter<SetPayloadConfig> {
-                override fun emit(element: SetPayloadConfig, ctx: CodegenContext): String {
-                    ctx.addImport("dev.museframework.dsl.dsl.setPayload")
-                    return """setPayload { value = "${element.value}" }"""
-                }
-            })
-            registerElementEmitter(SetVariableConfig::class, object : ElementCodeEmitter<SetVariableConfig> {
-                override fun emit(element: SetVariableConfig, ctx: CodegenContext): String {
-                    ctx.addImport("dev.museframework.dsl.dsl.setVariable")
-                    return """setVariable("${element.variableName}") { value = "${element.value}" }"""
-                }
-            })
-            registerElementEmitter(LoggerConfig::class, object : ElementCodeEmitter<LoggerConfig> {
-                override fun emit(element: LoggerConfig, ctx: CodegenContext): String {
-                    ctx.addImport("dev.museframework.engine.components.processor.dsl.logger")
-                    return """logger { message = "${element.message}" }"""
-                }
-            })
+    private fun createTestEmitter(): KotlinCodeEmitter = KotlinCodeEmitter().apply {
+        registerElementEmitter(SetPayloadConfig::class) { element, _ ->
+            CodeBlock.of("%M { value = %S }", MemberName("dev.museframework.dsl.dsl", "setPayload", true), element.value)
+        }
+        registerElementEmitter(SetVariableConfig::class) { element, _ ->
+            CodeBlock.of("%M(%S) { value = %S }", MemberName("dev.museframework.dsl.dsl", "setVariable", true),
+                element.variableName, element.value)
+        }
+        registerElementEmitter(LoggerConfig::class) { element, _ ->
+            CodeBlock.of("%M { message = %S }", MemberName("dev.museframework.dsl.dsl", "logger", true), element.message)
         }
     }
 
@@ -149,7 +140,10 @@ class MuseBabelfishIT {
 
         val tempDir = java.nio.file.Files.createTempDirectory("babelfish-test")
         try {
-            val writtenFiles = result.writeTo(tempDir, "com.test")
+            val failure = assertFailsWith<IllegalStateException> { result.writeTo(tempDir, "com.test") }
+            assertContains(failure.message!!, "flow-with-subflow.xml")
+            assertTrue(tempDir.toFile().listFiles()!!.isEmpty())
+            val writtenFiles = result.writeTo(tempDir, "com.test", createTestEmitter())
 
             assertEquals(1, writtenFiles.size, "Should write exactly one file")
             val outputFile = writtenFiles.first()
@@ -176,7 +170,7 @@ class MuseBabelfishIT {
         val tempDir = java.nio.file.Files.createTempDirectory("babelfish-test")
         try {
             val nestedOutputDir = tempDir.resolve("src/main/resources/flows")
-            val writtenFiles = result.writeTo(nestedOutputDir, "com.example")
+            val writtenFiles = result.writeTo(nestedOutputDir, "com.example", createTestEmitter())
 
             assertEquals(1, writtenFiles.size)
             val outputFile = writtenFiles.first()

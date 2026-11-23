@@ -1,5 +1,8 @@
 package dev.museframework.babelfish.mapper
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.model.error.ErrorHandler
@@ -99,51 +102,34 @@ object ErrorHandlerStrategyCodeEmitter {
     fun emitStrategy(
         strategy: ErrorHandlerStrategy,
         ctx: CodegenContext,
-    ): String =
-        when (strategy) {
-            is ErrorHandlerStrategy.OnErrorContinue -> emitStrategyCall("onErrorContinue", strategy, ctx)
-            is ErrorHandlerStrategy.OnErrorPropagate -> emitStrategyCall("onErrorPropagate", strategy, ctx)
+    ): CodeBlock {
+        val function = when (strategy) {
+            is ErrorHandlerStrategy.OnErrorContinue -> "onErrorContinue"
+            is ErrorHandlerStrategy.OnErrorPropagate -> "onErrorPropagate"
         }
-
-    private fun emitStrategyCall(
-        functionName: String,
-        strategy: ErrorHandlerStrategy,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.dsl.api.model.error.ErrorType")
-
-        val hasConfiguration =
-            strategy.whenExpression != null ||
-                !strategy.enableNotifications ||
-                !strategy.logException
-        val namespace = ctx.escapeKotlinString(strategy.errorType.namespace)
-        val identifier = ctx.escapeKotlinString(strategy.errorType.identifier)
-
-        return buildString {
-            if (hasConfiguration) {
-                appendLine("$functionName(")
-                appendLine("    ErrorType(\"$namespace\", \"$identifier\"),")
-                appendLine("    configure = {")
-                strategy.whenExpression?.let { whenExpression ->
-                    appendLine("        whenExpression = \"${ctx.escapeKotlinString(whenExpression)}\"")
-                }
-                if (!strategy.enableNotifications) {
-                    appendLine("        enableNotifications = false")
-                }
-                if (!strategy.logException) {
-                    appendLine("        logException = false")
-                }
-                appendLine("    },")
-                append(") {")
+        val errorType = CodeBlock.of(
+            "%T(%L, %L)",
+            ErrorType::class,
+            kotlinStringLiteral(strategy.errorType.namespace),
+            kotlinStringLiteral(strategy.errorType.identifier),
+        )
+        val configuration = buildCodeBlock {
+            strategy.whenExpression?.let { addStatement("whenExpression = %L", kotlinStringLiteral(it)) }
+            if (!strategy.enableNotifications) addStatement("enableNotifications = false")
+            if (!strategy.logException) addStatement("logException = false")
+        }
+        return buildCodeBlock {
+            if (configuration.isEmpty()) {
+                beginControlFlow("%N(%L)", function, errorType)
             } else {
-                append("$functionName(ErrorType(\"$namespace\", \"$identifier\")) {")
+                add("%N(%L, configure = {\n", function, errorType)
+                indent()
+                add(configuration)
+                unindent()
+                beginControlFlow("})")
             }
-
-            if (strategy.pipeline.isNotEmpty()) {
-                appendLine()
-                append(ctx.emitPipelineElements(strategy.pipeline, "    "))
-            }
-            append("}")
+            add(ctx.emitPipelineElements(strategy.pipeline))
+            endControlFlow()
         }
     }
 }
