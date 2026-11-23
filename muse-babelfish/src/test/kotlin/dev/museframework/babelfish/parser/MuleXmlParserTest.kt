@@ -96,6 +96,40 @@ class MuleXmlParserTest {
         }
 
         @Test
+        fun `global config IDs honor the documentation namespace without changing fallback allocation`() {
+            val doc = parser.parse(fixture("config-doc-id-alias.xml"))
+            val configs = doc.globalConfigs
+
+            assertEquals(
+                listOf(
+                    "canonical-config-original",
+                    "http-request-config-original",
+                    "unnamed_config_1",
+                    "unnamed_config_2",
+                    "rebound-doc-alias",
+                    "foreign-doc-prefix-only",
+                ),
+                configs.map { it.id },
+            )
+            assertEquals("canonical-config-original", configs[0].attrs["doc:id"])
+            assertEquals("http-request-config-original", configs[1].attrs["meta:id"])
+            assertEquals("http-request-config-original", configs[1].attrs["doc:id"])
+            assertEquals("unnamed_config_1", configs[2].attrs["name"])
+            assertEquals("HTTP request configuration", configs[2].attrs["doc:name"])
+            assertEquals("foreign-id", configs[3].attrs["other:id"])
+            assertEquals("documentation-id-original", configs[4].attrs["meta:id"])
+            assertEquals("documentation-id-original", configs[4].attrs["doc:id"])
+            assertEquals(null, configs[5].attrs["doc:id"])
+            assertEquals(listOf(7, 8, 9, 10, 14, 17), configs.map { it.location.line })
+
+            val flow = doc.flows.single()
+            assertEquals("raw-config-flow-original", flow.docId)
+            assertEquals("raw-config-element-original", flow.source?.attrs?.get("doc:id"))
+            assertEquals(18, flow.location.line)
+            assertEquals(19, flow.source?.location?.line)
+        }
+
+        @Test
         fun `error handler is separated from pipeline`() {
             val doc = parser.parse(fixture("flow-with-error-handler.xml"))
             val flow = doc.flows.first()

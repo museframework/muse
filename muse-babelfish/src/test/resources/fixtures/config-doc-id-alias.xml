@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:meta="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:other="urn:example:foreign-docs">
+    <http:listener-config doc:id="canonical-config-original"/>
+    <http:request-config meta:id="http-request-config-original"/>
+    <http:request-config name="unnamed_config_1" doc:name="HTTP request configuration"/>
+    <http:request-config other:id="foreign-id"/>
+    <http:request-config name="rebound-doc-alias"
+                         xmlns:doc="urn:example:foreign-docs"
+                         meta:id="documentation-id-original"
+                         doc:id="foreign-id-original"/>
+    <http:request-config name="foreign-doc-prefix-only"
+                         xmlns:doc="urn:example:foreign-docs"
+                         doc:id="foreign-prefix-id"/>
+    <flow name="raw-config-flow" meta:id="raw-config-flow-original">
+        <set-payload value="ok" meta:id="raw-config-element-original"/>
+    </flow>
+</mule>
