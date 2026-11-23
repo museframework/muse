@@ -50,6 +50,15 @@ class GeneratedDatabaseCompilationIT {
     }
 
     @Test
+    fun `compiled database config and operation preserve source XML IDs`() {
+        val generated = DatabaseConfig()
+        val select = assertIs<DbSelectConfig>(generated.databaseFidelity.pipeline.first())
+
+        assertEquals("packaged-database-config-original", generated.packagedDatabase.docId)
+        assertEquals("packaged-database-select-original", select.docId)
+    }
+
+    @Test
     fun `compiled database operations preserve SQL optional targets and typed parameters`() {
         val operations = DatabaseConfig().databaseFidelity.pipeline
         assertEquals(12, operations.size)

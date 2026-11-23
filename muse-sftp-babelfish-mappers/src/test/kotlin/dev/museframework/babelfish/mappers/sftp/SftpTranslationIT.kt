@@ -3,6 +3,7 @@ package dev.museframework.babelfish.mappers.sftp
 import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.dsl.api.model.flow.MuseFlow
 import dev.museframework.sftp.api.config.SftpConnectionConfig
 import dev.museframework.sftp.api.config.SftpConnectionRef
@@ -19,12 +20,15 @@ import dev.museframework.sftp.api.config.SftpWriteConfig
 import dev.museframework.sftp.api.model.SftpFileType
 import dev.museframework.sftp.api.model.SftpPostAction
 import dev.museframework.sftp.api.model.SftpWriteMode
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
+import java.util.UUID
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SftpTranslationIT {
     @Test
@@ -70,7 +74,7 @@ class SftpTranslationIT {
         assertEquals(SftpFileType.REGULAR_FILE, listener.matcher.fileType)
 
         val pipeline = flow.pipeline
-        assertEquals(8, pipeline.size)
+        assertEquals(9, pipeline.size)
 
         val read = assertIs<SftpReadConfig>(pipeline[0])
         assertEquals("inbox/input.csv", read.path)
@@ -108,6 +112,27 @@ class SftpTranslationIT {
         val createDirectory = assertIs<SftpCreateDirectoryConfig>(pipeline[7])
         assertEquals("inbox/created", createDirectory.directoryPath)
 
+        val secondaryWrite = assertIs<SftpWriteConfig>(pipeline[8])
+        assertEquals("outbox/secondary.csv", secondaryWrite.path)
+
+        assertAll(
+            { assertEquals("sftp-connection-original", connection.docId) },
+            { assertEquals("sftp-read-original", read.docId) },
+            { assertEquals("sftp-write-original", write.docId) },
+            { assertEquals("sftp-list-original", list.docId) },
+            { assertEquals("sftp-copy-original", copy.docId) },
+            { assertEquals("sftp-move-original", moveOp.docId) },
+            { assertEquals("sftp-delete-original", delete.docId) },
+            { assertEquals("sftp-rename-original", rename.docId) },
+            { assertEquals("sftp-create-directory-original", createDirectory.docId) },
+            {
+                assertEquals(
+                    "sftp-write-" + '"' + "secondary" + '"' + '-' + '$' + "batch",
+                    secondaryWrite.docId,
+                )
+            },
+        )
+
         val code =
             KotlinCodeEmitter()
                 .apply { provider.registerEmitters(this) }
@@ -133,9 +158,28 @@ class SftpTranslationIT {
         assertContains(code, "pollIntervalMs = 2000")
         assertContains(code, "moveAfterProcessing(\"archive\", overwrite = true)")
         assertContains(code, "sftpRead(sftpConnection(\"Sftp_Config\"))")
+        assertCallHasDocId(code, "sftpRead(sftpConnection(\"Sftp_Config\"))", read.docId)
+        assertCallHasDocId(code, "sftpList(sftpConnection(\"Sftp_Config\"))", list.docId)
         assertContains(code, "path = \"inbox/input.csv\"")
         assertContains(code, "mode = SftpWriteMode.APPEND")
         assertContains(code, "content = \"#[payload]\"")
+        assertCallHasDocId(code, "sftpWrite(sftpConnection(\"Sftp_Config\"))", write.docId)
+        assertCallHasDocId(
+            code,
+            "sftpWrite(sftpConnection(\"Sftp_Config\"))",
+            secondaryWrite.docId,
+            occurrence = 1,
+        )
+        assertCallHasDocId(code, "sftpCopy(sftpConnection(\"Sftp_Config\"))", copy.docId)
+        assertCallHasDocId(code, "sftpMove(sftpConnection(\"Sftp_Config\"))", moveOp.docId)
+        assertCallHasDocId(code, "sftpDelete(sftpConnection(\"Sftp_Config\"))", delete.docId)
+        assertCallHasDocId(code, "sftpRename(sftpConnection(\"Sftp_Config\"))", rename.docId)
+        assertCallHasDocId(
+            code,
+            "sftpCreateDirectory(sftpConnection(\"Sftp_Config\"))",
+            createDirectory.docId,
+        )
+        assertContains(code, "docId = " + kotlinStringLiteral(connection.docId))
         assertContains(code, "filenamePattern = \"*.csv\"")
         assertContains(code, "sftpList(sftpConnection(\"Sftp_Config\"))")
         assertContains(code, "sftpCopy(sftpConnection(\"Sftp_Config\"))")
@@ -146,6 +190,24 @@ class SftpTranslationIT {
         assertContains(code, "newName = \"new-name.csv\"")
         assertContains(code, "sftpCreateDirectory(sftpConnection(\"Sftp_Config\"))")
         assertFalse(code.contains("dev.museframework.connectors.sftp"))
+    }
+
+    private fun assertCallHasDocId(
+        code: String,
+        call: String,
+        docId: String,
+        occurrence: Int = 0,
+    ) {
+        val matches = Regex.escape(call).toRegex().findAll(code).toList()
+        assertTrue(occurrence < matches.size, "Expected generated call #$occurrence for $call")
+
+        val afterCall = code.substring(matches[occurrence].range.last + 1)
+        val expectedAssignment = "docId = " + kotlinStringLiteral(docId)
+        val expectedPrefix = Regex("^\\s*\\{\\s*" + Regex.escape(expectedAssignment))
+        assertTrue(
+            expectedPrefix.containsMatchIn(afterCall),
+            "Expected $call #$occurrence to emit docId $docId in its own DSL block",
+        )
     }
 
     @Test
@@ -160,6 +222,7 @@ class SftpTranslationIT {
 
         val connection = assertIs<SftpConnectionConfig>(result.usedConfigs.getValue("Exchange_Sftp"))
         assertEquals("Exchange SFTP", connection.docName)
+        assertTrue(runCatching { UUID.fromString(connection.docId) }.isSuccess)
         assertEquals("sftp.example.test", connection.host)
         assertEquals(22, connection.port)
         assertEquals("exchange", connection.username)
@@ -175,6 +238,7 @@ class SftpTranslationIT {
         assertEquals(3, flow.pipeline.size)
 
         val list = assertIs<SftpListConfig>(flow.pipeline[0])
+        assertTrue(runCatching { UUID.fromString(list.docId) }.isSuccess)
         assertEquals("/inbox", list.directoryPath)
         assertEquals("regex:orders-\\d{4}\\.csv", list.matcher.filenamePattern)
         assertEquals(SftpFileType.REGULAR_FILE, list.matcher.fileType)
@@ -200,6 +264,8 @@ class SftpTranslationIT {
         assertContains(code, "privateKeyPassphrase = \"\${'$'}{test.key.passphrase}\"")
         assertContains(code, "workingDirectory = \"/exchange\\\\\${'$'}batch/\\\"daily\\\"\"")
         assertContains(code, "knownHostsFile = \"/keys/known hosts\"")
+        assertContains(code, "docId = " + kotlinStringLiteral(connection.docId))
+        assertCallHasDocId(code, "sftpList(sftpConnection(\"Exchange_Sftp\"))", list.docId)
         assertFalse(code.contains("hostKeyChecking = SftpHostKeyChecking.INSECURE"))
         assertContains(code, "filenamePattern = \"regex:orders-\\\\d{4}\\\\.csv\"")
         assertContains(code, "fileType = SftpFileType.REGULAR_FILE")

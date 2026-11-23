@@ -20,12 +20,14 @@ import dev.museframework.db.api.operation.DbUpdateConfig
 import dev.museframework.db.api.source.DbRowListenerConfig
 import dev.museframework.dsl.api.config.SchedulerTimeUnit
 import dev.museframework.dsl.api.model.flow.MuseFlow
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class DbTranslationIT {
     @Test
@@ -39,6 +41,7 @@ class DbTranslationIT {
             )
 
         val config = assertIs<DbConfig>(result.usedConfigs.getValue("database-config"))
+        assertEquals("database-config-original", config.docId)
         val connection = assertIs<GenericDbConnectionConfig>(config.connection)
         assertEquals("jdbc:postgresql://localhost/orders", connection.url)
         assertEquals("${'$'}{db.password}", connection.password)
@@ -62,11 +65,13 @@ class DbTranslationIT {
             operationsFlow.pipeline.map { it::class },
         )
         val select = assertIs<DbSelectConfig>(operationsFlow.pipeline.first())
+        assertEquals("database-select-original", select.docId)
         assertEquals(DbConfigRef.ByName("database-config"), select.configRef)
         assertEquals(25, select.settings.fetchSize)
 
         val listenerFlow = assertIs<MuseFlow.Flow>(result.flows.first { it.name == "database-listener" })
         val listener = assertIs<DbRowListenerConfig>(listenerFlow.source)
+        assertEquals("database-listener-original", listener.docId)
         assertEquals("outbox", listener.table)
         assertEquals("id", listener.watermarkColumn)
         assertEquals("5", listener.schedulingStrategy.frequency)
@@ -86,5 +91,21 @@ class DbTranslationIT {
         assertContains(code, "startDelay = \"3\"")
         assertContains(code, "timeUnit = SchedulerTimeUnit.SECONDS")
         assertFalse(code.contains("dev.museframework.connectors.db"))
+
+        val configCall = code.indexOf("dbConfig(\"database-config\")")
+        val selectCall = code.indexOf("dbSelect(DbConfigRef.ByName(\"database-config\"))")
+        val listenerCall = code.indexOf("dbListener(DbConfigRef.ByName(\"database-config\"))")
+        val firstQuerySingle = "dbQuerySingle(DbConfigRef.ByName(\"database-config\"))"
+        val operationsEnd = code.indexOf(firstQuerySingle, selectCall)
+        val listenerEnd = code.indexOf(firstQuerySingle, listenerCall)
+
+        assertTrue(configCall >= 0)
+        assertTrue(selectCall > configCall)
+        assertTrue(listenerCall > selectCall)
+        assertAll(
+            { assertContains(code.substring(configCall, selectCall), "docId = \"database-config-original\"") },
+            { assertContains(code.substring(selectCall, operationsEnd), "docId = \"database-select-original\"") },
+            { assertContains(code.substring(listenerCall, listenerEnd), "docId = \"database-listener-original\"") },
+        )
     }
 }

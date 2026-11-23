@@ -24,6 +24,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 object FileMatcherConfigMapper : ConfigMapper {
@@ -35,6 +36,7 @@ object FileMatcherConfigMapper : ConfigMapper {
         return FileMatcherConfig(
             name = name,
             docName = config.attrs["doc:name"] ?: name,
+            docId = config.attrs["doc:id"] ?: UUID.randomUUID().toString(),
             matcher = localFileMatcher(config.attrs),
         )
     }
@@ -48,6 +50,7 @@ object FileMatcherConfigCodeEmitter : ConfigCodeEmitter<FileMatcherConfig> {
         beginControlFlow("%M", fileDsl("fileMatcher"))
         addString("name", config.name)
         if (config.docName.isNotBlank() && config.docName != config.name) addString("docName", config.docName)
+        addString("docId", config.docId)
         addMatcher(config.matcher)
         endControlFlow()
     }

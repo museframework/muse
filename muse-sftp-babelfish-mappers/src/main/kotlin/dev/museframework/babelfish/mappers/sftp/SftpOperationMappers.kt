@@ -22,6 +22,7 @@ import dev.museframework.sftp.api.config.SftpWriteConfig
 import dev.museframework.sftp.api.model.SftpFileMatcher
 import dev.museframework.sftp.api.model.SftpTransferRequest
 import dev.museframework.sftp.api.model.SftpWriteMode
+import java.util.UUID
 
 object SftpReadMapper : ElementMapper<SftpReadConfig> {
     override fun map(
@@ -30,6 +31,7 @@ object SftpReadMapper : ElementMapper<SftpReadConfig> {
     ): SftpReadConfig =
         SftpReadConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.docIdOrRandom(),
             connection = SftpConnectionRef.ByName(element.requireAttr("config-ref", element.location)),
             path = element.requireAttr("path", element.location),
             targetConfig = element.mapTargetConfig(),
@@ -45,6 +47,7 @@ object SftpWriteMapper : ElementMapper<SftpWriteConfig> {
         val modeExpression = rawMode?.takeIf { it.trim().startsWith("#[") && it.trim().endsWith("]") }
         return SftpWriteConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.docIdOrRandom(),
             connection = SftpConnectionRef.ByName(element.requireAttr("config-ref", element.location)),
             path = element.requireAttr("path", element.location),
             content = element.childText("content"),
@@ -63,6 +66,7 @@ object SftpListMapper : ElementMapper<SftpListConfig> {
     ): SftpListConfig =
         SftpListConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.docIdOrRandom(),
             connection = SftpConnectionRef.ByName(element.requireAttr("config-ref", element.location)),
             directoryPath =
                 element.attrs["directoryPath"]
@@ -82,6 +86,7 @@ object SftpCopyMapper : ElementMapper<SftpCopyConfig> {
         val transfer = mapTransferRequest(element)
         return SftpCopyConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.docIdOrRandom(),
             connection = SftpConnectionRef.ByName(element.requireAttr("config-ref", element.location)),
             sourcePath = transfer.sourcePath,
             targetDirectory = transfer.targetDirectory,
@@ -100,6 +105,7 @@ object SftpMoveMapper : ElementMapper<SftpMoveConfig> {
         val transfer = mapTransferRequest(element)
         return SftpMoveConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.docIdOrRandom(),
             connection = SftpConnectionRef.ByName(element.requireAttr("config-ref", element.location)),
             sourcePath = transfer.sourcePath,
             targetDirectory = transfer.targetDirectory,
@@ -117,6 +123,7 @@ object SftpDeleteMapper : ElementMapper<SftpDeleteConfig> {
     ): SftpDeleteConfig =
         SftpDeleteConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.docIdOrRandom(),
             connection = SftpConnectionRef.ByName(element.requireAttr("config-ref", element.location)),
             path = element.requireAttr("path", element.location),
         )
@@ -129,6 +136,7 @@ object SftpRenameMapper : ElementMapper<SftpRenameConfig> {
     ): SftpRenameConfig =
         SftpRenameConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.docIdOrRandom(),
             connection = SftpConnectionRef.ByName(element.requireAttr("config-ref", element.location)),
             path = element.requireAttr("path", element.location),
             newName =
@@ -145,6 +153,7 @@ object SftpCreateDirectoryMapper : ElementMapper<SftpCreateDirectoryConfig> {
     ): SftpCreateDirectoryConfig =
         SftpCreateDirectoryConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.docIdOrRandom(),
             connection = SftpConnectionRef.ByName(element.requireAttr("config-ref", element.location)),
             directoryPath = element.requireAttr("directoryPath", element.location),
         )
@@ -152,7 +161,7 @@ object SftpCreateDirectoryMapper : ElementMapper<SftpCreateDirectoryConfig> {
 
 object SftpReadCodeEmitter : ElementCodeEmitter<SftpReadConfig> {
     override fun emit(element: SftpReadConfig, ctx: CodegenContext): CodeBlock =
-        sftpOperation("sftpRead", element.connection) {
+        sftpOperation("sftpRead", element.connection, element.docId) {
             addString("path", element.path)
             addTargetConfig(element.targetConfig)
         }
@@ -160,7 +169,7 @@ object SftpReadCodeEmitter : ElementCodeEmitter<SftpReadConfig> {
 
 object SftpWriteCodeEmitter : ElementCodeEmitter<SftpWriteConfig> {
     override fun emit(element: SftpWriteConfig, ctx: CodegenContext): CodeBlock =
-        sftpOperation("sftpWrite", element.connection) {
+        sftpOperation("sftpWrite", element.connection, element.docId) {
             addString("path", element.path)
             addString("content", element.content)
             addString("modeExpression", element.modeExpression)
@@ -173,7 +182,7 @@ object SftpWriteCodeEmitter : ElementCodeEmitter<SftpWriteConfig> {
 
 object SftpListCodeEmitter : ElementCodeEmitter<SftpListConfig> {
     override fun emit(element: SftpListConfig, ctx: CodegenContext): CodeBlock =
-        sftpOperation("sftpList", element.connection) {
+        sftpOperation("sftpList", element.connection, element.docId) {
             if (element.directoryPath != "/") addString("directoryPath", element.directoryPath)
             addNonDefaultBoolean("recursive", element.recursive, default = false)
             addMatcher(element.matcher, SftpFileMatcher())
@@ -183,28 +192,28 @@ object SftpListCodeEmitter : ElementCodeEmitter<SftpListConfig> {
 
 object SftpCopyCodeEmitter : ElementCodeEmitter<SftpCopyConfig> {
     override fun emit(element: SftpCopyConfig, ctx: CodegenContext): CodeBlock =
-        sftpOperation("sftpCopy", element.connection) {
+        sftpOperation("sftpCopy", element.connection, element.docId) {
             addTransfer(element.transfer)
         }
 }
 
 object SftpMoveCodeEmitter : ElementCodeEmitter<SftpMoveConfig> {
     override fun emit(element: SftpMoveConfig, ctx: CodegenContext): CodeBlock =
-        sftpOperation("sftpMove", element.connection) {
+        sftpOperation("sftpMove", element.connection, element.docId) {
             addTransfer(element.transfer)
         }
 }
 
 object SftpDeleteCodeEmitter : ElementCodeEmitter<SftpDeleteConfig> {
     override fun emit(element: SftpDeleteConfig, ctx: CodegenContext): CodeBlock =
-        sftpOperation("sftpDelete", element.connection) {
+        sftpOperation("sftpDelete", element.connection, element.docId) {
             addString("path", element.path)
         }
 }
 
 object SftpRenameCodeEmitter : ElementCodeEmitter<SftpRenameConfig> {
     override fun emit(element: SftpRenameConfig, ctx: CodegenContext): CodeBlock =
-        sftpOperation("sftpRename", element.connection) {
+        sftpOperation("sftpRename", element.connection, element.docId) {
             addString("path", element.path)
             addString("newName", element.newName)
             addNonDefaultBoolean("overwrite", element.overwrite, default = false)
@@ -213,7 +222,7 @@ object SftpRenameCodeEmitter : ElementCodeEmitter<SftpRenameConfig> {
 
 object SftpCreateDirectoryCodeEmitter : ElementCodeEmitter<SftpCreateDirectoryConfig> {
     override fun emit(element: SftpCreateDirectoryConfig, ctx: CodegenContext): CodeBlock =
-        sftpOperation("sftpCreateDirectory", element.connection) {
+        sftpOperation("sftpCreateDirectory", element.connection, element.docId) {
             addString("directoryPath", element.directoryPath)
         }
 }
@@ -233,12 +242,17 @@ private fun mapTransferRequest(element: RawElement): SftpTransferRequest =
 private fun sftpOperation(
     name: String,
     connection: SftpConnectionRef,
+    docId: String,
     body: CodeBlock.Builder.() -> Unit,
 ): CodeBlock = buildCodeBlock {
     beginControlFlow("%M(%M(%L))", sftpDsl(name), sftpDsl("sftpConnection"), connectionName(connection))
+    addString("docId", docId)
     body()
     endControlFlow()
 }
+
+private fun RawElement.docIdOrRandom(): String =
+    attrs["doc:id"] ?: UUID.randomUUID().toString()
 
 private fun CodeBlock.Builder.addTransfer(transfer: SftpTransferRequest) {
     addString("sourcePath", transfer.sourcePath)

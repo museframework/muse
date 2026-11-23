@@ -2,12 +2,13 @@
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
       xmlns:db="http://www.mulesoft.org/schema/mule/db"
       xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:meta="http://www.mulesoft.org/schema/mule/documentation"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
 
-    <db:config name="database-config" doc:name="Database Config">
+    <db:config name="database-config" doc:name="Database Config" meta:id="database-config-original">
         <db:generic-connection url="jdbc:postgresql://localhost/orders"
                                driverClassName="org.postgresql.Driver"
                                user="muse"
@@ -20,7 +21,7 @@
     </db:config>
 
     <flow name="database-operations">
-        <db:select config-ref="database-config" fetchSize="25" maxRows="100" doc:name="Select rows">
+        <db:select config-ref="database-config" fetchSize="25" maxRows="100" doc:name="Select rows" doc:id="database-select-original">
             <db:sql>SELECT id, name FROM account WHERE id = :id</db:sql>
             <db:input-parameters><![CDATA[#[{ id: payload }]]]></db:input-parameters>
             <db:parameter-types>
@@ -47,7 +48,7 @@
     </flow>
 
     <flow name="database-listener">
-        <db:listener config-ref="database-config" table="outbox" watermarkColumn="id" idColumn="id" doc:name="Outbox listener">
+        <db:listener config-ref="database-config" table="outbox" watermarkColumn="id" idColumn="id" doc:name="Outbox listener" doc:id="database-listener-original">
             <scheduling-strategy>
                 <fixed-frequency frequency="5" startDelay="3" timeUnit="SECONDS"/>
             </scheduling-strategy>

@@ -3,13 +3,14 @@
       xmlns:http="http://www.mulesoft.org/schema/mule/http"
       xmlns:db="http://www.mulesoft.org/schema/mule/db"
       xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:meta="http://www.mulesoft.org/schema/mule/documentation"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
         http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
 
-    <db:config name="packaged-database" doc:name="Packaged database">
+    <db:config name="packaged-database" doc:name="Packaged database" meta:id="packaged-database-config-original">
         <db:generic-connection url="jdbc:h2:mem:packaged;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
                                driverClassName="org.h2.Driver"
                                user="sa"/>
@@ -36,7 +37,8 @@
     </flow>
     <sub-flow name="database-fidelity">
         <db:select config-ref="packaged-database" target="rows" targetValue="#[payload[0]]"
-                   queryTimeout="125" queryTimeoutUnit="MILLISECONDS" fetchSize="4" maxRows="8" useColumnNumbers="true">
+                   queryTimeout="125" queryTimeoutUnit="MILLISECONDS" fetchSize="4" maxRows="8" useColumnNumbers="true"
+                   doc:id="packaged-database-select-original">
             <db:sql>  SELECT '"$price"' FROM items&#13;&#10;WHERE id = :id&#13;&#10;&#13;&#10;</db:sql>
             <db:input-parameters>#[{ id: vars.id }]&#13;&#10;</db:input-parameters>
             <db:parameter-types><db:parameter-type key="id" type="DECIMAL" customType="amount" scale="2"/></db:parameter-types>

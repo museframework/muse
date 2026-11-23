@@ -10,6 +10,7 @@ import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.model.config.ConfigRef
 import dev.museframework.file.api.config.FileListenerConfig
 import dev.museframework.file.api.model.WatermarkMode
+import java.util.UUID
 
 object FileListenerMapper : SourceMapper<FileListenerConfig> {
     override fun map(
@@ -18,6 +19,7 @@ object FileListenerMapper : SourceMapper<FileListenerConfig> {
     ): FileListenerConfig =
         FileListenerConfig(
             docName = element.attrs["doc:name"].orEmpty(),
+            docId = element.attrs["doc:id"] ?: UUID.randomUUID().toString(),
             connectionConfig = ConfigRef.ByName(element.requireAttr("config-ref", element.location)),
             directory = element.attrs["directory"] ?: ".",
             recursive = element.attrs["recursive"]?.toBooleanStrictOrNull() ?: true,
@@ -46,6 +48,7 @@ object FileListenerCodeEmitter : SourceCodeEmitter<FileListenerConfig> {
         ctx: CodegenContext,
     ): CodeBlock = buildCodeBlock {
         beginControlFlow("%M(%L)", fileDsl("fileListener"), connectionName(source.connectionConfig))
+        addString("docId", source.docId)
         if (source.directory != ".") addString("directory", source.directory)
         addNonDefaultBoolean("recursive", source.recursive, default = true)
         addMatcher(source.matcher)

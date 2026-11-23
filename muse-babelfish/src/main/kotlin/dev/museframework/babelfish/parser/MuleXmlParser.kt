@@ -8,9 +8,11 @@ import dev.museframework.babelfish.model.RawErrorHandler
 import dev.museframework.babelfish.model.RawFlow
 import dev.museframework.babelfish.model.SourceLocation
 import org.jdom2.Element
+import org.jdom2.Namespace
 import java.nio.file.Path
 
 private const val DOCUMENTATION_NAMESPACE = "http://www.mulesoft.org/schema/mule/documentation"
+private val documentationNamespace = Namespace.getNamespace("doc", DOCUMENTATION_NAMESPACE)
 
 class MuleXmlParser {
     fun parse(file: Path): MuleDocument {
@@ -132,25 +134,23 @@ class MuleXmlParser {
         locOf: (Element) -> SourceLocation,
         fallbackId: String?,
     ): RawConfig {
-        // Extract doc:name and doc:id from attributes (handle namespaced attrs)
-        var docName: String? = null
-        var docId: String? = null
-        for (attr in el.attributes) {
-            if (attr.namespacePrefix == "doc") {
-                when (attr.name) {
-                    "name" -> docName = attr.value
-                    "id" -> docId = attr.value
-                }
-            }
-        }
-
         return RawConfig(
             id = explicitConfigId(el) ?: requireNotNull(fallbackId),
             namespace = ns,
             tag = el.name,
             attrs =
-                el.attributes.associate { attr ->
-                    attr.qualifiedName to attr.value
+                buildMap {
+                    el.attributes.forEach { attr ->
+                        when {
+                            attr.namespaceURI == DOCUMENTATION_NAMESPACE -> {
+                                put(attr.qualifiedName, attr.value)
+                                if (attr.name == "id") put("doc:id", attr.value)
+                            }
+
+                            // A literal `doc` prefix without this namespace is not documentation metadata.
+                            attr.namespacePrefix != "doc" -> put(attr.qualifiedName, attr.value)
+                        }
+                    }
                 },
             children = el.children.map { toRaw(it, nsMap, locOf) },
             location = locOf(el),
@@ -161,8 +161,8 @@ class MuleXmlParser {
     private fun explicitConfigId(el: Element): String? =
         sequenceOf(
             el.getAttributeValue("name"),
-            el.attributes.firstOrNull { it.namespacePrefix == "doc" && it.name == "name" }?.value,
-            el.attributes.firstOrNull { it.namespacePrefix == "doc" && it.name == "id" }?.value,
+            el.getAttributeValue("name", documentationNamespace),
+            el.getAttributeValue("id", documentationNamespace),
         ).filterNotNull().firstOrNull { it.isNotBlank() }
 
     private fun buildNamespacePrefixMap(root: Element): Map<String, String> = root.namespacesInScope.associate { ns -> ns.uri to ns.prefix }

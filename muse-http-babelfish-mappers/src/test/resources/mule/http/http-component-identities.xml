@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:meta="http://www.mulesoft.org/schema/mule/documentation">
+    <http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config">
+        <http:listener-connection host="127.0.0.1" port="8081"/>
+    </http:listener-config>
+    <http:request-config name="HTTP_Request_config" doc:name="HTTP Request config">
+        <http:request-connection host="api.example.test"/>
+    </http:request-config>
+    <flow name="http-identity-flow" doc:id="http-flow-original">
+        <http:listener config-ref="HTTP_Listener_config" path="/" allowedMethods="POST"
+                       meta:id="http-listener-original" meta:name="HTTP Listener"/>
+        <http:request config-ref="HTTP_Request_config" path="/first" method="POST"
+                      meta:id="http-request-first" meta:name="HTTP first request"/>
+        <http:request config-ref="HTTP_Request_config" path="/second" method="PATCH"
+                      meta:id="http-request-&quot;second&quot;-$" meta:name="HTTP second request"/>
+    </flow>
+</mule>

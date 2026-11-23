@@ -43,6 +43,7 @@ object DbRowListenerMapper : SourceMapper<DbRowListenerConfig> {
 object DbRowListenerCodeEmitter : SourceCodeEmitter<DbRowListenerConfig> {
     override fun emit(source: DbRowListenerConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
         beginControlFlow("%M(%L)", dbDsl("dbListener"), source.configRef.code())
+        addStatement("docId = %L", kotlinStringLiteral(source.docId))
         addStatement("table = %L", kotlinStringLiteral(source.table))
         source.watermarkColumn?.let { addStatement("watermarkColumn = %L", kotlinStringLiteral(it)) }
         source.idColumn?.let { addStatement("idColumn = %L", kotlinStringLiteral(it)) }
