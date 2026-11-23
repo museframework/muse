@@ -7,6 +7,16 @@
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
 
+    <http:request-config name="http-binding-fixture" doc:name="HTTP binding fixture">
+        <http:request-connection host="127.0.0.1" port="18080"/>
+        <http:default-headers>
+            <http:default-header key="header-&quot;-$-\" value="value-&quot;-$-\&#13;&#10;next"/>
+        </http:default-headers>
+        <http:default-query-params>
+            <http:query-param key="query-&quot;-$-\" value="value-&quot;-$-\&#13;&#10;next"/>
+        </http:default-query-params>
+    </http:request-config>
+
     <flow name="packaged-outbound-backend-flow" doc:id="packaged-outbound-backend-flow">
         <http:listener config-ref="packaged-listener" path="/e2e/backend" allowedMethods="POST" doc:name="Loopback backend listener"/>
         <set-payload value="Outbound response" doc:name="Set backend response"/>
@@ -30,4 +40,16 @@
         <http:listener config-ref="packaged-listener" path="/e2e/stream-failure" allowedMethods="POST" doc:name="Streaming failure listener"/>
         <http:request config-ref="packaged-loopback" path="/e2e/missing-stream-backend" method="POST" doc:name="Invoke missing streaming backend"/>
     </flow>
+
+    <sub-flow name="http-request" doc:id="http-request-import-resolution">
+        <http:request config-ref="http-binding-fixture"
+                      path="/e2e/backend"
+                      method="PATCH"
+                      requestStreamingMode="NEVER"
+                      target="httpReply"
+                      targetValue="#[message]">
+            <http:headers>#[vars.headers default {"header-\"-$-\\": "value-\"-$-\\"}]</http:headers>
+            <http:query-params>#[vars.query default {"query-\"-$-\\": "value-\"-$-\\"}]</http:query-params>
+        </http:request>
+    </sub-flow>
 </mule>

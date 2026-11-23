@@ -7,7 +7,7 @@
   </http:listener-config>
   
   <flow name="http-listener-flow" doc:name="HTTP Listener Test">
-    <http:listener config-ref="http-listener-config" path="/test" doc:name="HTTP Listener"/>
+    <http:listener config-ref="http-listener-config" path="/test" allowedMethods="GET, POST" doc:name="HTTP Listener"/>
     <set-payload value="HTTP Response" doc:name="Set Response"/>
     <logger message="#[payload]" level="INFO" doc:name="Log Response"/>
   </flow>

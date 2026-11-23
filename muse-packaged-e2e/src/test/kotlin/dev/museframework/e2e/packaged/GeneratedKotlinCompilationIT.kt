@@ -5,13 +5,22 @@ import dev.museframework.dsl.api.config.MuseConfigDefinition
 import dev.museframework.dsl.api.config.RemoveVariableConfig
 import dev.museframework.dsl.api.config.SchedulerConfig
 import dev.museframework.dsl.api.config.SetPayloadConfig
+import dev.museframework.dsl.api.config.TargetConfig
 import dev.museframework.dsl.api.config.TransformConfig
 import dev.museframework.dsl.api.config.WithCorrelationIdConfig
 import dev.museframework.dsl.api.expression.DwExpression
+import dev.museframework.dsl.api.model.config.ConfigRef
 import dev.museframework.e2e.packaged.generated.ComponentIdentityConfig
+import dev.museframework.e2e.packaged.generated.ConnectionsConfig
 import dev.museframework.e2e.packaged.generated.CoreFlowControlConfig
 import dev.museframework.e2e.packaged.generated.CrossFileSubflowConfig
+import dev.museframework.e2e.packaged.generated.OutboundRequestConfig
 import dev.museframework.e2e.packaged.generated.SimpleEchoConfig
+import dev.museframework.http.api.config.ConnectionConfigRef
+import dev.museframework.http.api.config.HttpListenerConfig
+import dev.museframework.http.api.config.HttpRequestConfig
+import dev.museframework.http.api.config.HttpStreamingMode
+import dev.museframework.http.api.model.HttpMethod
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Modifier
 import kotlin.test.assertEquals
@@ -123,6 +132,59 @@ class GeneratedKotlinCompilationIT {
         val expected = "%dw 2.0\r\noutput application/json\n---\n" +
             """{ labels: ["$(vars.outer ++ "$(vars.inner)")", "quote: \"ok\""] }"""
         assertEquals(expected, payload.expression)
+    }
+
+    @Test
+    fun `compiled Kotlin resolves the HTTP request extension alongside its namesake flow property`() {
+        val generated = OutboundRequestConfig()
+        val request = assertIs<HttpRequestConfig>(generated.httpRequest.pipeline.single())
+
+        assertEquals("/e2e/backend", request.path)
+        assertEquals(HttpMethod.PATCH, request.method)
+        assertEquals(HttpStreamingMode.NEVER, request.requestStreamingMode)
+        assertEquals(TargetConfig("httpReply", "#[{payload: payload, attributes: attributes}]"), request.targetConfig)
+        val dollar = '$'
+        assertEquals(
+            """#[vars.headers default {"header-\"-${dollar}-\\": "value-\"-${dollar}-\\"}]""",
+            request.headersExpression,
+        )
+        assertEquals(
+            """#[vars.query default {"query-\"-${dollar}-\\": "value-\"-${dollar}-\\"}]""",
+            request.queryParamsExpression,
+        )
+    }
+
+    @Test
+    fun `compiled HTTP request connection preserves exact default names and values`() {
+        val generated = OutboundRequestConfig()
+        val connection = generated.httpBindingFixture
+        val request = assertIs<HttpRequestConfig>(generated.httpRequest.pipeline.single())
+        val requestRef = assertIs<ConfigRef.ByName>(request.connectionConfig)
+
+        assertEquals("http-binding-fixture", requestRef.name)
+        assertEquals(connection.name, requestRef.name)
+        val value = "value-\"-\$-\\\r\nnext"
+        assertEquals(mapOf("header-\"-\$-\\" to value), connection.defaultHeaders)
+        assertEquals(mapOf("query-\"-\$-\\" to value), connection.defaultQueryParams)
+    }
+
+    @Test
+    fun `compiled listener and request references match connection names across files`() {
+        val connections = ConnectionsConfig()
+        val flow = OutboundRequestConfig().packagedOutboundProxyFlow
+        val listener = assertIs<HttpListenerConfig>(flow.source)
+        val request = assertIs<HttpRequestConfig>(flow.pipeline.single())
+
+        val listenerRef = assertIs<ConnectionConfigRef.ByName>(listener.connectionConfigRef)
+        val requestRef = assertIs<ConfigRef.ByName>(request.connectionConfig)
+
+        assertEquals("packaged-listener", listenerRef.name)
+        assertEquals(connections.packagedListener.name, listenerRef.name)
+        assertEquals("Packaged listener", connections.packagedListener.docName)
+        assertEquals(listOf(HttpMethod.POST), listener.allowedMethods)
+        assertEquals("packaged-loopback", requestRef.name)
+        assertEquals(connections.packagedLoopback.name, requestRef.name)
+        assertEquals("Packaged loopback request", connections.packagedLoopback.docName)
     }
 
     private fun loadGeneratedClass(simpleName: String): Class<*> =

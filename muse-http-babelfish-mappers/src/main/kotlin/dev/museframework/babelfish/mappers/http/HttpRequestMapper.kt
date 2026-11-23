@@ -1,15 +1,19 @@
 package dev.museframework.babelfish.mappers.http
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.babelfish.model.RawElement
-import dev.museframework.dsl.api.model.config.ConfigRef
 import dev.museframework.dsl.api.config.TargetConfig
+import dev.museframework.dsl.api.model.config.ConfigRef
 import dev.museframework.http.api.config.HttpRequestConfig
 import dev.museframework.http.api.config.HttpRequestConnectionConfig
 import dev.museframework.http.api.config.HttpSendBodyMode
@@ -78,51 +82,53 @@ object HttpRequestMapper : ElementMapper<HttpRequestConfig> {
         )
 }
 
+private val httpRequestConnection = MemberName("dev.museframework.http.api.dsl", "httpRequestConnection")
+private val httpRequest = MemberName("dev.museframework.http.api.dsl", "httpRequest", isExtension = true)
+
 object HttpRequestConnectionConfigCodeEmitter : ConfigCodeEmitter<HttpRequestConnectionConfig> {
     override fun emit(
         config: HttpRequestConnectionConfig,
         ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.http.api.config.HttpSendBodyMode")
-        ctx.addImport("dev.museframework.http.api.config.HttpStreamingMode")
-        ctx.addImport("dev.museframework.http.api.config.SendCorrelationId")
-        ctx.addImport("dev.museframework.http.api.dsl.httpRequestConnection")
-        ctx.addImport("dev.museframework.http.api.model.HttpProtocol")
-        return buildString {
-            appendLine("httpRequestConnection {")
-            appendLine("    name = \"${ctx.escapeKotlinString(config.name)}\"")
-            appendLine("    docName = \"${ctx.escapeKotlinString(config.docName)}\"")
-            appendLine("    host = \"${ctx.escapeKotlinString(config.host)}\"")
-            if (config.protocol != HttpProtocol.HTTP) appendLine("    protocol = HttpProtocol.${config.protocol}")
-            appendLine("    port = ${config.port}")
-            config.portExpression?.let { appendLine("    portExpression = \"${ctx.escapeKotlinString(it)}\"") }
-            if (config.basePath != "/") appendLine("    basePath = \"${ctx.escapeKotlinString(config.basePath)}\"")
-            if (config.connectionTimeoutMs != 30000L) appendLine("    connectionTimeoutMs = ${config.connectionTimeoutMs}")
-            if (config.connectionIdleTimeoutMs != 30000L) {
-                appendLine("    connectionIdleTimeoutMs = ${config.connectionIdleTimeoutMs}")
-            }
-            if (config.responseTimeoutMs != 30000L) appendLine("    responseTimeoutMs = ${config.responseTimeoutMs}")
-            if (!config.followRedirects) appendLine("    followRedirects = false")
-            if (!config.usePersistentConnections) appendLine("    usePersistentConnections = false")
-            if (config.maxConnections != -1) appendLine("    maxConnections = ${config.maxConnections}")
-            if (!config.enableCookies) appendLine("    enableCookies = false")
-            if (config.sendCorrelationId != SendCorrelationId.AUTO) {
-                appendLine("    sendCorrelationId = SendCorrelationId.${config.sendCorrelationId}")
-            }
-            if (config.sendBodyMode != HttpSendBodyMode.AUTO) {
-                appendLine("    sendBodyMode = HttpSendBodyMode.${config.sendBodyMode}")
-            }
-            if (config.requestStreamingMode != HttpStreamingMode.AUTO) {
-                appendLine("    requestStreamingMode = HttpStreamingMode.${config.requestStreamingMode}")
-            }
-            config.defaultHeaders.forEach { (name, value) ->
-                appendLine("    defaultHeader(\"${ctx.escapeKotlinString(name)}\", \"${ctx.escapeKotlinString(value)}\")")
-            }
-            config.defaultQueryParams.forEach { (name, value) ->
-                appendLine("    defaultQueryParam(\"${ctx.escapeKotlinString(name)}\", \"${ctx.escapeKotlinString(value)}\")")
-            }
-            append("}")
+    ): CodeBlock = buildCodeBlock {
+        add("%M {\n", httpRequestConnection)
+        indent()
+        addStatement("name = %L", kotlinStringLiteral(config.name))
+        addStatement("docName = %L", kotlinStringLiteral(config.docName))
+        addStatement("host = %L", kotlinStringLiteral(config.host))
+        if (config.protocol != HttpProtocol.HTTP) {
+            addStatement("protocol = %T.%N", HttpProtocol::class, config.protocol.name)
         }
+        addStatement("port = %L", config.port)
+        config.portExpression?.let { addStatement("portExpression = %L", kotlinStringLiteral(it)) }
+        if (config.basePath != "/") addStatement("basePath = %L", kotlinStringLiteral(config.basePath))
+        if (config.connectionTimeoutMs != 30000L) {
+            addStatement("connectionTimeoutMs = %L", config.connectionTimeoutMs)
+        }
+        if (config.connectionIdleTimeoutMs != 30000L) {
+            addStatement("connectionIdleTimeoutMs = %L", config.connectionIdleTimeoutMs)
+        }
+        if (config.responseTimeoutMs != 30000L) addStatement("responseTimeoutMs = %L", config.responseTimeoutMs)
+        if (!config.followRedirects) addStatement("followRedirects = false")
+        if (!config.usePersistentConnections) addStatement("usePersistentConnections = false")
+        if (config.maxConnections != -1) addStatement("maxConnections = %L", config.maxConnections)
+        if (!config.enableCookies) addStatement("enableCookies = false")
+        if (config.sendCorrelationId != SendCorrelationId.AUTO) {
+            addStatement("sendCorrelationId = %T.%N", SendCorrelationId::class, config.sendCorrelationId.name)
+        }
+        if (config.sendBodyMode != HttpSendBodyMode.AUTO) {
+            addStatement("sendBodyMode = %T.%N", HttpSendBodyMode::class, config.sendBodyMode.name)
+        }
+        if (config.requestStreamingMode != HttpStreamingMode.AUTO) {
+            addStatement("requestStreamingMode = %T.%N", HttpStreamingMode::class, config.requestStreamingMode.name)
+        }
+        config.defaultHeaders.forEach { (name, value) ->
+            addStatement("defaultHeader(%L, %L)", kotlinStringLiteral(name), kotlinStringLiteral(value))
+        }
+        config.defaultQueryParams.forEach { (name, value) ->
+            addStatement("defaultQueryParam(%L, %L)", kotlinStringLiteral(name), kotlinStringLiteral(value))
+        }
+        unindent()
+        add("}")
     }
 }
 
@@ -130,66 +136,55 @@ object HttpRequestCodeEmitter : ElementCodeEmitter<HttpRequestConfig> {
     override fun emit(
         element: HttpRequestConfig,
         ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.http.api.config.HttpSendBodyMode")
-        ctx.addImport("dev.museframework.http.api.config.HttpStreamingMode")
-        ctx.addImport("dev.museframework.http.api.config.SendCorrelationId")
-        ctx.addImport("dev.museframework.http.api.dsl.httpRequest")
-        ctx.addImport("dev.museframework.http.api.dsl.httpRequestConnection")
-        ctx.addImport("dev.museframework.http.api.model.HttpMethod")
-        element.targetConfig?.let { ctx.addImport("dev.museframework.dsl.api.config.TargetConfig") }
-
-        val configRef =
-            when (val ref = element.connectionConfig) {
-                is ConfigRef.ByReference ->
-                    HttpRequestConnectionConfigCodeEmitter.emit(ref.config as HttpRequestConnectionConfig, ctx)
-                is ConfigRef.ByName -> "httpRequestConnection(\"${ctx.escapeKotlinString(ref.name)}\")"
-            }
-
-        return buildString {
-            appendLine("httpRequest($configRef) {")
-            element.url?.let { url ->
-                appendLine("    url = \"${ctx.escapeKotlinString(url)}\"")
-            } ?: appendLine("    path = \"${ctx.escapeKotlinString(element.path)}\"")
-            if (element.method != HttpMethod.GET) appendLine("    method = HttpMethod.${element.method}")
-            element.headers.forEach { (name, value) ->
-                appendLine("    header(\"${ctx.escapeKotlinString(name)}\", \"${ctx.escapeKotlinString(value)}\")")
-            }
-            element.queryParams.forEach { (name, value) ->
-                appendLine("    queryParam(\"${ctx.escapeKotlinString(name)}\", \"${ctx.escapeKotlinString(value)}\")")
-            }
-            element.uriParams.forEach { (name, value) ->
-                appendLine("    uriParam(\"${ctx.escapeKotlinString(name)}\", \"${ctx.escapeKotlinString(value)}\")")
-            }
-            element.headersExpression?.let {
-                appendLine("    headersExpression = \"${ctx.escapeKotlinString(it)}\"")
-            }
-            element.queryParamsExpression?.let {
-                appendLine("    queryParamsExpression = \"${ctx.escapeKotlinString(it)}\"")
-            }
-            element.uriParamsExpression?.let {
-                appendLine("    uriParamsExpression = \"${ctx.escapeKotlinString(it)}\"")
-            }
-            element.body?.let { appendLine("    body = \"${ctx.escapeKotlinString(it)}\"") }
-            element.responseTimeoutMs?.let { appendLine("    responseTimeoutMs = $it") }
-            element.followRedirects?.let { appendLine("    followRedirects = $it") }
-            element.sendBodyMode?.let { appendLine("    sendBodyMode = HttpSendBodyMode.$it") }
-            element.requestStreamingMode?.let { appendLine("    requestStreamingMode = HttpStreamingMode.$it") }
-            element.sendCorrelationId?.let { appendLine("    sendCorrelationId = SendCorrelationId.$it") }
-            element.correlationId?.let {
-                appendLine("    correlationId = \"${ctx.escapeKotlinString(it)}\"")
-            }
-            element.targetConfig?.let { target ->
-                append("    targetConfig = TargetConfig(\"${ctx.escapeKotlinString(target.target)}\"")
-                target.targetValue?.let { value ->
-                    val expression =
-                        if (value == "#[message]") "#[{payload: payload, attributes: attributes}]" else value
-                    append(", \"${ctx.escapeKotlinString(expression)}\"")
-                }
-                appendLine(")")
-            }
-            append("}")
+    ): CodeBlock = buildCodeBlock {
+        val configRef = when (val ref = element.connectionConfig) {
+            is ConfigRef.ByReference ->
+                HttpRequestConnectionConfigCodeEmitter.emit(ref.config as HttpRequestConnectionConfig, ctx)
+            is ConfigRef.ByName -> CodeBlock.of("%M(%L)", httpRequestConnection, kotlinStringLiteral(ref.name))
         }
+
+        beginControlFlow("%M(%L)", httpRequest, configRef)
+        val url = element.url
+        if (url != null) {
+            addStatement("url = %L", kotlinStringLiteral(url))
+        } else {
+            addStatement("path = %L", kotlinStringLiteral(element.path))
+        }
+        if (element.method != HttpMethod.GET) {
+            addStatement("method = %T.%N", HttpMethod::class, element.method.name)
+        }
+        element.headers.forEach { (name, value) ->
+            addStatement("header(%L, %L)", kotlinStringLiteral(name), kotlinStringLiteral(value))
+        }
+        element.queryParams.forEach { (name, value) ->
+            addStatement("queryParam(%L, %L)", kotlinStringLiteral(name), kotlinStringLiteral(value))
+        }
+        element.uriParams.forEach { (name, value) ->
+            addStatement("uriParam(%L, %L)", kotlinStringLiteral(name), kotlinStringLiteral(value))
+        }
+        element.headersExpression?.let { addStatement("headersExpression = %L", kotlinStringLiteral(it)) }
+        element.queryParamsExpression?.let { addStatement("queryParamsExpression = %L", kotlinStringLiteral(it)) }
+        element.uriParamsExpression?.let { addStatement("uriParamsExpression = %L", kotlinStringLiteral(it)) }
+        element.body?.let { addStatement("body = %L", kotlinStringLiteral(it)) }
+        element.responseTimeoutMs?.let { addStatement("responseTimeoutMs = %L", it) }
+        element.followRedirects?.let { addStatement("followRedirects = %L", it) }
+        element.sendBodyMode?.let { addStatement("sendBodyMode = %T.%N", HttpSendBodyMode::class, it.name) }
+        element.requestStreamingMode?.let { addStatement("requestStreamingMode = %T.%N", HttpStreamingMode::class, it.name) }
+        element.sendCorrelationId?.let { addStatement("sendCorrelationId = %T.%N", SendCorrelationId::class, it.name) }
+        element.correlationId?.let { addStatement("correlationId = %L", kotlinStringLiteral(it)) }
+        element.targetConfig?.let { target ->
+            val name = kotlinStringLiteral(target.target)
+            val expression = when (val value = target.targetValue) {
+                "#[message]" -> "#[{payload: payload, attributes: attributes}]"
+                else -> value
+            }
+            if (expression == null) {
+                addStatement("targetConfig = %T(%L)", TargetConfig::class, name)
+            } else {
+                addStatement("targetConfig = %T(%L, %L)", TargetConfig::class, name, kotlinStringLiteral(expression))
+            }
+        }
+        endControlFlow()
     }
 }
 

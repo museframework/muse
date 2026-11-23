@@ -8,6 +8,8 @@ assert configFiles.size() == 1 : "Expected one generated HTTP listener config, g
 def generatedCode = configFiles[0].text
 assert generatedCode.contains('httpListenerConnection("http-listener-config")') : "HTTP listener connection missing"
 assert generatedCode.contains('host = "0.0.0.0"') : "HTTP listener host missing"
-assert generatedCode.contains('port = 8081') : "HTTP listener port missing"
+assert generatedCode.contains('port = 8_081') : "HTTP listener port missing"
 assert generatedCode.contains('httpListener("http-listener-config")') : "HTTP listener source missing"
 assert generatedCode.contains('path = "/test"') : "HTTP listener path missing"
+assert generatedCode.contains('import dev.museframework.http.api.dsl.httpListener\n') : "HTTP listener extension import missing"
+assert generatedCode.contains('allowedMethods = listOf(HttpMethod.GET, HttpMethod.POST)') : "HTTP listener methods missing"
