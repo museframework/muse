@@ -14,12 +14,13 @@ internal fun <K, T> MutableMap<K, OwnedRegistration<T>>.registerIfAbsent(
     category: String,
     value: T,
     owner: BabelfishRegistrationOwner,
+    implementationClass: String = value!!::class.java.name,
 ) {
     val incoming =
         OwnedRegistration(
             value = value,
             owner = owner,
-            implementationClass = value!!::class.java.name,
+            implementationClass = implementationClass,
         )
     val existing = putIfAbsent(key, incoming) ?: return
 

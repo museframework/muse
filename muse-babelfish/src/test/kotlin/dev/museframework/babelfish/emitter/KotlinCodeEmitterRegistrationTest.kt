@@ -87,6 +87,8 @@ class KotlinCodeEmitterRegistrationTest {
                 }
             }
         assertEquals("configuration emitter", configException.category)
+        assertEquals(FirstConfigEmitter::class.java.name, configException.existingRegistrationClass)
+        assertEquals(SecondConfigEmitter::class.java.name, configException.incomingRegistrationClass)
     }
 
     @Test

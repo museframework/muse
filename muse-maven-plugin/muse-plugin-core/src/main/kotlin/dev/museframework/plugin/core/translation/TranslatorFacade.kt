@@ -11,7 +11,7 @@ import dev.museframework.plugin.core.codegen.GeneratedFile
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
-import java.util.Locale
+import java.util.TreeMap
 
 class TranslatorFacade(
     private val registry: TranslatorRegistry = TranslatorRegistry.load(),
@@ -42,11 +42,11 @@ class TranslatorFacade(
         }
 
         log.info("Translating ${xmlFiles.size} XML file(s) from $sourceDirectory")
-        val outputOwners = mutableMapOf<String, File>()
+        val outputOwners = TreeMap<String, File>(String.CASE_INSENSITIVE_ORDER)
         return xmlFiles.sorted().map { source ->
             val result = translateFile(source, packageName, configurationClassSpec, nativeBuild, lenient)
             for (output in result.generatedFiles) {
-                val portablePath = output.relativePath.replace('\\', '/').lowercase(Locale.ROOT)
+                val portablePath = output.relativePath.replace('\\', '/')
                 val previous = outputOwners.putIfAbsent(portablePath, source)
                 if (previous != null) {
                     throw MuseTranslationException(

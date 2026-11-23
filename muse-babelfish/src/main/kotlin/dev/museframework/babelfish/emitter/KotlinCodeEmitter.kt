@@ -73,6 +73,7 @@ class KotlinCodeEmitter {
             "configuration emitter",
             ConfigEmitterRegistration(emitter, generatedType),
             registrationOwner,
+            implementationClass = emitter.javaClass.name,
         )
     }
 
