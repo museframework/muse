@@ -1,5 +1,7 @@
 package dev.museframework.babelfish.mappers.sftp
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.FileSpec
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
@@ -19,6 +21,7 @@ import dev.museframework.sftp.api.config.SftpReadConfig
 import dev.museframework.sftp.api.config.SftpRenameConfig
 import dev.museframework.sftp.api.config.SftpWriteConfig
 import dev.museframework.sftp.api.model.SftpFileType
+import dev.museframework.sftp.api.model.SftpPostAction
 import dev.museframework.sftp.api.model.SftpWriteMode
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
@@ -29,6 +32,11 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 class SftpOperationMapperTest {
+    private fun CodeBlock.render(): String = FileSpec.scriptBuilder("Fixture", "com.example")
+        .addCode(this)
+        .build()
+        .toString()
+
     private val registry = BabelfishRegistry().apply { SftpMapperProvider().registerMappings(this) }
     private val mappingContext = MappingContext(registry, SOURCE_FILE)
 
@@ -38,7 +46,7 @@ class SftpOperationMapperTest {
             operation("write", mapOf("config-ref" to "C", "path" to "/output", "mode" to "#[vars.sftpWriteMode]")),
             mappingContext,
         )
-        val code = SftpWriteCodeEmitter.emit(mapped, CodegenContext("com.example"))
+        val code = SftpWriteCodeEmitter.emit(mapped, CodegenContext("com.example")).render()
         assertContains(code, "modeExpression = \"#[vars.sftpWriteMode]\"")
         assertFalse(code.contains("SftpWriteMode.#["))
     }
@@ -103,7 +111,7 @@ class SftpOperationMapperTest {
         assertEquals("application/csv; separator=|; streaming=true; header=false", mapped.outputMimeType)
         assertEquals("listener-csv-id", mapped.docId)
         assertEquals(true, mapped.nonRepeatable)
-        val code = SftpListenerCodeEmitter.emit(mapped, CodegenContext("com.example"))
+        val code = SftpListenerCodeEmitter.emit(mapped, CodegenContext("com.example")).render()
         assertContains(code, "outputMimeType = \"application/csv; separator=|; streaming=true; header=false\"")
         assertContains(code, "docName = \"Incoming CSV\"")
         assertContains(code, "docId = \"listener-csv-id\"")
@@ -144,6 +152,32 @@ class SftpOperationMapperTest {
 
         assertIs<SftpListenerConfig>(mapped)
         assertEquals(false, mapped.applyPostActionOnFailure)
+        assertEquals(false, mapped.watermarkEnabled)
+        assertEquals(SftpPostAction.None, mapped.postAction)
+        assertEquals(1_000L, mapped.pollIntervalMs)
+        val code = SftpListenerCodeEmitter.emit(mapped, CodegenContext("com.example")).render()
+        assertContains(code, "watermarkEnabled = false")
+        assertFalse(code.contains("pollIntervalMs"))
+        assertFalse(code.contains("AfterProcessing("))
+    }
+
+    @Test
+    fun `auto delete takes precedence over move and honors post action on failure`() {
+        val mapped = SftpListenerMapper.map(
+            operation("listener", mapOf(
+                "config-ref" to "C",
+                "autoDelete" to "true",
+                "moveToDirectory" to "/unused",
+                "applyPostActionWhenFailed" to "true",
+            )),
+            mappingContext,
+        )
+
+        assertEquals(SftpPostAction.Delete, mapped.postAction)
+        val code = SftpListenerCodeEmitter.emit(mapped, CodegenContext("com.example")).render()
+        assertContains(code, "deleteAfterProcessing()")
+        assertContains(code, "applyPostActionOnFailure = true")
+        assertFalse(code.contains("moveAfterProcessing("))
     }
 
     @Test
@@ -273,12 +307,12 @@ class SftpOperationMapperTest {
         )
 
         val ctx = CodegenContext("com.example")
-        assertContains(SftpReadCodeEmitter.emit(read, ctx), "path = \"/a.txt\"")
-        assertContains(SftpWriteCodeEmitter.emit(write, ctx), "mode = SftpWriteMode.APPEND")
-        assertContains(SftpListCodeEmitter.emit(list, ctx), "filenamePattern = \"regex:.*\\\\.csv\"")
-        assertContains(SftpCopyCodeEmitter.emit(copy, ctx), "targetDirectory = \"/dst\"")
-        assertContains(SftpCopyCodeEmitter.emit(copy, ctx), "renameTo = \"b.txt\"")
-        assertContains(SftpMoveCodeEmitter.emit(move, ctx), "createParentDirectories = false")
+        assertContains(SftpReadCodeEmitter.emit(read, ctx).render(), "path = \"/a.txt\"")
+        assertContains(SftpWriteCodeEmitter.emit(write, ctx).render(), "mode = SftpWriteMode.APPEND")
+        assertContains(SftpListCodeEmitter.emit(list, ctx).render(), "filenamePattern = \"regex:.*\\\\.csv\"")
+        assertContains(SftpCopyCodeEmitter.emit(copy, ctx).render(), "targetDirectory = \"/dst\"")
+        assertContains(SftpCopyCodeEmitter.emit(copy, ctx).render(), "renameTo = \"b.txt\"")
+        assertContains(SftpMoveCodeEmitter.emit(move, ctx).render(), "createParentDirectories = false")
         assertContains(
             SftpDeleteCodeEmitter.emit(
                 SftpDeleteConfig(
@@ -286,21 +320,21 @@ class SftpOperationMapperTest {
                     path = "/gone.txt",
                 ),
                 ctx,
-            ),
+            ).render(),
             "path = \"/gone.txt\"",
         )
         assertContains(
             SftpRenameCodeEmitter.emit(
                 SftpRenameConfig(connection = copy.connection, path = "/old.txt", newName = "new.txt"),
                 ctx,
-            ),
+            ).render(),
             "newName = \"new.txt\"",
         )
         assertContains(
             SftpCreateDirectoryCodeEmitter.emit(
                 SftpCreateDirectoryConfig(connection = copy.connection, directoryPath = "/new"),
                 ctx,
-            ),
+            ).render(),
             "directoryPath = \"/new\"",
         )
     }
@@ -395,46 +429,43 @@ class SftpOperationMapperTest {
         val targetOnly = TargetConfig(target = "listing", targetValue = null)
         val escaped = TargetConfig(target = "result\"\$name", targetValue = "#[\"line one\\n\$payload\"]")
 
-        val readWithValueCtx = CodegenContext("com.example")
+        val ctx = CodegenContext("com.example")
         val readWithValueCode =
             SftpReadCodeEmitter.emit(
                 SftpReadConfig(connection = connection, path = "/a", targetConfig = withValue),
-                readWithValueCtx,
-            )
+                ctx,
+            ).render()
         assertContains(readWithValueCode, "targetConfig = TargetConfig(\"download\", \"#[payload]\")")
-        assertContains(readWithValueCtx.resolvedImports(), "dev.museframework.dsl.api.config.TargetConfig")
+        assertContains(readWithValueCode, "import dev.museframework.dsl.api.config.TargetConfig")
 
-        val listTargetOnlyCtx = CodegenContext("com.example")
         val listTargetOnlyCode =
             SftpListCodeEmitter.emit(
                 SftpListConfig(connection = connection, directoryPath = "/inbox", targetConfig = targetOnly),
-                listTargetOnlyCtx,
-            )
+                ctx,
+            ).render()
         assertContains(listTargetOnlyCode, "targetConfig = TargetConfig(\"listing\")")
         assertFalse(listTargetOnlyCode.contains("targetConfig = TargetConfig(\"listing\","))
-        assertContains(listTargetOnlyCtx.resolvedImports(), "dev.museframework.dsl.api.config.TargetConfig")
+        assertContains(listTargetOnlyCode, "import dev.museframework.dsl.api.config.TargetConfig")
 
-        val noTargetCtx = CodegenContext("com.example")
         val noTargetCode =
-            SftpReadCodeEmitter.emit(SftpReadConfig(connection = connection, path = "/a"), noTargetCtx)
+            SftpReadCodeEmitter.emit(SftpReadConfig(connection = connection, path = "/a"), ctx).render()
         assertFalse(noTargetCode.contains("targetConfig"))
-        assertFalse(noTargetCtx.resolvedImports().contains("dev.museframework.dsl.api.config.TargetConfig"))
+        assertFalse(noTargetCode.contains("import dev.museframework.dsl.api.config.TargetConfig"))
 
-        val escapedCtx = CodegenContext("com.example")
         val escapedRead =
             SftpReadCodeEmitter.emit(
                 SftpReadConfig(connection = connection, path = "/a", targetConfig = escaped),
-                escapedCtx,
-            )
+                ctx,
+            ).render()
         val escapedList =
             SftpListCodeEmitter.emit(
                 SftpListConfig(connection = connection, directoryPath = "/inbox", targetConfig = escaped),
-                CodegenContext("com.example"),
-            )
+                ctx,
+            ).render()
         listOf(escapedRead, escapedList).forEach { code ->
             assertContains(code, "result\\\"")
-            assertContains(code, "\\\$name")
-            assertContains(code, "\\\$payload")
+            assertContains(code, "\${'\$'}name")
+            assertContains(code, "\${'\$'}payload")
             assertContains(code, "\\\\n")
         }
     }

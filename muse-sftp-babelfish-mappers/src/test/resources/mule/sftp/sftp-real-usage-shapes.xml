@@ -9,7 +9,9 @@
                          port="22"
                          username="exchange"
                          identityFile="/keys/client.pem"
-                         workingDir="/exchange"/>
+                         passphrase="${test.key.passphrase}"
+                         knownHostsFile="/keys/known hosts"
+                         workingDir="/exchange\$batch/&quot;daily&quot;"/>
     </sftp:config>
 
     <flow name="sftp-real-usage-shapes">

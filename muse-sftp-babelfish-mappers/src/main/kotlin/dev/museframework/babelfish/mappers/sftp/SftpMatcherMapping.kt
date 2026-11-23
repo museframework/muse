@@ -1,6 +1,7 @@
 package dev.museframework.babelfish.mappers.sftp
 
-import dev.museframework.babelfish.emitter.CodegenContext
+import com.squareup.kotlinpoet.CodeBlock
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.sftp.api.model.SftpFileMatcher
@@ -37,30 +38,16 @@ internal fun mapSftpMatcher(
     )
 }
 
-internal fun StringBuilder.appendSftpMatcherAssignment(
-    property: String,
-    matcher: SftpFileMatcher,
-    default: SftpFileMatcher,
-    ctx: CodegenContext,
-    indent: String = "    ",
-) {
+internal fun CodeBlock.Builder.addMatcher(matcher: SftpFileMatcher, default: SftpFileMatcher) {
     if (matcher == default) return
-    ctx.addImport("dev.museframework.sftp.api.model.SftpFileMatcher")
-    ctx.addImport("dev.museframework.sftp.api.model.SftpFileType")
-    appendLine("$indent$property = SftpFileMatcher(")
-    matcher.filenamePattern?.let {
-        appendLine("$indent    filenamePattern = \"${ctx.escapeKotlinString(it)}\",")
-    }
-    matcher.pathPattern?.let {
-        appendLine("$indent    pathPattern = \"${ctx.escapeKotlinString(it)}\",")
-    }
-    if (matcher.fileType != SftpFileType.ANY) {
-        appendLine("$indent    fileType = SftpFileType.${matcher.fileType},")
-    }
-    matcher.minSize?.let { appendLine("$indent    minSize = $it,") }
-    matcher.maxSize?.let { appendLine("$indent    maxSize = $it,") }
-    if (!matcher.caseSensitive) {
-        appendLine("$indent    caseSensitive = false,")
-    }
-    appendLine("$indent)")
+    add("matcher = %T(\n", SftpFileMatcher::class)
+    indent()
+    matcher.filenamePattern?.let { add("filenamePattern = %L,\n", kotlinStringLiteral(it)) }
+    matcher.pathPattern?.let { add("pathPattern = %L,\n", kotlinStringLiteral(it)) }
+    if (matcher.fileType != SftpFileType.ANY) add("fileType = %T.%N,\n", SftpFileType::class, matcher.fileType.name)
+    matcher.minSize?.let { add("minSize = %L,\n", it) }
+    matcher.maxSize?.let { add("maxSize = %L,\n", it) }
+    if (!matcher.caseSensitive) add("caseSensitive = false,\n")
+    unindent()
+    add(")\n")
 }
