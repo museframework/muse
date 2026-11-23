@@ -1,10 +1,10 @@
 package dev.museframework.babelfish.mappers.apikit
 
 import dev.museframework.apikit.api.config.ApikitConfig
+import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
 import dev.museframework.babelfish.mapper.MappingContext
-import dev.museframework.babelfish.mapper.TranslationResult
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.babelfish.model.SourceLocation
 import dev.museframework.babelfish.spi.BabelfishMapperProvider
@@ -58,20 +58,17 @@ class ApikitMapperProviderTest {
 
     @Test
     fun `provider registers apikit emitters on independent emitters`() {
-        repeat(2) {
-            val registry = BabelfishRegistry().apply { ApikitMapperProvider().registerMappings(this) }
-            val rawConfig = apikitConfig()
-            val mapper = registry.resolveConfig(rawConfig, SOURCE_FILE)
-            val config = mapper.map(rawConfig, MappingContext(registry, SOURCE_FILE))
-            val translationResult =
-                TranslationResult(
-                    sourceFile = SOURCE_FILE,
-                    flows = emptyList(),
-                    usedConfigs = mapOf("api-spec-config" to config),
-                )
-            val emitter = KotlinCodeEmitter().apply { ApikitMapperProvider().registerEmitters(this) }
+        val provider = ApikitMapperProvider()
+        val registry = BabelfishRegistry().apply { provider.registerMappings(this) }
+        val fixture = Path.of("src/test/resources/mule/apikit/apikit-router.xml")
+        val result = MuseBabelfish.translateXmlToMuseKotlinDsl(fixture, registry, lenient = true)
 
-            assertContains(emitter.emit(translationResult, "com.example"), "apikitConfig {")
+        repeat(2) {
+            val emitter = KotlinCodeEmitter().apply { provider.registerEmitters(this) }
+            val code = emitter.emit(result, "com.example")
+
+            assertContains(code, "apikitConfig {")
+            assertContains(code, "apikit(\"orders-api\") {")
         }
     }
 

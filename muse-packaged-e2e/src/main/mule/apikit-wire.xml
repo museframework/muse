@@ -11,7 +11,8 @@
         http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
         http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 
-    <apikit:config name="wire-api" api="api/apikit-wire.raml"/>
+    <apikit:config name="wire-api" api="api/apikit-$wire.raml"
+                   doc:description="Wire &quot;API&quot;&#13;&#10;routes"/>
 
     <flow name="packaged-apikit-wire">
         <http:listener config-ref="packaged-listener" path="/e2e/apikit/*">

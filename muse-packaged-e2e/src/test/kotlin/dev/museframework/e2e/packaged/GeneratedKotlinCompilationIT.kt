@@ -1,5 +1,7 @@
 package dev.museframework.e2e.packaged
 
+import dev.museframework.apikit.api.config.ApikitRef
+import dev.museframework.apikit.api.config.ApikitRouter
 import dev.museframework.dsl.api.config.ChoiceConfig
 import dev.museframework.dsl.api.config.MuseConfigDefinition
 import dev.museframework.dsl.api.config.RemoveVariableConfig
@@ -10,6 +12,7 @@ import dev.museframework.dsl.api.config.TransformConfig
 import dev.museframework.dsl.api.config.WithCorrelationIdConfig
 import dev.museframework.dsl.api.expression.DwExpression
 import dev.museframework.dsl.api.model.config.ConfigRef
+import dev.museframework.e2e.packaged.generated.ApikitWireConfig
 import dev.museframework.e2e.packaged.generated.ComponentIdentityConfig
 import dev.museframework.e2e.packaged.generated.ConnectionsConfig
 import dev.museframework.e2e.packaged.generated.CoreFlowControlConfig
@@ -24,6 +27,7 @@ import dev.museframework.http.api.model.HttpMethod
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Modifier
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -58,6 +62,19 @@ class GeneratedKotlinCompilationIT {
         assertTrue(Modifier.isPublic(mainMethod.modifiers))
         assertTrue(Modifier.isStatic(mainMethod.modifiers))
         assertEquals(Void.TYPE, mainMethod.returnType)
+    }
+
+    @Test
+    fun `compiled APIKit router binds to the original config name and classpath RAML`() {
+        val generated = ApikitWireConfig()
+        val config = generated.wireApi
+        val router = assertIs<ApikitRouter>(generated.packagedApikitWire.pipeline.single())
+
+        assertEquals("wire-api", config.name)
+        assertEquals("api/apikit-\$wire.raml", config.spec)
+        assertEquals("Wire \"API\"\r\nroutes", config.docDescription)
+        assertFalse(config.disableValidations)
+        assertEquals(config.name, assertIs<ApikitRef.ByName>(router.configRef).name)
     }
 
     @Test

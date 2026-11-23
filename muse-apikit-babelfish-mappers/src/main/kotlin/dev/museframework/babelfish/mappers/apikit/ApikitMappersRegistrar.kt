@@ -4,7 +4,6 @@ import dev.museframework.apikit.api.config.ApikitConfig
 import dev.museframework.apikit.api.config.ApikitRouter
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
-import dev.museframework.babelfish.strategy.CodeGenerationStrategy
 
 object ApikitMappersRegistrar {
     fun register(registry: BabelfishRegistry) {
@@ -25,13 +24,5 @@ object ApikitMappersRegistrar {
         emitter.registerElementEmitter(ApikitRouter::class, ApikitRouterCodeEmitter)
 
         // TODO: Register apikit:console emitter (optional)
-    }
-
-    fun registerKotlinPoetEmitters(strategy: CodeGenerationStrategy) {
-        // Register apikit:config KotlinPoet emitter
-        strategy.registerEmitter(ApikitConfig::class, KotlinPoetApikitConfigCodeEmitter)
-
-        // Register apikit:router KotlinPoet emitter
-        strategy.registerEmitter(ApikitRouter::class, KotlinPoetApikitRouterCodeEmitter)
     }
 }
