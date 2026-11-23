@@ -127,6 +127,15 @@ class KotlinCodeEmitterTest {
     }
 
     @Test
+    fun `preserves internal uppercase letters in generated class names`() {
+        val result = TranslationResult(Path.of("orderAPI.xml"), emptyList(), emptyMap())
+
+        val code = KotlinCodeEmitter().emit(result, "com.example")
+
+        assertContains(code, "class OrderAPIConfig")
+    }
+
+    @Test
     fun `config emitter declares its public generated type independently of the mapped model`() {
         val emitter = KotlinCodeEmitter()
         emitter.registerConfigEmitter(
