@@ -12,4 +12,13 @@
             <remove-variable variableName="temporary" meta:id="remove-identity"/>
         </with-correlation-id>
     </flow>
+    <sub-flow name="literal-values" meta:id="literal-values">
+        <set-payload value="" meta:id="literal-empty"/>
+        <set-payload value="first&#13;&#10;last&#13;&#10;" meta:id="literal-crlf"/>
+        <set-payload value="&#10;|margin&#10;" meta:id="literal-margin"/>
+        <set-payload value="first&#13;last" meta:id="literal-cr"/>
+        <set-payload value="tab&#9;here" meta:id="literal-tab"/>
+        <set-payload value="&quot;quote&quot; &quot;&quot;&quot;" meta:id="literal-quotes"/>
+        <set-payload value="back\slash $ ${literal} 100% &#x1F642;" meta:id="literal-symbols"/>
+    </sub-flow>
 </mule>

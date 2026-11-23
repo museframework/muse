@@ -95,6 +95,24 @@ class GeneratedKotlinCompilationIT {
         assertEquals("temporary", remove.variableName)
     }
 
+    @Test
+    fun `compiled Kotlin preserves exact payload values`() {
+        val values = ComponentIdentityConfig().literalValues.pipeline.map { assertIs<SetPayloadConfig>(it).value }
+
+        assertEquals(
+            listOf(
+                "",
+                "first\r\nlast\r\n",
+                "\n|margin\n",
+                "first\rlast",
+                "tab\there",
+                "\"quote\" \"\"\"",
+                "back\\slash \$ \${literal} 100% \uD83D\uDE42",
+            ),
+            values,
+        )
+    }
+
     private fun loadGeneratedClass(simpleName: String): Class<*> =
         Class.forName("$GENERATED_PACKAGE.$simpleName")
 

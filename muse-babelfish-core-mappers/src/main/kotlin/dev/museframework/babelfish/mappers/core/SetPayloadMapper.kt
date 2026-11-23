@@ -3,6 +3,7 @@ package dev.museframework.babelfish.mappers.core
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.SetPayloadConfig
@@ -27,7 +28,7 @@ object SetPayloadCodeEmitter : ElementCodeEmitter<SetPayloadConfig> {
         val codeBlock = CodeBlock.builder().apply {
             add("setPayload·{\n")
             addDocumentation(element, ctx)
-            add("    value·=·%S\n", element.value)
+            add("    value·=·%L\n", kotlinStringLiteral(element.value))
             element.mimeType?.let { add("    mimeType·=·%S\n", it) }
             element.encoding?.let { add("    encoding·=·%S\n", it) }
             add("}")
