@@ -1,0 +1,3 @@
+<mule xmlns="http://www.mulesoft.org/schema/mule/core">
+    <flow name="valid"><set-payload value="ok"/></flow>
+</mule>

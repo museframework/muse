@@ -52,20 +52,6 @@ class CodegenContext internal constructor(
 
     internal fun missingEmitter(category: String, model: Any): Nothing =
         throw MissingEmitterException(category, model.javaClass, sourceFile, currentFlow)
-
-    /**
-     * Escapes a string for use in Kotlin double-quoted string literals.
-     * This also handles whitespace preserved by XML character references.
-     */
-    fun escapeKotlinString(value: String): String {
-        return value
-            .replace("\\", "\\\\")  // Backslash first!
-            .replace("\"", "\\\"")   // Double quote
-            .replace("$", "\\$")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-    }
 }
 
 internal val IDENTIFIER_SEPARATORS = Regex("[^\\p{L}\\p{N}]+")

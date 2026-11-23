@@ -1,0 +1,3 @@
+<mule xmlns="http://www.mulesoft.org/schema/mule/core">
+    <flow name="duplicate"><set-payload value="test"/></flow>
+</mule>
