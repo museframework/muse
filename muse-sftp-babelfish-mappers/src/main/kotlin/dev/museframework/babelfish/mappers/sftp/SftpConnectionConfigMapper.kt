@@ -10,6 +10,7 @@ import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.sftp.api.config.SftpConnectionConfig
 import dev.museframework.sftp.api.config.SftpHostKeyChecking
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 object SftpConnectionConfigMapper : ConfigMapper {
@@ -36,6 +37,7 @@ object SftpConnectionConfigMapper : ConfigMapper {
         return SftpConnectionConfig(
             name = configName,
             docName = config.attrs["doc:name"] ?: configName,
+            docId = config.attrs["doc:id"] ?: UUID.randomUUID().toString(),
             host = connection.requireAttr("host", connection.location),
             port = connection.attrs["port"]?.toIntOrNull() ?: 22,
             portExpression = connection.attrs["port"]?.takeIf { it.toIntOrNull() == null },
@@ -83,6 +85,7 @@ object SftpConnectionConfigCodeEmitter : ConfigCodeEmitter<SftpConnectionConfig>
         beginControlFlow("%M", sftpDsl("sftpConnection"))
         addString("name", config.name)
         addString("docName", config.docName)
+        addString("docId", config.docId)
         addString("host", config.host)
         if (config.port != 22) addStatement("port = %L", kotlinNumericLiteral(config.port))
         addString("portExpression", config.portExpression)

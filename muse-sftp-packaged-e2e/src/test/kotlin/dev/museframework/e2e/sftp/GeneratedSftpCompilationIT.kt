@@ -44,6 +44,7 @@ class GeneratedSftpCompilationIT {
         val config = SftpGeneratedConfig()
         val connection = config.generatedSftp
         assertEquals("generated-sftp", connection.name)
+        assertEquals("packaged-sftp-connection-original", connection.docId)
         assertEquals(18822, connection.port)
         assertEquals("/", connection.workingDirectory)
         assertEquals(5_000L, connection.operationTimeoutMs)
@@ -52,8 +53,9 @@ class GeneratedSftpCompilationIT {
         val flow = config.sftpOptions
         assertEquals("sftp-options-id", flow.docId)
         val pipeline = flow.pipeline
-        assertEquals(8, pipeline.size)
+        assertEquals(9, pipeline.size)
         val list = assertIs<SftpListConfig>(pipeline[0])
+        assertEquals("packaged-sftp-list-original", list.docId)
         assertEquals(SftpConnectionRef.ByName("generated-sftp"), list.connection)
         assertEquals("/incoming\\\$batch", list.directoryPath)
         assertEquals(
@@ -68,24 +70,39 @@ class GeneratedSftpCompilationIT {
         )
         assertEquals(TargetConfig("listing"), list.targetConfig)
         val write = assertIs<SftpWriteConfig>(pipeline[1])
+        assertEquals("packaged-sftp-write-original", write.docId)
         assertEquals("#[vars.remotePath]", write.path)
         assertEquals("#[vars.body ++ \"\$suffix\"]", write.content)
         assertEquals("#[vars.mode]", write.modeExpression)
         assertEquals(SftpWriteMode.OVERWRITE, write.mode)
         assertTrue(write.createParentDirectories)
         val read = assertIs<SftpReadConfig>(pipeline[2])
+        assertEquals("packaged-sftp-read-original", read.docId)
         assertEquals("/in/\"quoted\"", read.path)
         assertEquals(TargetConfig("bytes", "#[payload]"), read.targetConfig)
         val copy = assertIs<SftpCopyConfig>(pipeline[3])
+        assertEquals("packaged-sftp-copy-original", copy.docId)
         assertEquals("/copy", copy.targetDirectory)
         assertEquals("copy-\$batch", copy.renameTo)
         val move = assertIs<SftpMoveConfig>(pipeline[4])
+        assertEquals("packaged-sftp-move-original", move.docId)
         assertEquals("/archive", move.targetDirectory)
         assertTrue(move.overwrite)
         assertEquals(null, move.renameTo)
-        assertEquals("new-\$name", assertIs<SftpRenameConfig>(pipeline[5]).newName)
-        assertEquals("/archive/old", assertIs<SftpDeleteConfig>(pipeline[6]).path)
-        assertEquals("/next", assertIs<SftpCreateDirectoryConfig>(pipeline[7]).directoryPath)
+        val rename = assertIs<SftpRenameConfig>(pipeline[5])
+        assertEquals("packaged-sftp-rename-original", rename.docId)
+        assertEquals("new-\$name", rename.newName)
+        val delete = assertIs<SftpDeleteConfig>(pipeline[6])
+        assertEquals("packaged-sftp-delete-original", delete.docId)
+        assertEquals("/archive/old", delete.path)
+        val createDirectory = assertIs<SftpCreateDirectoryConfig>(pipeline[7])
+        assertEquals("packaged-sftp-create-directory-original", createDirectory.docId)
+        assertEquals("/next", createDirectory.directoryPath)
+        val secondaryWrite = assertIs<SftpWriteConfig>(pipeline[8])
+        assertEquals(
+            "packaged-sftp-write-" + '"' + "secondary" + '"' + '-' + '$' + "batch",
+            secondaryWrite.docId,
+        )
     }
 
     private fun loadGeneratedClass(simpleName: String): Class<*> =

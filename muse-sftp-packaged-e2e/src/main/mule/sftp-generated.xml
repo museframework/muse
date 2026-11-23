@@ -3,13 +3,14 @@
       xmlns:http="http://www.mulesoft.org/schema/mule/http"
       xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
       xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:meta="http://www.mulesoft.org/schema/mule/documentation"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
         http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd">
 
-    <sftp:config name="generated-sftp" doc:name="Generated SFTP">
+    <sftp:config name="generated-sftp" doc:name="Generated SFTP" meta:id="packaged-sftp-connection-original">
         <sftp:connection host="127.0.0.1"
                          port="18822"
                          username="muse"
@@ -32,17 +33,18 @@
         <sftp:read config-ref="generated-sftp" path="/outbound/generated-request.bin" doc:name="Read generated request"/>
     </flow>
     <sub-flow name="sftp-options" doc:id="sftp-options-id">
-        <sftp:list config-ref="generated-sftp" directoryPath="/incoming\$batch" target="listing">
+        <sftp:list config-ref="generated-sftp" directoryPath="/incoming\$batch" target="listing" doc:id="packaged-sftp-list-original">
             <sftp:matcher pathPattern="regex:in\d+" symLinks="REQUIRE" caseSensitive="false" minSize="1" maxSize="17"/>
         </sftp:list>
-        <sftp:write config-ref="generated-sftp" path="#[vars.remotePath]" mode="#[vars.mode]">
+        <sftp:write config-ref="generated-sftp" path="#[vars.remotePath]" mode="#[vars.mode]" doc:id="packaged-sftp-write-original">
             <sftp:content><![CDATA[#[vars.body ++ "$suffix"]]]></sftp:content>
         </sftp:write>
-        <sftp:read config-ref="generated-sftp" path="/in/&quot;quoted&quot;" target="bytes" targetValue="#[payload]"/>
-        <sftp:copy config-ref="generated-sftp" sourcePath="/in/a" targetPath="/copy" renameTo="copy-$batch"/>
-        <sftp:move config-ref="generated-sftp" sourcePath="/copy/a" targetDirectory="/archive" overwrite="true"/>
-        <sftp:rename config-ref="generated-sftp" path="/archive/a" to="new-$name"/>
-        <sftp:delete config-ref="generated-sftp" path="/archive/old"/>
-        <sftp:create-directory config-ref="generated-sftp" directoryPath="/next"/>
+        <sftp:read config-ref="generated-sftp" path="/in/&quot;quoted&quot;" target="bytes" targetValue="#[payload]" doc:id="packaged-sftp-read-original"/>
+        <sftp:copy config-ref="generated-sftp" sourcePath="/in/a" targetPath="/copy" renameTo="copy-$batch" doc:id="packaged-sftp-copy-original"/>
+        <sftp:move config-ref="generated-sftp" sourcePath="/copy/a" targetDirectory="/archive" overwrite="true" doc:id="packaged-sftp-move-original"/>
+        <sftp:rename config-ref="generated-sftp" path="/archive/a" to="new-$name" doc:id="packaged-sftp-rename-original"/>
+        <sftp:delete config-ref="generated-sftp" path="/archive/old" doc:id="packaged-sftp-delete-original"/>
+        <sftp:create-directory config-ref="generated-sftp" directoryPath="/next" doc:id="packaged-sftp-create-directory-original"/>
+        <sftp:write config-ref="generated-sftp" path="/another-write" meta:id="packaged-sftp-write-&quot;secondary&quot;-$batch"/>
     </sub-flow>
 </mule>
