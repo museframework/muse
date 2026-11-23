@@ -52,8 +52,8 @@ class TranslatorFacadeTest {
 
     @Test
     fun `generated file path and declaration use the same name`(@TempDir dir: Path) {
-        val facade = TranslatorFacade(TranslatorRegistry.of(listOf(CoreMapperProvider())))
-        writeCoreFlow(dir, "3-order.API__flow.XML")
+        val facade = TranslatorFacade(TranslatorRegistry.of(emptyList()))
+        dir.resolve("3-order.API__flow.XML").toFile().writeText("<mule/>")
         val file = facade.translateAll(dir.toFile(), "com.example").single().generatedFiles.single()
         assertEquals("com/example/_3OrderAPIFlowConfig.kt", file.relativePath)
         assertContains(file.content, "class _3OrderAPIFlowConfig")
@@ -61,9 +61,9 @@ class TranslatorFacadeTest {
 
     @Test
     fun `two input files with the same output path report both sources`(@TempDir dir: Path) {
-        val facade = TranslatorFacade(TranslatorRegistry.of(listOf(CoreMapperProvider())))
-        writeCoreFlow(dir, "customer-order.xml")
-        writeCoreFlow(dir, "customer_order.xml")
+        val facade = TranslatorFacade(TranslatorRegistry.of(emptyList()))
+        dir.resolve("customer-order.xml").toFile().writeText("<mule/>")
+        dir.resolve("customer_order.xml").toFile().writeText("<mule/>")
         val error = assertFailsWith<MuseTranslationException> { facade.translateAll(dir.toFile(), "com.example") }
         assertContains(error.message!!, "customer-order.xml")
         assertContains(error.message!!, "customer_order.xml")
