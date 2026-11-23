@@ -43,13 +43,18 @@ mvn -f muse-http/pom.xml verify \
 
 Run the core, HTTP, APIKit, and Database plugin fixtures:
 
+The central fixture includes Quarkus migration output, and the Quarkus reactor
+is separate from the root reactor. Use the owner runner so it prepares the root
+artifacts, installs Quarkus into the same private repository, and then runs the
+Invoker fixtures.
+
 ```bash
-mvn clean verify --batch-mode \
-  -DskipTests \
-  -Dkotlin.daemon.enabled=false \
-  -Pplugin-it \
-  -pl muse-maven-plugin/muse-plugin-it \
-  -am
+verification_root="$(mktemp -d)"
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 scripts/run-verification-owner.py \
+  muse-maven-plugin/muse-plugin-it \
+  --repository "$verification_root/muse-plugin-it-repo" \
+  --scratch "$verification_root/muse-plugin-it-scratch" \
+  --result-json "$verification_root/muse-plugin-it.json"
 ```
 
 Run a family provider realm (File shown; use `muse-sftp-plugin-it` or

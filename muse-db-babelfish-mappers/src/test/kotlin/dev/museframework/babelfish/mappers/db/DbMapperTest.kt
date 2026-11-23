@@ -482,7 +482,8 @@ class DbMapperTest {
                 DbBulkInsertConfig(
                     configRef = DbConfigRef.ByName("database"),
                     sql = "INSERT INTO numbers VALUES (:int, :long)",
-                    batchParameters = DbBatchParameterSource.Values(listOf(numericValues(8081, 8082L))),
+                    batchParameters =
+                        DbBatchParameterSource.Values(listOf(numericValuesWithNonFinite(8081, 8082L))),
                 )
             val source = generatedOperationSource(config)
 
@@ -547,6 +548,13 @@ class DbMapperTest {
         linkedMapOf<String, Any?>().apply {
             put("int", intValue)
             put("long", longValue)
+        }
+
+    private fun numericValuesWithNonFinite(
+        intValue: Int,
+        longValue: Long,
+    ): Map<String, Any?> =
+        numericValues(intValue, longValue).toMutableMap().apply {
             put("float", FLOAT_NAN)
             put("double", DOUBLE_NAN)
         }
