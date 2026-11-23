@@ -27,14 +27,14 @@ object RemoveVariableMapper : ElementMapper<RemoveVariableConfig> {
 /**
  * Emits Kotlin DSL code for RemoveVariableConfig.
  *
- * Generates: removeVariable { variableName = "myVar" }
+ * Generates: removeVariable("myVar") { }
  */
 object RemoveVariableCodeEmitter : ElementCodeEmitter<RemoveVariableConfig> {
     override fun emit(element: RemoveVariableConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.engine.components.processor.dsl.removeVariable")
+        ctx.addImport("dev.museframework.dsl.dsl.removeVariable")
         val codeBlock = CodeBlock.builder().apply {
-            add("removeVariable·{\n")
-            add("    variableName·=·%S\n", element.variableName)
+            add("removeVariable(%S)·{\n", element.variableName)
+            addDocumentation(element, ctx)
             add("}")
         }.build()
         return codeBlock.toString()

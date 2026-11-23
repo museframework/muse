@@ -34,9 +34,11 @@ object WithCorrelationIdMapper : ElementMapper<WithCorrelationIdConfig> {
  */
 object WithCorrelationIdCodeEmitter : ElementCodeEmitter<WithCorrelationIdConfig> {
     override fun emit(element: WithCorrelationIdConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.withCorrelationId")
+        ctx.addImport("dev.museframework.dsl.builder.withCorrelationId")
         val codeBlock = CodeBlock.builder().apply {
-            add("withCorrelationId(%S)·{\n", element.correlationId)
+            add("withCorrelationId·{\n")
+            addDocumentation(element, ctx)
+            add("    correlationId·=·%S\n", element.correlationId)
             if (element.pipeline.isNotEmpty()) {
                 add("%L", ctx.emitPipelineElements(element.pipeline, "    "))
             }

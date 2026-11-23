@@ -43,7 +43,8 @@ object ParallelForEachCodeEmitter : ElementCodeEmitter<ParallelForEachConfig> {
     override fun emit(element: ParallelForEachConfig, ctx: CodegenContext): String {
         ctx.addImport("dev.museframework.dsl.dsl.parallelForEach")
         val codeBlock = CodeBlock.builder().apply {
-            add("parallelForEach·{")
+            add("parallelForEach·{\n")
+            addDocumentation(element, ctx)
             if (
                 element.collection != null ||
                 element.timeout != null ||
@@ -51,7 +52,6 @@ object ParallelForEachCodeEmitter : ElementCodeEmitter<ParallelForEachConfig> {
                 element.targetConfig != null ||
                 element.pipeline.isNotEmpty()
             ) {
-                add("\n")
                 element.collection?.let { add("    collection·=·%S\n", it) }
                 element.timeout?.let { add("    timeout·=·%L\n", it) }
                 element.maxConcurrency?.let { add("    maxConcurrency·=·%L\n", it) }

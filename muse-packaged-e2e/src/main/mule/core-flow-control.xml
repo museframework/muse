@@ -74,14 +74,14 @@
         </error-handler>
     </flow>
 
-    <flow name="core-choice-first-match" doc:id="core-choice-first-match">
+    <flow name="core-choice-first-match" doc:id="choice-flow-original">
         <http:listener config-ref="packaged-listener" path="/e2e/core/choice-first-match" allowedMethods="POST"/>
-        <choice>
+        <choice doc:id="choice-router-original">
             <when expression="#[true]">
-                <set-payload value="first"/>
+                <set-payload value="first" doc:id="choice-first-original"/>
             </when>
             <when expression="#[true]">
-                <set-payload value="second"/>
+                <set-payload value="second" doc:id="choice-second-original"/>
             </when>
             <otherwise>
                 <set-payload value="otherwise"/>

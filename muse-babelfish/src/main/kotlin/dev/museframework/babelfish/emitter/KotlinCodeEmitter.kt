@@ -172,6 +172,7 @@ class KotlinCodeEmitter {
             is MuseFlow.Flow -> {
                 buildString {
                     appendLine("flow(\"${ctx.escapeKotlinString(flow.name)}\") {")
+                    appendLine(" docId = \"${ctx.escapeKotlinString(flow.docId)}\"")
                     flow.source?.let { source ->
                         val emitter = sourceEmitters[source::class]?.value
                         if (emitter != null) {
@@ -207,6 +208,7 @@ class KotlinCodeEmitter {
             is MuseFlow.SubFlow -> {
                 buildString {
                     appendLine("subFlow(\"${ctx.escapeKotlinString(flow.name)}\") {")
+                    appendLine(" docId = \"${ctx.escapeKotlinString(flow.docId)}\"")
                     flow.pipeline.forEach { el ->
                         val emitter = elementEmitters[el::class]?.value
                         if (emitter != null) {

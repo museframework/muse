@@ -68,14 +68,16 @@ open class CodegenContext(
 
     /**
      * Escapes a string for use in Kotlin double-quoted string literals.
-     * For flow names, subFlow refs, etc. that use "..." (not triple quotes).
-     * Does NOT escape control chars - those should not appear in identifiers.
+     * This also handles whitespace preserved by XML character references.
      */
     open fun escapeKotlinString(value: String): String {
         return value
             .replace("\\", "\\\\")  // Backslash first!
             .replace("\"", "\\\"")   // Double quote
-            .replace("$", "\\$")   // Dollar sign
+            .replace("$", "\\$")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
     }
 
     /**

@@ -10,6 +10,8 @@ import dev.museframework.babelfish.model.SourceLocation
 import org.jdom2.Element
 import java.nio.file.Path
 
+private const val DOCUMENTATION_NAMESPACE = "http://www.mulesoft.org/schema/mule/documentation"
+
 class MuleXmlParser {
     fun parse(file: Path): MuleDocument {
         val builder = LocationAwareSaxBuilder()
@@ -89,7 +91,14 @@ class MuleXmlParser {
         val source = if (!isSubFlow) nonError.firstOrNull() else null
         val pipeline = if (source != null) nonError.drop(1) else nonError
 
-        return RawFlow(name, source, pipeline, errorHandler, loc)
+        return RawFlow(
+            name = name,
+            source = source,
+            pipeline = pipeline,
+            errorHandler = errorHandler,
+            location = loc,
+            docId = el.attributes.firstOrNull { it.namespaceURI == DOCUMENTATION_NAMESPACE && it.name == "id" }?.value,
+        )
     }
 
     private fun toRaw(
@@ -97,7 +106,14 @@ class MuleXmlParser {
         nsMap: Map<String, String>,
         locOf: (Element) -> SourceLocation,
     ): RawElement {
-        val attrMap = el.attributes.associate { attr -> attr.qualifiedName to attr.value }
+        val attrMap = buildMap {
+            for (attribute in el.attributes) {
+                when {
+                    attribute.namespaceURI == DOCUMENTATION_NAMESPACE -> put("doc:${attribute.name}", attribute.value)
+                    attribute.namespacePrefix != "doc" -> put(attribute.qualifiedName, attribute.value)
+                }
+            }
+        }
         return RawElement(
             namespace = nsMap[el.namespaceURI] ?: "",
             tag = el.name,

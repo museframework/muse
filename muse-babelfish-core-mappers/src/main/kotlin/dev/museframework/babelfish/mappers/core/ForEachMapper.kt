@@ -40,12 +40,12 @@ object ForEachCodeEmitter : ElementCodeEmitter<ForEachConfig> {
     override fun emit(element: ForEachConfig, ctx: CodegenContext): String {
         ctx.addImport("dev.museframework.dsl.dsl.forEach")
         val codeBlock = CodeBlock.builder().apply {
-            add("forEach·{")
+            add("forEach·{\n")
+            addDocumentation(element, ctx)
             if (element.collection != null || element.batchSize != 1 || element.batchSizeExpression != null ||
                 element.rootMessageVariableName != "rootMessage" || 
                 element.counterVariableName != "counter" || 
                 element.pipeline.isNotEmpty()) {
-                add("\n")
                 element.collection?.let { add("    collection·=·%S\n", it) }
                 if (element.batchSize != 1) add("    batchSize·=·%L\n", element.batchSize)
                 element.batchSizeExpression?.let { add("    batchSizeExpression·=·%S\n", it) }

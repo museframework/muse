@@ -36,9 +36,9 @@ object AsyncCodeEmitter : ElementCodeEmitter<AsyncConfig> {
     override fun emit(element: AsyncConfig, ctx: CodegenContext): String {
         ctx.addImport("dev.museframework.dsl.dsl.async")
         val codeBlock = CodeBlock.builder().apply {
-            add("async·{")
+            add("async·{\n")
+            addDocumentation(element, ctx)
             if (element.maxConcurrency != null || element.pipeline.isNotEmpty()) {
-                add("\n")
                 element.maxConcurrency?.let { add("    maxConcurrency·=·%L\n", it) }
                 if (element.pipeline.isNotEmpty()) {
                     add("%L", ctx.emitPipelineElements(element.pipeline, "    "))

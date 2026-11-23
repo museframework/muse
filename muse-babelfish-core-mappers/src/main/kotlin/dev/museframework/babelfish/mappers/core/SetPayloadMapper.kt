@@ -26,6 +26,7 @@ object SetPayloadCodeEmitter : ElementCodeEmitter<SetPayloadConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.setPayload")
         val codeBlock = CodeBlock.builder().apply {
             add("setPayload·{\n")
+            addDocumentation(element, ctx)
             add("    value·=·%S\n", element.value)
             element.mimeType?.let { add("    mimeType·=·%S\n", it) }
             element.encoding?.let { add("    encoding·=·%S\n", it) }

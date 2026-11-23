@@ -51,6 +51,7 @@ object TryCodeEmitter : ElementCodeEmitter<TryConfig> {
         ctx.addImport("dev.museframework.dsl.dsl.`try`")
         val codeBlock = CodeBlock.builder().apply {
             add("`try`·{\n")
+            addDocumentation(element, ctx)
             if (element.pipeline.isNotEmpty()) {
                 add("%L", ctx.emitPipelineElements(element.pipeline, "    "))
             }
