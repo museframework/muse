@@ -9,10 +9,12 @@ import dev.museframework.babelfish.model.SourceLocation
 import dev.museframework.db.api.config.DbConfigRef
 import dev.museframework.db.api.config.DbTransactionIsolation
 import dev.museframework.db.api.config.GenericDbConnectionConfig
+import dev.museframework.db.api.model.DbBatchParameterSource
 import dev.museframework.db.api.model.DbGeneratedKeys
 import dev.museframework.db.api.model.DbParameterSource
 import dev.museframework.db.api.model.DbParameterType
 import dev.museframework.db.api.model.DbQuerySettings
+import dev.museframework.db.api.operation.DbBulkInsertConfig
 import dev.museframework.db.api.operation.DbExecuteScriptConfig
 import dev.museframework.db.api.source.DbRowListenerConfig
 import dev.museframework.engine.api.streaming.StreamingStrategy
@@ -63,7 +65,7 @@ class DbMapperTest {
         assertEquals(DbTransactionIsolation.READ_COMMITTED, generic.transactionIsolation)
         assertEquals("secret", generic.password)
 
-        val code = DbConfigCodeEmitter.emit(mapped, CodegenContext("generated"))
+        val code = DbConfigCodeEmitter.emit(mapped, CodegenContext("generated")).toString()
         assertContains(code, "dbConfig(\"database\")")
         assertContains(code, "driverClassName = \"org.postgresql.Driver\"")
         assertContains(code, "DbTransactionIsolation.READ_COMMITTED")
@@ -111,8 +113,8 @@ class DbMapperTest {
         assertEquals("rows", mapped.targetConfig?.target)
 
         val codeContext = CodegenContext("generated")
-        val code = DbSelectCodeEmitter.emit(mapped, codeContext)
-        assertContains(code, "dbSelect(DbConfigRef.ByName(\"database\"))")
+        val code = DbSelectCodeEmitter.emit(mapped, codeContext).toString()
+        assertContains(code, "DbConfigRef.ByName(\"database\")")
         assertContains(code, "inputParameters(\"#[{ id: payload }]\")")
         assertContains(code, "fetchSize = 25")
         assertContains(code, "target = \"rows\"")
@@ -191,7 +193,7 @@ class DbMapperTest {
                     ),
             )
 
-        val code = DbRowListenerCodeEmitter.emit(config, CodegenContext("generated"))
+        val code = DbRowListenerCodeEmitter.emit(config, CodegenContext("generated")).toString()
 
         assertContains(code, "fetchSize = 25")
         assertContains(code, "maxRows = 10")
@@ -213,7 +215,7 @@ class DbMapperTest {
                     ),
             )
 
-        val code = DbExecuteScriptCodeEmitter.emit(config, CodegenContext("generated"))
+        val code = DbExecuteScriptCodeEmitter.emit(config, CodegenContext("generated")).toString()
 
         assertContains(code, "queryTimeout")
         assertFalse(code.contains("fetchSize"), code)
@@ -250,7 +252,7 @@ class DbMapperTest {
         assertEquals(DbParameterType(JDBCType.INTEGER), mapped.parameterTypes["result"])
         assertFalse(mapped.parameterTypes.containsKey("label"))
 
-        val code = DbStoredProcedureCodeEmitter.emit(mapped, CodegenContext("generated"))
+        val code = DbStoredProcedureCodeEmitter.emit(mapped, CodegenContext("generated")).toString()
         assertContains(code, "inOutParameters(mapOf(\"result\" to \"3\", \"label\" to \"abc\"))")
     }
 
@@ -307,8 +309,8 @@ class DbMapperTest {
         val mapped = DbSelectMapper.map(selectWith(listOf(strategy)), context)
 
         assertEquals(StreamingStrategy.NonRepeatable, mapped.streamingStrategy)
-        val code = DbSelectCodeEmitter.emit(mapped, CodegenContext("generated"))
-        assertContains(code, "streamingStrategy = StreamingStrategy.NonRepeatable")
+        val code = DbSelectCodeEmitter.emit(mapped, CodegenContext("generated")).toString()
+        assertContains(code, "StreamingStrategy.NonRepeatable")
     }
 
     @Test
@@ -417,6 +419,38 @@ class DbMapperTest {
         val mapped = DbInsertMapper.map(insertWith(), context)
 
         assertEquals(DbGeneratedKeys(), mapped.generatedKeys)
+    }
+
+    @Test
+    fun `inline SQL and parameter expressions keep significant leading and trailing whitespace`() {
+        val sql = "  SELECT '\"\$price' WHERE id = :id\r\n\r\n"
+        val expression = "  #[{ id: payload }]\r\n"
+        val operation = raw(
+            "select",
+            attrs = mapOf("config-ref" to "database"),
+            children = listOf(raw("sql", text = sql), raw("input-parameters", text = expression)),
+        )
+        val select = DbSelectMapper.map(operation, context)
+        assertEquals(sql, select.sql)
+        assertEquals(DbParameterSource.Expression(expression), select.inputParameters)
+    }
+
+    @Test
+    fun `explicit batch rows preserve null and numeric types and distinguish an empty batch from the payload default`() {
+        val row = mapOf("nullable" to null, "byte" to 1.toByte(), "short" to 2.toShort(), "long" to 3L, "float" to 4.5f)
+        val config = DbBulkInsertConfig(DbConfigRef.ByName("db"), "INSERT INTO t VALUES (:id)")
+        fun emit(rows: List<Map<String, Any?>>): String =
+            DbBulkInsertCodeEmitter.emit(config.copy(batchParameters = DbBatchParameterSource.Values(rows)), CodegenContext("test"))
+                .toString()
+
+        assertContains(emit(emptyList()), "batchParameters(listOf())")
+        val body = emit(listOf(emptyMap(), row))
+        assertContains(body, "mapOf(),")
+        assertContains(body, "\"nullable\" to null")
+        assertContains(body, "\"byte\" to (1).toByte()")
+        assertContains(body, "\"short\" to (2).toShort()")
+        assertContains(body, "\"long\" to 3L")
+        assertContains(body, "\"float\" to 4.5F")
     }
 
     private fun raw(

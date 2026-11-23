@@ -121,6 +121,7 @@ class MuleXmlParser {
             children = el.children.map { toRaw(it, nsMap, locOf) },
             location = locOf(el),
             textContent = el.textTrim.takeIf { it.isNotEmpty() },
+            untrimmedTextContent = if (el.children.isEmpty()) el.text.takeIf(String::isNotEmpty) else null,
         )
     }
 

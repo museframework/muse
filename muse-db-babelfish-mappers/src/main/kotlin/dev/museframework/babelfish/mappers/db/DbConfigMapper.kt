@@ -1,8 +1,11 @@
 package dev.museframework.babelfish.mappers.db
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.db.api.config.DataSourceDbConnectionConfig
@@ -68,37 +71,29 @@ object DbConfigMapper : ConfigMapper {
 }
 
 object DbConfigCodeEmitter : ConfigCodeEmitter<DbConfig> {
-    override fun emit(
-        config: DbConfig,
-        ctx: CodegenContext,
-    ): String {
+    override fun emit(config: DbConfig, ctx: CodegenContext): CodeBlock {
         val connection = config.connection
         if (connection is DataSourceDbConnectionConfig) {
             throw IllegalArgumentException("A DataSource database configuration cannot be emitted without an application DataSource")
         }
         connection as GenericDbConnectionConfig
-        ctx.addImport("dev.museframework.db.api.dsl.dbConfig")
-        if (connection.transactionIsolation != DbTransactionIsolation.DEFAULT) {
-            ctx.addImport("dev.museframework.db.api.config.DbTransactionIsolation")
-        }
-
-        return buildString {
-            appendLine("dbConfig(${config.name.kotlinLiteral()}) {")
-            if (config.docName != config.name) appendLine("    docName = ${config.docName.kotlinLiteral()}")
-            if (!config.validateConnectivity) appendLine("    validateConnectivity = false")
-            appendLine("    generic {")
-            appendLine("        url = ${connection.url.kotlinLiteral()}")
-            appendLine("        driverClassName = ${connection.driverClassName.kotlinLiteral()}")
-            connection.user?.let { appendLine("        user = ${it.kotlinLiteral()}") }
-            connection.password?.let { appendLine("        password = ${it.kotlinLiteral()}") }
+        return buildCodeBlock {
+            beginControlFlow("%M(%L)", dbDsl("dbConfig"), kotlinStringLiteral(config.name))
+            if (config.docName != config.name) addStatement("docName = %L", kotlinStringLiteral(config.docName))
+            if (!config.validateConnectivity) addStatement("validateConnectivity = false")
+            beginControlFlow("generic")
+            addStatement("url = %L", kotlinStringLiteral(connection.url))
+            addStatement("driverClassName = %L", kotlinStringLiteral(connection.driverClassName))
+            connection.user?.let { addStatement("user = %L", kotlinStringLiteral(it)) }
+            connection.password?.let { addStatement("password = %L", kotlinStringLiteral(it)) }
             connection.connectionProperties.forEach { (name, value) ->
-                appendLine("        connectionProperty(${name.kotlinLiteral()}, ${value.kotlinLiteral()})")
+                addStatement("connectionProperty(%L, %L)", kotlinStringLiteral(name), kotlinStringLiteral(value))
             }
             if (connection.transactionIsolation != DbTransactionIsolation.DEFAULT) {
-                appendLine("        transactionIsolation = DbTransactionIsolation.${connection.transactionIsolation}")
+                addStatement("transactionIsolation = %T.%N", DbTransactionIsolation::class, connection.transactionIsolation.name)
             }
-            appendLine("    }")
-            append("}")
+            endControlFlow()
+            endControlFlow()
         }
     }
 }

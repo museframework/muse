@@ -49,7 +49,7 @@
     <flow name="database-listener">
         <db:listener config-ref="database-config" table="outbox" watermarkColumn="id" idColumn="id" doc:name="Outbox listener">
             <scheduling-strategy>
-                <fixed-frequency frequency="5" timeUnit="SECONDS"/>
+                <fixed-frequency frequency="5" startDelay="3" timeUnit="SECONDS"/>
             </scheduling-strategy>
         </db:listener>
         <db:query-single config-ref="database-config"><db:sql>SELECT 1 AS processed</db:sql></db:query-single>

@@ -3,6 +3,8 @@ package dev.museframework.babelfish.parser
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -13,6 +15,15 @@ class MuleXmlParserTest {
     private val parser = MuleXmlParser()
 
     private fun fixture(name: String): Path = Path.of("src/test/resources/fixtures/$name")
+
+    @Test
+    fun `element leaf text preserves XML character references and boundary whitespace`(@TempDir directory: Path) {
+        val file = directory.resolve("leaf.xml")
+        Files.writeString(file, """<mule><sub-flow name="example"><value>  text&#13;&#10;&#13;&#10;</value></sub-flow></mule>""")
+        val leaf = parser.parse(file).subFlows.single().pipeline.single()
+        assertEquals("text", leaf.textContent)
+        assertEquals("  text\r\n\r\n", leaf.untrimmedTextContent)
+    }
 
     @Nested
     @DisplayName("line numbers")

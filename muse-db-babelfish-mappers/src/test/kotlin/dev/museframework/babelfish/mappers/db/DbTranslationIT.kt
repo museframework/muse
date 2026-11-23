@@ -18,6 +18,7 @@ import dev.museframework.db.api.operation.DbSelectConfig
 import dev.museframework.db.api.operation.DbStoredProcedureConfig
 import dev.museframework.db.api.operation.DbUpdateConfig
 import dev.museframework.db.api.source.DbRowListenerConfig
+import dev.museframework.dsl.api.config.SchedulerTimeUnit
 import dev.museframework.dsl.api.model.flow.MuseFlow
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
@@ -69,6 +70,8 @@ class DbTranslationIT {
         assertEquals("outbox", listener.table)
         assertEquals("id", listener.watermarkColumn)
         assertEquals("5", listener.schedulingStrategy.frequency)
+        assertEquals("3", listener.schedulingStrategy.startDelay)
+        assertEquals(SchedulerTimeUnit.SECONDS, listener.schedulingStrategy.timeUnit)
 
         val code =
             KotlinCodeEmitter()
@@ -79,7 +82,9 @@ class DbTranslationIT {
         assertContains(code, "import dev.museframework.db.api.dsl.dbStoredProcedure")
         assertContains(code, "import dev.museframework.db.api.dsl.dbListener")
         assertContains(code, "dbSelect(DbConfigRef.ByName(\"database-config\"))")
-        assertContains(code, "dbListener(\"database-config\")")
+        assertContains(code, "dbListener(DbConfigRef.ByName(\"database-config\"))")
+        assertContains(code, "startDelay = \"3\"")
+        assertContains(code, "timeUnit = SchedulerTimeUnit.SECONDS")
         assertFalse(code.contains("dev.museframework.connectors.db"))
     }
 }
