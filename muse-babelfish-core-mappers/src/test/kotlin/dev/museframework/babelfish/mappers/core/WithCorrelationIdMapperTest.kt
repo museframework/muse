@@ -1,12 +1,12 @@
 package dev.museframework.babelfish.mappers.core
 
 import dev.museframework.babelfish.api.BabelfishRegistry
-import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.babelfish.model.SourceLocation
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
 class WithCorrelationIdMapperTest {
@@ -27,18 +27,11 @@ class WithCorrelationIdMapperTest {
         assertEquals("correlation-01", config.docId)
         assertEquals("Set correlation ID", config.docName)
 
-        val ctx = CodegenContext("example")
-        val code = WithCorrelationIdCodeEmitter.emit(config, ctx)
-        assertEquals(
-            """
-            withCorrelationId {
-                docId = "correlation-01"
-                docName = "Set correlation ID"
-                correlationId = "#[vars.correlationId]"
-            }
-            """.trimIndent(),
-            code,
-        )
-        assertEquals(listOf("dev.museframework.dsl.builder.withCorrelationId"), ctx.resolvedImports())
+        val code = emitCore(config)
+        assertContains(code, "import dev.museframework.dsl.builder.withCorrelationId")
+        assertContains(code, "withCorrelationId {")
+        assertContains(code, "docId = \"correlation-01\"")
+        assertContains(code, "docName = \"Set correlation ID\"")
+        assertContains(code, "correlationId = \"#[vars.correlationId]\"")
     }
 }

@@ -1,7 +1,6 @@
 package dev.museframework.babelfish.mappers.core
 
 import dev.museframework.babelfish.api.BabelfishRegistry
-import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.babelfish.model.SourceLocation
@@ -103,9 +102,8 @@ class SchedulerSourceMapperTest {
 
     @Test
     fun `escapes dollar sign in frequency value`() {
-        val ctx = CodegenContext("com.test")
         val code =
-            KotlinPoetSchedulerSourceCodeEmitter.emit(
+            emitCore(
                 SchedulerConfig(
                     docName = "Scheduler",
                     schedulingStrategy = FixedFrequencyStrategy(
@@ -113,7 +111,6 @@ class SchedulerSourceMapperTest {
                         startDelay = "0",
                     ),
                 ),
-                ctx,
             )
 
         val d = "$"
@@ -123,9 +120,8 @@ class SchedulerSourceMapperTest {
 
     @Test
     fun `emits fixed frequency scheduler DSL with KotlinPoet`() {
-        val ctx = CodegenContext("com.test")
         val code =
-            KotlinPoetSchedulerSourceCodeEmitter.emit(
+            emitCore(
                 SchedulerConfig(
                     docName = "Scheduler",
                     disallowConcurrentExecution = true,
@@ -135,7 +131,6 @@ class SchedulerSourceMapperTest {
                         timeUnit = SchedulerTimeUnit.SECONDS,
                     ),
                 ),
-                ctx,
             )
 
         assertTrue(code.contains("scheduler {"))
@@ -148,9 +143,8 @@ class SchedulerSourceMapperTest {
 
     @Test
     fun `emits cron scheduler DSL with KotlinPoet`() {
-        val ctx = CodegenContext("com.test")
         val code =
-            KotlinPoetSchedulerSourceCodeEmitter.emit(
+            emitCore(
                 SchedulerConfig(
                     docName = "Scheduler",
                     schedulingStrategy = CronStrategy(
@@ -158,7 +152,6 @@ class SchedulerSourceMapperTest {
                         timeZone = "America/Los_Angeles",
                     ),
                 ),
-                ctx,
             )
 
         assertTrue(code.contains("scheduler {"))

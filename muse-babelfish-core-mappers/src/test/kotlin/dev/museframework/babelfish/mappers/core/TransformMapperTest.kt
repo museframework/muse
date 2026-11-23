@@ -1,7 +1,6 @@
 package dev.museframework.babelfish.mappers.core
 
 import dev.museframework.babelfish.api.BabelfishRegistry
-import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.babelfish.model.SourceLocation
@@ -40,7 +39,7 @@ class TransformMapperTest {
         )
         val element = MuleXmlParser().parse(xml).subFlows.single().pipeline.single()
 
-        val code = TransformCodeEmitter.emit(TransformMapper.map(element, context), CodegenContext("com.test"))
+        val code = emitCore(TransformMapper.map(element, context))
 
         assertTrue(code.contains("setPayload = DwExpression.Resource(\"dataweave/JAVA2JSON.dwl\")"), code)
     }
@@ -61,7 +60,7 @@ class TransformMapperTest {
         assertEquals("result", config.setVariables.single().variableName)
         assertEquals(DwExpression.Resource("dataweave/variable.dwl"), config.setVariables.single().expression)
 
-        val code = TransformCodeEmitter.emit(config, CodegenContext("com.test"))
+        val code = emitCore(config)
         assertTrue(code.contains("setPayload = DwExpression.Resource(\"dataweave/JAVA2JSON.dwl\")"))
         assertTrue(code.contains("setAttributes = DwExpression.Resource(\"dataweave/attributes.dwl\")"))
         assertTrue(code.contains("setVariable(\"result\", DwExpression.Resource(\"dataweave/variable.dwl\"))"))
@@ -69,7 +68,7 @@ class TransformMapperTest {
 
     @Test
     fun `preserves inline expressions for payload attributes and variables`() {
-        val script = "%dw 2.0\noutput application/json\n---\npayload"
+        val script = "%dw 2.0\r\noutput application/json\n---\n{quoted: \"\${vars.\"nested\"} \$\"}\n"
         val config = TransformMapper.map(
             transform(
                 expression("set-payload", inline = script),
@@ -82,6 +81,11 @@ class TransformMapperTest {
         assertEquals(DwExpression.Inline(script), config.setPayload)
         assertEquals(DwExpression.Inline("attributes"), config.setAttributes)
         assertEquals(DwExpression.Inline("vars.input"), config.setVariables.single().expression)
+
+        val code = emitCore(config)
+        assertTrue(code.contains("DwExpression.Inline("), code)
+        assertTrue(code.contains("\\r\" + \"\\n\""), code)
+        assertTrue(code.contains("{'$'}{vars."), code)
     }
 
     @Test

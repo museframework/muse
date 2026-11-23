@@ -1,12 +1,15 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.RemoveVariableConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -30,13 +33,11 @@ object RemoveVariableMapper : ElementMapper<RemoveVariableConfig> {
  * Generates: removeVariable("myVar") { }
  */
 object RemoveVariableCodeEmitter : ElementCodeEmitter<RemoveVariableConfig> {
-    override fun emit(element: RemoveVariableConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.removeVariable")
-        val codeBlock = CodeBlock.builder().apply {
-            add("removeVariable(%S)·{\n", element.variableName)
-            addDocumentation(element, ctx)
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val removeVariable = MemberName("dev.museframework.dsl.dsl", "removeVariable")
+
+    override fun emit(element: RemoveVariableConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M(%L)", removeVariable, kotlinStringLiteral(element.variableName))
+        addDocumentation(element)
+        endControlFlow()
     }
 }

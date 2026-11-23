@@ -1,15 +1,18 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.SourceMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.SourceCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.CronStrategy
 import dev.museframework.dsl.api.config.FixedFrequencyStrategy
 import dev.museframework.dsl.api.config.SchedulerConfig
 import dev.museframework.dsl.api.config.SchedulerTimeUnit
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 object SchedulerSourceMapper : SourceMapper<SchedulerConfig> {
@@ -62,45 +65,30 @@ object SchedulerSourceMapper : SourceMapper<SchedulerConfig> {
 }
 
 object KotlinPoetSchedulerSourceCodeEmitter : SourceCodeEmitter<SchedulerConfig> {
-    override fun emit(source: SchedulerConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.scheduler")
+    private val scheduler = MemberName("dev.museframework.dsl.dsl", "scheduler")
 
-        val codeBlock =
-            CodeBlock.builder()
-                .addStatement("scheduler {")
-                .apply {
-                    if (source.docName.isNotEmpty()) {
-                        addStatement("    docName = %S", source.docName)
-                    }
-                    addDocumentationId(source.docId, ctx)
-                    if (source.disallowConcurrentExecution) {
-                        addStatement("    disallowConcurrentExecution = true")
-                    }
-                    when (val strategy = source.schedulingStrategy) {
-                        is FixedFrequencyStrategy -> {
-                            ctx.addImport("dev.museframework.dsl.api.config.SchedulerTimeUnit")
-                            addStatement("    fixedFrequency {")
-                            addStatement("        frequency = %S", strategy.frequency)
-                            addStatement("        startDelay = %S", strategy.startDelay)
-                            addStatement(
-                                "        timeUnit = SchedulerTimeUnit.%L",
-                                strategy.timeUnit.name,
-                            )
-                            addStatement("    }")
-                        }
-                        is CronStrategy -> {
-                            addStatement("    cron {")
-                            addStatement("        expression = %S", strategy.expression)
-                            strategy.timeZone?.let {
-                                addStatement("        timeZone = %S", it)
-                            }
-                            addStatement("    }")
-                        }
-                    }
-                }
-                .add("}")
-                .build()
+    override fun emit(source: SchedulerConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", scheduler)
+        addDocumentation(source)
+        if (source.disallowConcurrentExecution) {
+            addStatement("disallowConcurrentExecution = true")
+        }
+        when (val strategy = source.schedulingStrategy) {
+            is FixedFrequencyStrategy -> {
+                beginControlFlow("fixedFrequency")
+                addStatement("frequency = %L", kotlinStringLiteral(strategy.frequency))
+                addStatement("startDelay = %L", kotlinStringLiteral(strategy.startDelay))
+                addStatement("timeUnit = %T.%N", SchedulerTimeUnit::class, strategy.timeUnit.name)
+                endControlFlow()
+            }
 
-        return codeBlock.toString()
+            is CronStrategy -> {
+                beginControlFlow("cron")
+                addStatement("expression = %L", kotlinStringLiteral(strategy.expression))
+                strategy.timeZone?.let { addStatement("timeZone = %L", kotlinStringLiteral(it)) }
+                endControlFlow()
+            }
+        }
+        endControlFlow()
     }
 }

@@ -1,12 +1,15 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.ForEachConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -37,30 +40,21 @@ object ForEachMapper : ElementMapper<ForEachConfig> {
  * Emits Kotlin DSL code for ForEachConfig.
  */
 object ForEachCodeEmitter : ElementCodeEmitter<ForEachConfig> {
-    override fun emit(element: ForEachConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.forEach")
-        val codeBlock = CodeBlock.builder().apply {
-            add("forEach·{\n")
-            addDocumentation(element, ctx)
-            if (element.collection != null || element.batchSize != 1 || element.batchSizeExpression != null ||
-                element.rootMessageVariableName != "rootMessage" || 
-                element.counterVariableName != "counter" || 
-                element.pipeline.isNotEmpty()) {
-                element.collection?.let { add("    collection·=·%S\n", it) }
-                if (element.batchSize != 1) add("    batchSize·=·%L\n", element.batchSize)
-                element.batchSizeExpression?.let { add("    batchSizeExpression·=·%S\n", it) }
-                if (element.rootMessageVariableName != "rootMessage") {
-                    add("    rootMessageVariableName·=·%S\n", element.rootMessageVariableName)
-                }
-                if (element.counterVariableName != "counter") {
-                    add("    counterVariableName·=·%S\n", element.counterVariableName)
-                }
-                if (element.pipeline.isNotEmpty()) {
-                    add("%L", ctx.emitPipelineElements(element.pipeline, "    "))
-                }
-            }
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val forEach = MemberName("dev.museframework.dsl.dsl", "forEach")
+
+    override fun emit(element: ForEachConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", forEach)
+        addDocumentation(element)
+        element.collection?.let { addStatement("collection = %L", kotlinStringLiteral(it)) }
+        if (element.batchSize != 1) addStatement("batchSize = %L", element.batchSize)
+        element.batchSizeExpression?.let { addStatement("batchSizeExpression = %L", kotlinStringLiteral(it)) }
+        if (element.rootMessageVariableName != "rootMessage") {
+            addStatement("rootMessageVariableName = %L", kotlinStringLiteral(element.rootMessageVariableName))
+        }
+        if (element.counterVariableName != "counter") {
+            addStatement("counterVariableName = %L", kotlinStringLiteral(element.counterVariableName))
+        }
+        add(ctx.emitPipelineElements(element.pipeline))
+        endControlFlow()
     }
 }

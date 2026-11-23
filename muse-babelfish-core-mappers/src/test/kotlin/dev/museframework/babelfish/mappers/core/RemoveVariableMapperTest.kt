@@ -1,12 +1,12 @@
 package dev.museframework.babelfish.mappers.core
 
 import dev.museframework.babelfish.api.BabelfishRegistry
-import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.babelfish.model.SourceLocation
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
 class RemoveVariableMapperTest {
@@ -23,17 +23,10 @@ class RemoveVariableMapperTest {
         assertEquals("remove-01", config.docId)
         assertEquals("Remove temporary value", config.docName)
 
-        val ctx = CodegenContext("example")
-        val code = RemoveVariableCodeEmitter.emit(config, ctx)
-        assertEquals(
-            """
-            removeVariable("temporary") {
-                docId = "remove-01"
-                docName = "Remove temporary value"
-            }
-            """.trimIndent(),
-            code,
-        )
-        assertEquals(listOf("dev.museframework.dsl.dsl.removeVariable"), ctx.resolvedImports())
+        val code = emitCore(config)
+        assertContains(code, "import dev.museframework.dsl.dsl.removeVariable")
+        assertContains(code, "removeVariable(\"temporary\") {")
+        assertContains(code, "docId = \"remove-01\"")
+        assertContains(code, "docName = \"Remove temporary value\"")
     }
 }

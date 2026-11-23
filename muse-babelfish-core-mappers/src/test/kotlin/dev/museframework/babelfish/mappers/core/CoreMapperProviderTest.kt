@@ -4,6 +4,10 @@ import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
 import dev.museframework.babelfish.spi.BabelfishMapperProvider
+import dev.museframework.dsl.api.config.ChoiceConfig
+import dev.museframework.dsl.api.config.SchedulerConfig
+import dev.museframework.dsl.api.config.SetPayloadConfig
+import dev.museframework.dsl.api.model.flow.MuseFlow
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.lang.reflect.Modifier
@@ -11,9 +15,51 @@ import java.nio.file.Path
 import java.util.ServiceLoader
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class CoreMapperProviderTest {
+    @Test
+    fun `composes a scheduler and choice with an imported payload extension`(@TempDir dir: Path) {
+        val path = dir.resolve("pilot.xml")
+        path.toFile().writeText(
+            """
+            <mule xmlns="http://www.mulesoft.org/schema/mule/core"
+                  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+              <flow name="pilot" doc:id="flow">
+                <scheduler doc:id="source"/>
+                <choice doc:id="router">
+                  <when expression="#[true]">
+                    <set-payload doc:id="leaf" value="hello"/>
+                  </when>
+                </choice>
+              </flow>
+            </mule>
+            """.trimIndent(),
+        )
+        val registry = BabelfishRegistry().apply {
+            registerSource("", "scheduler", SchedulerSourceMapper)
+            registerElement("", "choice", ChoiceMapper)
+            registerElement("", "set-payload", SetPayloadMapper)
+        }
+        val result = MuseBabelfish.translateXmlToMuseKotlinDsl(path, registry)
+        val file = KotlinCodeEmitter().apply {
+            registerSourceEmitter(SchedulerConfig::class, KotlinPoetSchedulerSourceCodeEmitter)
+            registerElementEmitter(ChoiceConfig::class, ChoiceCodeEmitter)
+            registerElementEmitter(SetPayloadConfig::class, SetPayloadCodeEmitter)
+        }.emitFile(result, "com.example")
+
+        val flow = assertIs<MuseFlow.Flow>(result.flows.single())
+        assertIs<SchedulerConfig>(flow.source)
+        val choice = assertIs<ChoiceConfig>(flow.pipeline.single())
+        val payload = assertIs<SetPayloadConfig>(choice.whenRoutes.single().pipeline.single())
+        assertEquals("hello", payload.value)
+        val source = file.toString()
+        for (extension in listOf("scheduler", "choice", "setPayload")) {
+            assertContains(source, "import dev.museframework.dsl.dsl.$extension")
+        }
+    }
+
     @Test
     fun `provider id is core`() {
         assertEquals("core", CoreMapperProvider().id)

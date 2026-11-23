@@ -5,7 +5,9 @@ import dev.museframework.dsl.api.config.MuseConfigDefinition
 import dev.museframework.dsl.api.config.RemoveVariableConfig
 import dev.museframework.dsl.api.config.SchedulerConfig
 import dev.museframework.dsl.api.config.SetPayloadConfig
+import dev.museframework.dsl.api.config.TransformConfig
 import dev.museframework.dsl.api.config.WithCorrelationIdConfig
+import dev.museframework.dsl.api.expression.DwExpression
 import dev.museframework.e2e.packaged.generated.ComponentIdentityConfig
 import dev.museframework.e2e.packaged.generated.CoreFlowControlConfig
 import dev.museframework.e2e.packaged.generated.CrossFileSubflowConfig
@@ -111,6 +113,16 @@ class GeneratedKotlinCompilationIT {
             ),
             values,
         )
+    }
+
+    @Test
+    fun `compiled Kotlin preserves a multiline DataWeave expression with nested interpolation`() {
+        val transform = assertIs<TransformConfig>(ComponentIdentityConfig().transformLiterals.pipeline.single())
+        val payload = assertIs<DwExpression.Inline>(transform.setPayload)
+
+        val expected = "%dw 2.0\r\noutput application/json\n---\n" +
+            """{ labels: ["$(vars.outer ++ "$(vars.inner)")", "quote: \"ok\""] }"""
+        assertEquals(expected, payload.expression)
     }
 
     private fun loadGeneratedClass(simpleName: String): Class<*> =

@@ -1,55 +1,43 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.dsl.api.config.TransformConfig
 import dev.museframework.dsl.api.expression.DwExpression
-import com.squareup.kotlinpoet.CodeBlock
 
 object TransformCodeEmitter : ElementCodeEmitter<TransformConfig> {
-    override fun emit(
-        element: TransformConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.dsl.dsl.transform")
-        ctx.addImport("dev.museframework.dsl.api.expression.DwExpression")
+    private val transform = MemberName("dev.museframework.dsl.dsl", "transform")
 
-        val codeBlock = CodeBlock.builder().apply {
-            add("transform·{\n")
-            add("    docName·=·%S\n", element.docName)
-            addDocumentationId(element.docId, ctx)
-
-            element.setPayload?.let { dwExpr ->
-                add("    setPayload·=·%L\n", emitDwExpression(dwExpr))
-            }
-
-            element.setAttributes?.let { dwExpr ->
-                add("    setAttributes·=·%L\n", emitDwExpression(dwExpr))
-            }
-
-            if (element.setVariables.isNotEmpty()) {
-                element.setVariables.forEach { variable ->
-                    val varName = variable.variableName
-                    val varExpr = emitDwExpression(variable.expression)
-                    add("    setVariable(%S,·%L)\n", varName, varExpr)
-                }
-            }
-
-            add("}")
-        }.build()
-
-        return codeBlock.toString()
+    override fun emit(element: TransformConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", transform)
+        addDocumentation(element)
+        element.setPayload?.let { addStatement("setPayload = %L", emitExpression(it)) }
+        element.setAttributes?.let { addStatement("setAttributes = %L", emitExpression(it)) }
+        for (variable in element.setVariables) {
+            addStatement(
+                "setVariable(%L, %L)",
+                kotlinStringLiteral(variable.variableName),
+                emitExpression(variable.expression),
+            )
+        }
+        endControlFlow()
     }
 
-    private fun emitDwExpression(expr: DwExpression): CodeBlock =
-        when (expr) {
-            is DwExpression.Inline -> {
-                val escapedContent = expr.expression.replace("\"\"\"", "\\\"\\\"\\\"")
-                CodeBlock.of("DwExpression.Inline(\"\"\"%L\"\"\")", escapedContent)
-            }
+    private fun emitExpression(expression: DwExpression): CodeBlock = when (expression) {
+        is DwExpression.Inline -> CodeBlock.of(
+            "%T.Inline(%L)",
+            DwExpression::class,
+            kotlinStringLiteral(expression.expression),
+        )
 
-            is DwExpression.Resource -> {
-                CodeBlock.of("DwExpression.Resource(%S)", expr.path)
-            }
-        }
+        is DwExpression.Resource -> CodeBlock.of(
+            "%T.Resource(%L)",
+            DwExpression::class,
+            kotlinStringLiteral(expression.path),
+        )
+    }
 }

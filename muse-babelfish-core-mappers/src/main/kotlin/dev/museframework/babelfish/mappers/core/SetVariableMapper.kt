@@ -1,12 +1,15 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.SetVariableConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 object SetVariableMapper : ElementMapper<SetVariableConfig> {
@@ -22,15 +25,13 @@ object SetVariableMapper : ElementMapper<SetVariableConfig> {
 }
 
 object SetVariableCodeEmitter : ElementCodeEmitter<SetVariableConfig> {
-    override fun emit(element: SetVariableConfig, ctx: CodegenContext): String {
-        ctx.addImport("dev.museframework.dsl.dsl.setVariable")
-        val codeBlock = CodeBlock.builder().apply {
-            add("setVariable(%S)·{\n", element.variableName)
-            addDocumentation(element, ctx)
-            add("    value·=·%S\n", element.value)
-            element.mimeType?.let { add("    mimeType·=·%S\n", it) }
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val setVariable = MemberName("dev.museframework.dsl.dsl", "setVariable")
+
+    override fun emit(element: SetVariableConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M(%L)", setVariable, kotlinStringLiteral(element.variableName))
+        addDocumentation(element)
+        addStatement("value = %L", kotlinStringLiteral(element.value))
+        element.mimeType?.let { addStatement("mimeType = %L", kotlinStringLiteral(it)) }
+        endControlFlow()
     }
 }

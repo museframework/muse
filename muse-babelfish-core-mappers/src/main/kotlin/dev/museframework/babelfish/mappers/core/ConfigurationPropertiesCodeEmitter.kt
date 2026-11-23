@@ -1,25 +1,20 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.dsl.api.config.ConfigurationPropertiesConfig
-import com.squareup.kotlinpoet.CodeBlock
 
 object ConfigurationPropertiesCodeEmitter : ConfigCodeEmitter<ConfigurationPropertiesConfig> {
-    override fun emit(
-        config: ConfigurationPropertiesConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.dsl.api.config.ConfigurationPropertiesConfig")
-        
-        val codeBlock = CodeBlock.builder().apply {
-            add("ConfigurationPropertiesConfig(\n")
-            add("    docName·=·%S,\n", config.docName)
-            add("    docId·=·%S,\n", config.docId)
-            add("    file·=·%S\n", config.file)
-            add(")")
-        }.build()
-        
-        return codeBlock.toString()
+    override fun emit(config: ConfigurationPropertiesConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        add("%T(\n", ConfigurationPropertiesConfig::class)
+        indent()
+        addStatement("docName = %L,", kotlinStringLiteral(config.docName))
+        addStatement("docId = %L,", kotlinStringLiteral(config.docId))
+        addStatement("file = %L,", kotlinStringLiteral(config.file))
+        unindent()
+        add(")")
     }
 }

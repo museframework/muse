@@ -1,13 +1,16 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.LogLevel
 import dev.museframework.dsl.api.config.LoggerConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 object LoggerMapper : ElementMapper<LoggerConfig> {
@@ -33,19 +36,13 @@ object LoggerMapper : ElementMapper<LoggerConfig> {
 }
 
 object LoggerCodeEmitter : ElementCodeEmitter<LoggerConfig> {
-    override fun emit(
-        element: LoggerConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.engine.components.processor.dsl.logger")
-        ctx.addImport("dev.museframework.dsl.api.config.LogLevel")
-        val codeBlock = CodeBlock.builder().apply {
-            add("logger·{\n")
-            addDocumentation(element, ctx)
-            add("    message·=·%S\n", element.message)
-            add("    level·=·LogLevel.%L\n", element.level)
-            add("}")
-        }.build()
-        return codeBlock.toString()
+    private val logger = MemberName("dev.museframework.engine.components.processor.dsl", "logger")
+
+    override fun emit(element: LoggerConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", logger)
+        addDocumentation(element)
+        addStatement("message = %L", kotlinStringLiteral(element.message))
+        addStatement("level = %T.%N", LogLevel::class, element.level.name)
+        endControlFlow()
     }
 }

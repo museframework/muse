@@ -1,14 +1,17 @@
 package dev.museframework.babelfish.mappers.core
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ElementMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ElementCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawElement
 import dev.museframework.dsl.api.config.TargetConfig
 import dev.museframework.dsl.api.model.flow.FlowRef
 import dev.museframework.dsl.api.model.flow.FlowRefConfig
-import com.squareup.kotlinpoet.CodeBlock
 import java.util.UUID
 
 /**
@@ -40,32 +43,20 @@ object FlowRefMapper : ElementMapper<FlowRefConfig> {
  * Generates: flowRef("flow-name") { }
  */
 object FlowRefCodeEmitter : ElementCodeEmitter<FlowRefConfig> {
-    override fun emit(
-        element: FlowRefConfig,
-        ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.dsl.dsl.flowRef")
-        return when (val ref = element.ref) {
-            is FlowRef.ByName -> {
-                val codeBlock = CodeBlock.builder().apply {
-                    add("flowRef(%S)·{\n", ref.name)
-                    addDocumentation(element, ctx)
-                    element.targetConfig?.let { target ->
-                        ctx.addImport("dev.museframework.dsl.api.config.TargetConfig")
-                        add("    targetConfig·=·TargetConfig(%S", target.target)
-                        target.targetValue?.let { add(",·%S", it) }
-                        add(")\n")
-                    }
-                    add("}")
-                }.build()
-                codeBlock.toString()
-            }
+    private val flowRef = MemberName("dev.museframework.dsl.dsl", "flowRef")
 
-            is FlowRef.ByReference -> {
-                // XML mapping always produces ByName - reference requires resolution
-                // This branch is included for exhaustiveness but should not be reached
-                "flowRef(/* reference */) { }"
-            }
+    override fun emit(element: FlowRefConfig, ctx: CodegenContext): CodeBlock = buildCodeBlock {
+        val name = when (val ref = element.ref) {
+            is FlowRef.ByName -> ref.name
+            is FlowRef.ByReference -> ref.flow.name
         }
+        beginControlFlow("%M(%L)", flowRef, kotlinStringLiteral(name))
+        addDocumentation(element)
+        element.targetConfig?.let { target ->
+            add("targetConfig = %T(%L", TargetConfig::class, kotlinStringLiteral(target.target))
+            target.targetValue?.let { add(", %L", kotlinStringLiteral(it)) }
+            add(")\n")
+        }
+        endControlFlow()
     }
 }

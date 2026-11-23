@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
       xmlns:meta="http://www.mulesoft.org/schema/mule/documentation">
     <flow name="scheduled-identity" meta:id="flow&#10;identity">
         <scheduler meta:id="scheduler&#13;&#10;identity">
@@ -20,5 +21,14 @@
         <set-payload value="tab&#9;here" meta:id="literal-tab"/>
         <set-payload value="&quot;quote&quot; &quot;&quot;&quot;" meta:id="literal-quotes"/>
         <set-payload value="back\slash $ ${literal} 100% &#x1F642;" meta:id="literal-symbols"/>
+    </sub-flow>
+    <sub-flow name="transform-literals" meta:id="transform-literals">
+        <ee:transform meta:id="complex-transform">
+            <ee:message>
+                <ee:set-payload>%dw 2.0&#13;&#10;output application/json
+---
+{ labels: ["$(vars.outer ++ "$(vars.inner)")", "quote: \"ok\""] }</ee:set-payload>
+            </ee:message>
+        </ee:transform>
     </sub-flow>
 </mule>
