@@ -28,7 +28,13 @@ import java.nio.file.Path
 import kotlin.reflect.KClass
 
 class KotlinCodeEmitter {
-    private val configEmitters = mutableMapOf<KClass<*>, OwnedRegistration<ConfigCodeEmitter<*>>>()
+    private data class ConfigEmitterRegistration<T : MuseConfiguration>(
+        val emitter: ConfigCodeEmitter<T>,
+        val generatedType: KClass<out MuseConfiguration>,
+    )
+
+    private val configEmitters =
+        mutableMapOf<KClass<*>, OwnedRegistration<ConfigEmitterRegistration<*>>>()
     private val sourceEmitters = mutableMapOf<KClass<*>, OwnedRegistration<SourceCodeEmitter<*>>>()
     private val elementEmitters = mutableMapOf<KClass<*>, OwnedRegistration<ElementCodeEmitter<*>>>()
     private var registrationOwner = BabelfishRegistrationOwner.DIRECT
@@ -49,12 +55,23 @@ class KotlinCodeEmitter {
     fun <T : MuseConfiguration> registerConfigEmitter(
         type: KClass<T>,
         emitter: ConfigCodeEmitter<T>,
+    ) = registerConfigEmitter(type, type, emitter)
+
+    /**
+     * Register an emitter whose DSL initializer returns a public type different
+     * from the mapped model type. The two-argument overload uses [type] as the
+     * generated property type.
+     */
+    fun <T : MuseConfiguration> registerConfigEmitter(
+        type: KClass<T>,
+        generatedType: KClass<out MuseConfiguration>,
+        emitter: ConfigCodeEmitter<T>,
     ) {
         configEmitters.registerIfAbsent(
             type,
             type.java.name,
             "configuration emitter",
-            emitter,
+            ConfigEmitterRegistration(emitter, generatedType),
             registrationOwner,
         )
     }
@@ -104,11 +121,12 @@ class KotlinCodeEmitter {
         val configNames = result.usedConfigs.keys.map(ctx::configValName)
         val flowNames = result.flows.map { ctx.flowValName(it.name) }
         result.usedConfigs.forEach { (id, config) ->
-            @Suppress("UNCHECKED_CAST")
-            val emitter = configEmitters[config::class]?.value as? ConfigCodeEmitter<MuseConfiguration>
+            val registration = configEmitters[config::class]?.value
                 ?: ctx.missingEmitter("configuration", config)
+            @Suppress("UNCHECKED_CAST")
+            val emitter = registration.emitter as ConfigCodeEmitter<MuseConfiguration>
             type.addProperty(
-                PropertySpec.builder(ctx.configValName(id), config::class)
+                PropertySpec.builder(ctx.configValName(id), registration.generatedType)
                     .initializer(emitter.emit(config, ctx))
                     .build(),
             )

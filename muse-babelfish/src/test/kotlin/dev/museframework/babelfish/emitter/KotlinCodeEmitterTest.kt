@@ -1,11 +1,14 @@
 package dev.museframework.babelfish.emitter
 
+import com.squareup.kotlinpoet.CodeBlock
 import dev.museframework.babelfish.mapper.TranslationResult
+import dev.museframework.dsl.api.model.config.MuseConfiguration
 import dev.museframework.dsl.api.model.flow.MuseFlow
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import java.nio.file.Path
 
@@ -124,6 +127,27 @@ class KotlinCodeEmitterTest {
     }
 
     @Test
+    fun `config emitter declares its public generated type independently of the mapped model`() {
+        val emitter = KotlinCodeEmitter()
+        emitter.registerConfigEmitter(
+            PrivateProviderConfig::class,
+            PublicProviderConfig::class,
+            ConfigCodeEmitter { _, _ -> CodeBlock.of("%T()", PublicProviderConfig::class) },
+        )
+        val result =
+            TranslationResult(
+                sourceFile = Path.of("provider-config.xml"),
+                flows = emptyList(),
+                usedConfigs = mapOf("provider-config" to PrivateProviderConfig()),
+            )
+
+        val code = emitter.emit(result, "com.example")
+
+        assertContains(code, "val providerConfig: PublicProviderConfig = PublicProviderConfig()")
+        assertFalse(code.contains("PrivateProviderConfig"))
+    }
+
+    @Test
     fun `class and property names have one stable allocation per file`() {
         val result = TranslationResult(
             Path.of("3-order.API__flow.XML"),
@@ -162,4 +186,22 @@ class KotlinCodeEmitterTest {
         assertEquals("orderApiFlow", ctx.flowValName("order-api-flow"))
         assertEquals("processOrder", ctx.flowValName("process_order"))
     }
+}
+
+private class PrivateProviderConfig : MuseConfiguration {
+    override val docName: String = "private"
+    override val docId: String = "private"
+    override val docDescription: String? = null
+    override val sourceFile: String? = null
+    override val sourceLine: Int? = null
+    override val sourceClass: String? = null
+}
+
+class PublicProviderConfig : MuseConfiguration {
+    override val docName: String = "public"
+    override val docId: String = "public"
+    override val docDescription: String? = null
+    override val sourceFile: String? = null
+    override val sourceLine: Int? = null
+    override val sourceClass: String? = null
 }

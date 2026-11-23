@@ -11,6 +11,7 @@ import dev.museframework.plugin.core.codegen.GeneratedFile
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
+import java.util.Locale
 
 class TranslatorFacade(
     private val registry: TranslatorRegistry = TranslatorRegistry.load(),
@@ -45,7 +46,8 @@ class TranslatorFacade(
         return xmlFiles.sorted().map { source ->
             val result = translateFile(source, packageName, configurationClassSpec, nativeBuild, lenient)
             for (output in result.generatedFiles) {
-                val previous = outputOwners.put(output.relativePath, source)
+                val portablePath = output.relativePath.replace('\\', '/').lowercase(Locale.ROOT)
+                val previous = outputOwners.putIfAbsent(portablePath, source)
                 if (previous != null) {
                     throw MuseTranslationException(
                         "Both '${previous.path}' and '${source.path}' generate '${output.relativePath}'",
