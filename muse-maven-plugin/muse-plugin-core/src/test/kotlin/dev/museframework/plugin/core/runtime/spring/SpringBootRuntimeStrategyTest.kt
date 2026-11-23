@@ -65,9 +65,18 @@ class SpringBootRuntimeStrategyTest {
         val entryPoint = files.single { it.kind == GeneratedFile.Kind.KOTLIN_SOURCE }
         val properties = files.single { it.kind == GeneratedFile.Kind.RESOURCE }
 
-        assertTrue(entryPoint.relativePath.startsWith("com/example/muse/"))
-        assertContains(entryPoint.content, "runMuseApplication<")
-        assertContains(entryPoint.content, "(args)")
+        assertEquals("com/example/muse/MyAppApplication.kt", entryPoint.relativePath)
+        assertContains(entryPoint.content, "fun main(args: Array<String>)")
+        assertContains(entryPoint.content, "runMuseApplication<MyAppApplicationMarker>(args)")
+        assertContains(
+            entryPoint.content,
+            "@MuseApplication(webEnvironment = WebApplicationType.SERVLET)",
+        )
+        assertContains(
+            entryPoint.content,
+            "@ComponentScan(basePackages = [\"com.example.muse\", \"dev.museframework\"])",
+        )
+        assertContains(entryPoint.content, "class MyAppApplicationMarker")
         assertEquals("resources/application-muse.properties", properties.relativePath)
         assertContains(properties.content, "muse.application.name=MyApp")
     }
@@ -92,6 +101,7 @@ class SpringBootRuntimeStrategyTest {
         assertContains(pom, "<artifactId>muse-spring-boot</artifactId>")
         assertContains(pom, "<artifactId>muse-http-connector-spring</artifactId>")
         assertContains(pom, "<artifactId>muse-apikit-connector-spring</artifactId>")
+        assertFalse(pom.contains("kotlinpoet"))
         assertFalse(pom.contains("<artifactId>spring-boot-starter-web</artifactId>"))
     }
 
@@ -103,6 +113,10 @@ class SpringBootRuntimeStrategyTest {
 
         assertEquals("spring-boot-maven-plugin", run.artifactId)
         assertEquals("run", run.goal)
+        assertEquals(
+            mapOf("mainClass" to "com.example.muse.MyAppApplicationKt", "addResources" to "true"),
+            run.configuration,
+        )
         assertEquals("repackage", build.goal)
         assertEquals("build-image", image.goal)
     }
