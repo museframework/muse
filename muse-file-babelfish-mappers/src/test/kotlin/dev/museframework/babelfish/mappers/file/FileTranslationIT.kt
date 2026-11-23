@@ -3,6 +3,7 @@ package dev.museframework.babelfish.mappers.file
 import dev.museframework.babelfish.MuseBabelfish
 import dev.museframework.babelfish.api.BabelfishRegistry
 import dev.museframework.babelfish.emitter.KotlinCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.TranslationResult
 import dev.museframework.dsl.api.config.TargetConfig
 import dev.museframework.dsl.api.model.config.ConfigRef
@@ -23,15 +24,18 @@ import dev.museframework.file.api.model.FileTypeRequirement
 import dev.museframework.file.api.model.FileWriteMode
 import dev.museframework.file.api.model.SortOrder
 import dev.museframework.file.api.model.WatermarkMode
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
 import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FileTranslationIT {
     @Test
@@ -64,6 +68,7 @@ class FileTranslationIT {
         assertEquals(TimeUnit.MILLISECONDS, connection.timeBetweenSizeCheckUnit)
 
         val flow = assertIs<MuseFlow.Flow>(result.flows.single())
+        assertEquals("file-flow-original", flow.docId)
         val listener = assertIs<FileListenerConfig>(flow.source)
         val listenerRef = assertIs<ConfigRef.ByName>(listener.connectionConfig)
         assertEquals("File_Config", listenerRef.name)
@@ -85,7 +90,7 @@ class FileTranslationIT {
         assertEquals(Duration.ofSeconds(1), listener.matcher?.updatedInTheLast)
 
         val pipeline = flow.pipeline
-        assertEquals(8, pipeline.size)
+        assertEquals(9, pipeline.size)
 
         val read = assertIs<FileReadConfig>(pipeline[0])
         assertEquals("inbox/input.txt", read.path)
@@ -134,6 +139,29 @@ class FileTranslationIT {
         val createDirectory = assertIs<FileCreateDirectoryConfig>(pipeline[7])
         assertEquals("inbox/created", createDirectory.directoryPath)
 
+        val secondaryWrite = assertIs<FileWriteConfig>(pipeline[8])
+        assertEquals("outbox/secondary.txt", secondaryWrite.path)
+
+        assertAll(
+            { assertEquals("file-connection-original", connection.docId) },
+            { assertEquals("file-matcher-original", namedMatcher.docId) },
+            { assertEquals("file-listener-original", listener.docId) },
+            { assertEquals("file-read-original", read.docId) },
+            { assertEquals("file-write-original", write.docId) },
+            { assertEquals("file-list-original", list.docId) },
+            { assertEquals("file-copy-original", copy.docId) },
+            { assertEquals("file-move-original", move.docId) },
+            { assertEquals("file-delete-original", delete.docId) },
+            { assertEquals("file-rename-original", rename.docId) },
+            { assertEquals("file-create-directory-original", createDirectory.docId) },
+            {
+                assertEquals(
+                    "file-write-" + '"' + "secondary" + '"' + '-' + '$' + "batch",
+                    secondaryWrite.docId,
+                )
+            },
+        )
+
         val code =
             KotlinCodeEmitter()
                 .apply { provider.registerEmitters(this) }
@@ -170,14 +198,43 @@ class FileTranslationIT {
         assertContains(code, "fileDelete(fileConnection(\"File_Config\"))")
         assertContains(code, "fileRename(fileConnection(\"File_Config\"))")
         assertContains(code, "fileCreateDirectory(fileConnection(\"File_Config\"))")
+        assertCodeRegionHasDocId(code, "fileConnection {", "fileMatcher {", connection.docId)
+        assertCodeRegionHasDocId(
+            code,
+            "fileMatcher {",
+            "fileListener(\"File_Config\")",
+            namedMatcher.docId,
+        )
+        assertCallHasDocId(code, "fileListener(\"File_Config\")", listener.docId)
+        assertCallHasDocId(code, "fileRead(fileConnection(\"File_Config\"))", read.docId)
+        assertCallHasDocId(code, "fileWrite(fileConnection(\"File_Config\"))", write.docId)
+        assertCallHasDocId(
+            code,
+            "fileWrite(fileConnection(\"File_Config\"))",
+            secondaryWrite.docId,
+            occurrence = 1,
+        )
+        assertCallHasDocId(code, "fileList(fileConnection(\"File_Config\"))", list.docId)
+        assertCallHasDocId(code, "fileCopy(fileConnection(\"File_Config\"))", copy.docId)
+        assertCallHasDocId(code, "fileMove(fileConnection(\"File_Config\"))", move.docId)
+        assertCallHasDocId(code, "fileDelete(fileConnection(\"File_Config\"))", delete.docId)
+        assertCallHasDocId(code, "fileRename(fileConnection(\"File_Config\"))", rename.docId)
+        assertCallHasDocId(
+            code,
+            "fileCreateDirectory(fileConnection(\"File_Config\"))",
+            createDirectory.docId,
+        )
         assertFalse(code.replace("`", "").contains("dev.museframework.connectors.file"))
     }
 
     @Test
     fun `translates a common archive listener with csv matcher`() {
         val result = translate("file-common-archive-listener.xml")
+        val connection = assertIs<FileConnectionConfig>(result.usedConfigs.getValue("File_Config"))
         val flow = assertIs<MuseFlow.Flow>(result.flows.single())
         val listener = assertIs<FileListenerConfig>(flow.source)
+        assertTrue(runCatching { UUID.fromString(connection.docId) }.isSuccess)
+        assertTrue(runCatching { UUID.fromString(listener.docId) }.isSuccess)
         assertNull(listener.sourceFile)
         assertNull(listener.sourceLine)
         assertNull(listener.sourceClass)
@@ -188,6 +245,8 @@ class FileTranslationIT {
         assertEquals(1_000L, listener.pollingFrequencyMillis)
 
         val code = emit(result)
+        assertContains(code, "docId = " + kotlinStringLiteral(connection.docId))
+        assertCallHasDocId(code, "fileListener(\"File_Config\")", listener.docId)
         assertContains(code, "directory = \"input\"")
         assertContains(code, "moveToDirectory = \"output\"")
         assertContains(code, "filenamePattern = \"*.csv\"")
@@ -198,10 +257,12 @@ class FileTranslationIT {
         val result = translate("file-common-read-csv.xml")
         val flow = assertIs<MuseFlow.Flow>(result.flows.single())
         val read = assertIs<FileReadConfig>(flow.pipeline.single())
+        assertTrue(runCatching { UUID.fromString(read.docId) }.isSuccess)
         assertEquals("files/data.csv", read.path)
         assertEquals("application/csv; streaming=true", read.outputMimeType)
 
         val code = emit(result)
+        assertCallHasDocId(code, "fileRead(fileConnection(\"File_Config\"))", read.docId)
         assertContains(code, "path = \"files/data.csv\"")
         assertContains(code, "outputMimeType = \"application/csv; streaming=true\"")
     }
@@ -236,6 +297,38 @@ class FileTranslationIT {
 
         val code = emit(result)
         assertContains(code, "directoryPath = \"./\"")
+    }
+
+    private fun assertCallHasDocId(
+        code: String,
+        call: String,
+        docId: String,
+        occurrence: Int = 0,
+    ) {
+        val matches = Regex.escape(call).toRegex().findAll(code).toList()
+        assertTrue(occurrence < matches.size, "Expected generated call #$occurrence for $call")
+
+        val afterCall = code.substring(matches[occurrence].range.last + 1)
+        val expectedAssignment = "docId = " + kotlinStringLiteral(docId)
+        val expectedPrefix = Regex("^\\s*\\{\\s*" + Regex.escape(expectedAssignment))
+        assertTrue(
+            expectedPrefix.containsMatchIn(afterCall),
+            "Expected $call #$occurrence to emit docId $docId in its own DSL block",
+        )
+    }
+
+    private fun assertCodeRegionHasDocId(
+        code: String,
+        start: String,
+        end: String,
+        docId: String,
+    ) {
+        val startIndex = code.indexOf(start)
+        assertTrue(startIndex >= 0, "Expected generated code to contain $start")
+        val endIndex = code.indexOf(end, startIndex + start.length)
+        assertTrue(endIndex > startIndex, "Expected $end after $start")
+        val region = code.substring(startIndex, endIndex)
+        assertContains(region, "docId = " + kotlinStringLiteral(docId))
     }
 
     private fun translate(fixture: String) =

@@ -2,19 +2,21 @@
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
       xmlns:file="http://www.mulesoft.org/schema/mule/file"
       xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:meta="http://www.mulesoft.org/schema/mule/documentation"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
 
-    <file:config name="generated-files" doc:name="Generated files">
+    <file:config name="generated-files" doc:name="Generated files" meta:id="packaged-file-connection-original">
         <file:connection workingDir="generated"/>
     </file:config>
 
-    <file:matcher name="text-files" filenamePattern="*.txt"/>
+    <file:matcher name="text-files" meta:id="packaged-file-matcher-original" filenamePattern="*.txt"/>
 
     <flow name="generated-file-flow" doc:id="generated-file-flow">
         <file:listener config-ref="generated-files"
+                       doc:id="packaged-file-listener-original"
                        directory="incoming"
                        moveToDirectory="archive"
                        renameTo="processed.txt"
@@ -26,6 +28,7 @@
         </file:listener>
         <file:write config-ref="generated-files"
                     path="output/copied.txt"
+                    doc:id="packaged-file-write-original"
                     createParentDirectories="true"
                     doc:name="Generated file write">
             <file:content><![CDATA[#[payload]]]></file:content>
@@ -34,15 +37,16 @@
     <sub-flow name="file-options" doc:id="file-options-id">
         <file:read config-ref="generated-files" path="inbox\$batch\input.csv"
                    outputMimeType="application/csv; streaming=true" outputEncoding=""
-                   target="rows" targetValue="#[payload]"/>
-        <file:list config-ref="generated-files" directoryPath="inbox" matcher="text-files">
+                   target="rows" targetValue="#[payload]" doc:id="packaged-file-read-original"/>
+        <file:list config-ref="generated-files" directoryPath="inbox" matcher="text-files" doc:id="packaged-file-list-original">
             <file:matcher minSize="2"/>
             <file:subset limit="3" order="ASCENDING"/>
         </file:list>
-        <file:copy config-ref="generated-files" sourcePath="original" targetPath="copy" renameTo=""/>
-        <file:move config-ref="generated-files" sourcePath="copy" targetPath="archive"/>
-        <file:delete config-ref="generated-files" path="obsolete"/>
-        <file:rename config-ref="generated-files" path="old" to="new"/>
-        <file:create-directory config-ref="generated-files" directoryPath="created"/>
+        <file:copy config-ref="generated-files" sourcePath="original" targetPath="copy" renameTo="" doc:id="packaged-file-copy-original"/>
+        <file:move config-ref="generated-files" sourcePath="copy" targetPath="archive" doc:id="packaged-file-move-original"/>
+        <file:delete config-ref="generated-files" path="obsolete" doc:id="packaged-file-delete-original"/>
+        <file:rename config-ref="generated-files" path="old" to="new" doc:id="packaged-file-rename-original"/>
+        <file:create-directory config-ref="generated-files" directoryPath="created" doc:id="packaged-file-create-directory-original"/>
+        <file:write config-ref="generated-files" path="secondary.txt" meta:id="packaged-file-write-&quot;secondary&quot;-$batch"/>
     </sub-flow>
 </mule>

@@ -8,6 +8,7 @@ import dev.museframework.babelfish.emitter.ConfigCodeEmitter
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.file.api.config.FileConnectionConfig
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 object FileConnectionConfigMapper : ConfigMapper {
@@ -20,6 +21,7 @@ object FileConnectionConfigMapper : ConfigMapper {
         return FileConnectionConfig(
             name = configName,
             docName = config.attrs["doc:name"] ?: configName,
+            docId = config.attrs["doc:id"] ?: UUID.randomUUID().toString(),
             workingDirectory =
                 connection?.attrs?.get("workingDir")
                     ?: connection?.attrs?.get("workingDirectory")
@@ -44,6 +46,7 @@ object FileConnectionConfigCodeEmitter : ConfigCodeEmitter<FileConnectionConfig>
         beginControlFlow("%M", fileDsl("fileConnection"))
         addString("name", config.name)
         addString("docName", config.docName)
+        addString("docId", config.docId)
         addString("workingDirectory", config.workingDirectory)
         addLong("timeBetweenSizeCheck", config.timeBetweenSizeCheck)
         addTimeUnit("timeBetweenSizeCheckUnit", config.timeBetweenSizeCheckUnit, TimeUnit.MILLISECONDS)

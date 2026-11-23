@@ -29,9 +29,11 @@ class GeneratedFileCompilationIT {
     fun `compiled file DSL retains references options and exact paths`() {
         val config = FileGeneratedConfig()
         assertEquals("generated", config.generatedFiles.workingDirectory)
+        assertEquals("packaged-file-connection-original", config.generatedFiles.docId)
         val flow = config.generatedFileFlow
         assertEquals("generated-file-flow", flow.docId)
         val listener = assertIs<FileListenerConfig>(flow.source)
+        assertEquals("packaged-file-listener-original", listener.docId)
         assertEquals(ConfigRef.ByName("generated-files"), listener.connectionConfig)
         assertEquals(25L, listener.pollingFrequencyMillis)
         assertEquals(0L, listener.startDelayMillis)
@@ -42,29 +44,48 @@ class GeneratedFileCompilationIT {
         assertNull(listener.outputMimeType)
         assertNull(listener.encoding)
         val write = assertIs<FileWriteConfig>(flow.pipeline.single())
+        assertEquals("packaged-file-write-original", write.docId)
         assertEquals("output/copied.txt", write.path)
         assertEquals("#[payload]", write.content)
 
         val options = config.fileOptions
         assertEquals("file-options-id", options.docId)
+        assertEquals("packaged-file-matcher-original", config.textFiles.docId)
         val pipeline = options.pipeline
-        assertEquals(7, pipeline.size)
+        assertEquals(8, pipeline.size)
         val read = assertIs<FileReadConfig>(pipeline[0])
+        assertEquals("packaged-file-read-original", read.docId)
         assertEquals("inbox\\\$batch\\input.csv", read.path)
         assertEquals("application/csv; streaming=true", read.outputMimeType)
         assertEquals("", read.encoding)
         assertEquals(TargetConfig("rows", "#[payload]"), read.targetConfig)
         val list = assertIs<FileListConfig>(pipeline[1])
+        assertEquals("packaged-file-list-original", list.docId)
         assertEquals("*.txt", config.textFiles.matcher.filenamePattern)
         assertEquals("*.txt", list.matcher?.filenamePattern)
         assertEquals(2L, list.matcher?.minSize)
         assertEquals(3, list.subset?.limit)
         assertEquals(SortOrder.ASCENDING, list.subset?.order)
-        assertEquals("", assertIs<FileCopyConfig>(pipeline[2]).renameTo)
-        assertNull(assertIs<FileMoveConfig>(pipeline[3]).renameTo)
-        assertEquals("obsolete", assertIs<FileDeleteConfig>(pipeline[4]).path)
-        assertEquals("new", assertIs<FileRenameConfig>(pipeline[5]).to)
-        assertEquals("created", assertIs<FileCreateDirectoryConfig>(pipeline[6]).directoryPath)
+        val copy = assertIs<FileCopyConfig>(pipeline[2])
+        assertEquals("packaged-file-copy-original", copy.docId)
+        assertEquals("", copy.renameTo)
+        val move = assertIs<FileMoveConfig>(pipeline[3])
+        assertEquals("packaged-file-move-original", move.docId)
+        assertNull(move.renameTo)
+        val delete = assertIs<FileDeleteConfig>(pipeline[4])
+        assertEquals("packaged-file-delete-original", delete.docId)
+        assertEquals("obsolete", delete.path)
+        val rename = assertIs<FileRenameConfig>(pipeline[5])
+        assertEquals("packaged-file-rename-original", rename.docId)
+        assertEquals("new", rename.to)
+        val createDirectory = assertIs<FileCreateDirectoryConfig>(pipeline[6])
+        assertEquals("packaged-file-create-directory-original", createDirectory.docId)
+        assertEquals("created", createDirectory.directoryPath)
+        val secondaryWrite = assertIs<FileWriteConfig>(pipeline[7])
+        assertEquals(
+            "packaged-file-write-" + '"' + "secondary" + '"' + '-' + '$' + "batch",
+            secondaryWrite.docId,
+        )
     }
 
     @Test

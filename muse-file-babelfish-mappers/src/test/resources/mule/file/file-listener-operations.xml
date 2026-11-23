@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
       xmlns:file="http://www.mulesoft.org/schema/mule/file"
-      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation">
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:meta="http://www.mulesoft.org/schema/mule/documentation">
 
-    <file:config name="File_Config" doc:name="File Config" timeBetweenSizeCheck="25">
+    <file:config name="File_Config" doc:name="File Config" meta:id="file-connection-original" timeBetweenSizeCheck="25">
         <file:connection workingDir="/tmp/muse-file"
                          timeBetweenSizeCheckUnit="MILLISECONDS"/>
     </file:config>
 
-    <file:matcher name="smallFileMatcher" filenamePattern="*.txt" maxSize="100"/>
+    <file:matcher name="smallFileMatcher" meta:id="file-matcher-original" filenamePattern="*.txt" maxSize="100"/>
 
-    <flow name="file-provider-flow">
+    <flow name="file-provider-flow" doc:id="file-flow-original">
         <file:listener config-ref="File_Config"
+                       doc:id="file-listener-original"
                        directory="inbox"
                        recursive="false"
                        watermarkMode="MODIFIED_TIMESTAMP"
@@ -32,6 +34,7 @@
 
         <file:read config-ref="File_Config"
                    path="inbox/input.txt"
+                   doc:id="file-read-original"
                    lock="true"
                    timeBetweenSizeCheck="5"
                    timeBetweenSizeCheckUnit="MILLISECONDS"
@@ -40,6 +43,7 @@
 
         <file:write config-ref="File_Config"
                     path="outbox/output.txt"
+                    doc:id="file-write-original"
                     mode="APPEND"
                     createParentDirectories="true"
                     lock="false">
@@ -48,6 +52,7 @@
 
         <file:list config-ref="File_Config"
                    directoryPath="inbox"
+                   doc:id="file-list-original"
                    recursive="true"
                    matcher="smallFileMatcher"
                    timeBetweenSizeCheck="15"
@@ -58,6 +63,7 @@
         <file:copy config-ref="File_Config"
                    sourcePath="inbox/input.txt"
                    targetPath="copies"
+                   doc:id="file-copy-original"
                    createParentDirectories="true"
                    overwrite="true"
                    renameTo="copied.txt"/>
@@ -65,16 +71,22 @@
         <file:move config-ref="File_Config"
                    sourcePath="inbox/staging.txt"
                    targetPath="moved"
+                   doc:id="file-move-original"
                    createParentDirectories="false"
                    overwrite="false"/>
 
-        <file:delete config-ref="File_Config" path="inbox/obsolete.txt"/>
+        <file:delete config-ref="File_Config" path="inbox/obsolete.txt" doc:id="file-delete-original"/>
 
         <file:rename config-ref="File_Config"
                      path="inbox/old-name.txt"
                      to="new-name.txt"
+                     doc:id="file-rename-original"
                      overwrite="true"/>
 
-        <file:create-directory config-ref="File_Config" directoryPath="inbox/created"/>
+        <file:create-directory config-ref="File_Config" directoryPath="inbox/created" doc:id="file-create-directory-original"/>
+
+        <file:write config-ref="File_Config"
+                    path="outbox/secondary.txt"
+                    meta:id="file-write-&quot;secondary&quot;-$batch"/>
     </flow>
 </mule>
