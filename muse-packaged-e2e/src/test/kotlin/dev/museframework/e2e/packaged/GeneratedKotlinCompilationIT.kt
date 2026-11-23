@@ -17,6 +17,7 @@ import dev.museframework.e2e.packaged.generated.ComponentIdentityConfig
 import dev.museframework.e2e.packaged.generated.ConnectionsConfig
 import dev.museframework.e2e.packaged.generated.CoreFlowControlConfig
 import dev.museframework.e2e.packaged.generated.CrossFileSubflowConfig
+import dev.museframework.e2e.packaged.generated.HttpComponentIdentityConfig
 import dev.museframework.e2e.packaged.generated.OutboundRequestConfig
 import dev.museframework.e2e.packaged.generated.SimpleEchoConfig
 import dev.museframework.http.api.config.ConnectionConfigRef
@@ -202,6 +203,20 @@ class GeneratedKotlinCompilationIT {
         assertEquals("packaged-loopback", requestRef.name)
         assertEquals(connections.packagedLoopback.name, requestRef.name)
         assertEquals("Packaged loopback request", connections.packagedLoopback.docName)
+    }
+
+    @Test
+    fun `compiled HTTP listener and same-type requests keep source XML IDs`() {
+        val flow = HttpComponentIdentityConfig().httpComponentIdentity
+        val listener = assertIs<HttpListenerConfig>(flow.source)
+        val requests = flow.pipeline.map { assertIs<HttpRequestConfig>(it) }
+        val escapedRequestId = "http-request-\"second\"-\$"
+
+        assertEquals("http-flow-identity", flow.docId)
+        assertEquals("http-listener-identity", listener.docId)
+        assertEquals(listOf("http-request-first", escapedRequestId), requests.map { it.docId })
+        assertEquals("/identity", listener.path)
+        assertEquals(listOf("/first", "/second"), requests.map { it.path })
     }
 
     private fun loadGeneratedClass(simpleName: String): Class<*> =

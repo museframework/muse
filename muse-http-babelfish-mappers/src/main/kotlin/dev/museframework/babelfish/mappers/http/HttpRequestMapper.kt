@@ -63,24 +63,28 @@ object HttpRequestMapper : ElementMapper<HttpRequestConfig> {
     override fun map(
         element: RawElement,
         ctx: MappingContext,
-    ): HttpRequestConfig =
-        HttpRequestConfig(
-            connectionConfig = ConfigRef.ByName(element.requireAttr("config-ref", element.location)),
-            path = element.attrs["path"] ?: "/",
-            url = element.attrs["url"],
-            method = element.attrs["method"]?.toEnum<HttpMethod>() ?: HttpMethod.GET,
-            headersExpression = element.childText("headers"),
-            queryParamsExpression = element.childText("query-params"),
-            uriParamsExpression = element.childText("uri-params"),
-            body = element.childText("body"),
-            responseTimeoutMs = element.attrs["responseTimeout"]?.toLongOrNull(),
-            followRedirects = element.attrs["followRedirects"]?.toBooleanStrictOrNull(),
-            sendBodyMode = element.attrs["sendBodyMode"]?.toEnum<HttpSendBodyMode>(),
-            requestStreamingMode = element.attrs["requestStreamingMode"]?.toEnum<HttpStreamingMode>(),
-            sendCorrelationId = element.attrs["sendCorrelationId"]?.toEnum<SendCorrelationId>(),
-            correlationId = element.attrs["correlationId"],
-            targetConfig = element.attrs["target"]?.let { TargetConfig(it, element.attrs["targetValue"]) },
-        )
+    ): HttpRequestConfig {
+        val mapped =
+            HttpRequestConfig(
+                connectionConfig = ConfigRef.ByName(element.requireAttr("config-ref", element.location)),
+                path = element.attrs["path"] ?: "/",
+                url = element.attrs["url"],
+                method = element.attrs["method"]?.toEnum<HttpMethod>() ?: HttpMethod.GET,
+                headersExpression = element.childText("headers"),
+                queryParamsExpression = element.childText("query-params"),
+                uriParamsExpression = element.childText("uri-params"),
+                body = element.childText("body"),
+                responseTimeoutMs = element.attrs["responseTimeout"]?.toLongOrNull(),
+                followRedirects = element.attrs["followRedirects"]?.toBooleanStrictOrNull(),
+                sendBodyMode = element.attrs["sendBodyMode"]?.toEnum<HttpSendBodyMode>(),
+                requestStreamingMode = element.attrs["requestStreamingMode"]?.toEnum<HttpStreamingMode>(),
+                sendCorrelationId = element.attrs["sendCorrelationId"]?.toEnum<SendCorrelationId>(),
+                correlationId = element.attrs["correlationId"],
+                targetConfig = element.attrs["target"]?.let { TargetConfig(it, element.attrs["targetValue"]) },
+            )
+
+        return element.attrs["doc:id"]?.let { mapped.copy(docId = it) } ?: mapped
+    }
 }
 
 private val httpRequestConnection = MemberName("dev.museframework.http.api.dsl", "httpRequestConnection")
@@ -149,6 +153,7 @@ object HttpRequestCodeEmitter : ElementCodeEmitter<HttpRequestConfig> {
         }
 
         beginControlFlow("%M(%L)", httpRequest, configRef)
+        addStatement("docId = %L", kotlinStringLiteral(element.docId))
         val url = element.url
         if (url != null) {
             addStatement("url = %L", kotlinStringLiteral(url))

@@ -63,7 +63,7 @@ object HttpListenerMapper : SourceMapper<HttpListenerConfig> {
         val successResponse = element.children.find { it.tag == "response" }
         val errorResponse = element.children.find { it.tag == "error-response" }
 
-        return HttpListenerConfig(
+        val mapped = HttpListenerConfig(
             connectionConfigRef =
                 ConnectionConfigRef.ByName(
                     element.requireAttr("config-ref", element.location),
@@ -92,6 +92,8 @@ object HttpListenerMapper : SourceMapper<HttpListenerConfig> {
                 element.attrs["responseStreamingMode"]?.toHttpEnum<HttpStreamingMode>()
                     ?: HttpStreamingMode.AUTO,
         )
+
+        return element.attrs["doc:id"]?.let { mapped.copy(docId = it) } ?: mapped
     }
 }
 
@@ -140,6 +142,7 @@ object HttpListenerCodeEmitter : SourceCodeEmitter<HttpListenerConfig> {
         }
 
         beginControlFlow("%M(%L)", httpListener, listenerArg)
+        addStatement("docId = %L", kotlinStringLiteral(source.docId))
         addStatement("path = %L", kotlinStringLiteral(source.path))
         if (source.allowedMethods != listOf(HttpMethod.ANY)) {
             val methods = source.allowedMethods.map { CodeBlock.of("%T.%N", HttpMethod::class, it.name) }
