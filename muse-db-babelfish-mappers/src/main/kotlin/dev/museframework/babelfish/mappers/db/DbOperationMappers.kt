@@ -363,6 +363,7 @@ private fun emitOperation(
     body: CodeBlock.Builder.() -> Unit,
 ): CodeBlock = buildCodeBlock {
     beginControlFlow("%M(%L)", dbDsl(functionName), element.configRef.code())
+    addStatement("docId = %L", kotlinStringLiteral(element.docId))
     body()
     if (element.docName.isNotBlank()) addStatement("docName = %L", kotlinStringLiteral(element.docName))
     emitTarget(element.targetConfig)

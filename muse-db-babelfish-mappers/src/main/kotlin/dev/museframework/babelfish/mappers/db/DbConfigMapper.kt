@@ -79,6 +79,7 @@ object DbConfigCodeEmitter : ConfigCodeEmitter<DbConfig> {
         connection as GenericDbConnectionConfig
         return buildCodeBlock {
             beginControlFlow("%M(%L)", dbDsl("dbConfig"), kotlinStringLiteral(config.name))
+            addStatement("docId = %L", kotlinStringLiteral(config.docId))
             if (config.docName != config.name) addStatement("docName = %L", kotlinStringLiteral(config.docName))
             if (!config.validateConnectivity) addStatement("validateConnectivity = false")
             beginControlFlow("generic")
