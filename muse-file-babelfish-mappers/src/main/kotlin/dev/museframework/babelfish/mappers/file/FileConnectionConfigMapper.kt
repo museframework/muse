@@ -1,5 +1,7 @@
 package dev.museframework.babelfish.mappers.file
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
@@ -38,21 +40,13 @@ object FileConnectionConfigCodeEmitter : ConfigCodeEmitter<FileConnectionConfig>
     override fun emit(
         config: FileConnectionConfig,
         ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.file.api.dsl.fileConnection")
-        ctx.addImport("java.util.concurrent.TimeUnit")
-        return buildString {
-            appendLine("fileConnection {")
-            appendLine("    name = \"${ctx.escapeKotlinString(config.name)}\"")
-            appendLine("    docName = \"${ctx.escapeKotlinString(config.docName)}\"")
-            appendOptionalString("workingDirectory", config.workingDirectory, ctx)
-            appendOptionalLong("timeBetweenSizeCheck", config.timeBetweenSizeCheck)
-            appendTimeUnit(
-                "timeBetweenSizeCheckUnit",
-                config.timeBetweenSizeCheckUnit,
-                default = TimeUnit.MILLISECONDS,
-            )
-            append("}")
-        }
+    ): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", fileDsl("fileConnection"))
+        addString("name", config.name)
+        addString("docName", config.docName)
+        addString("workingDirectory", config.workingDirectory)
+        addLong("timeBetweenSizeCheck", config.timeBetweenSizeCheck)
+        addTimeUnit("timeBetweenSizeCheckUnit", config.timeBetweenSizeCheckUnit, TimeUnit.MILLISECONDS)
+        endControlFlow()
     }
 }

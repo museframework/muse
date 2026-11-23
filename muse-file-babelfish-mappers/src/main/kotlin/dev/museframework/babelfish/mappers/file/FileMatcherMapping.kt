@@ -1,8 +1,11 @@
 package dev.museframework.babelfish.mappers.file
 
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.buildCodeBlock
 import dev.museframework.babelfish.api.ConfigMapper
 import dev.museframework.babelfish.emitter.CodegenContext
 import dev.museframework.babelfish.emitter.ConfigCodeEmitter
+import dev.museframework.babelfish.emitter.kotlinStringLiteral
 import dev.museframework.babelfish.mapper.MappingContext
 import dev.museframework.babelfish.model.RawConfig
 import dev.museframework.babelfish.model.RawElement
@@ -40,17 +43,12 @@ object FileMatcherConfigCodeEmitter : ConfigCodeEmitter<FileMatcherConfig> {
     override fun emit(
         config: FileMatcherConfig,
         ctx: CodegenContext,
-    ): String {
-        ctx.addImport("dev.museframework.file.api.dsl.fileMatcher")
-        return buildString {
-            appendLine("fileMatcher {")
-            appendLine("    name = \"${ctx.escapeKotlinString(config.name)}\"")
-            if (config.docName.isNotBlank() && config.docName != config.name) {
-                appendLine("    docName = \"${ctx.escapeKotlinString(config.docName)}\"")
-            }
-            appendLocalFileMatcherAssignment("matcher", config.matcher, ctx)
-            append("}")
-        }
+    ): CodeBlock = buildCodeBlock {
+        beginControlFlow("%M", fileDsl("fileMatcher"))
+        addString("name", config.name)
+        if (config.docName.isNotBlank() && config.docName != config.name) addString("docName", config.docName)
+        addMatcher(config.matcher)
+        endControlFlow()
     }
 }
 
@@ -133,59 +131,18 @@ internal fun mergeMatchers(
     )
 }
 
-internal fun StringBuilder.appendLocalFileMatcherAssignment(
-    property: String,
-    matcher: LocalFileMatcher?,
-    ctx: CodegenContext,
-    indent: String = "    ",
-) {
+internal fun CodeBlock.Builder.addMatcher(matcher: LocalFileMatcher?) {
     if (matcher == null) return
-    ctx.addImport("dev.museframework.file.api.model.LocalFileMatcher")
-    appendLine("$indent$property = LocalFileMatcher(")
-    appendLocalFileMatcherArguments(matcher, ctx, "$indent    ")
-    appendLine("$indent)")
-}
-
-internal fun StringBuilder.appendSubset(
-    subset: LocalSubsetList?,
-    ctx: CodegenContext,
-    indent: String = "    ",
-) {
-    if (subset == null) return
-    ctx.addImport("dev.museframework.file.api.model.LocalSubsetList")
-    appendLine("${indent}subset = LocalSubsetList(")
-    if (subset.limit != 0) appendLine("$indent    limit = ${subset.limit},")
-    if (subset.offset != 0) appendLine("$indent    offset = ${subset.offset},")
-    if (subset.criteria != FileListSortCriteria.DATE_MODIFIED) {
-        ctx.addImport("dev.museframework.file.api.model.FileListSortCriteria")
-        appendLine("$indent    criteria = FileListSortCriteria.${subset.criteria},")
-    }
-    if (subset.order != SortOrder.DESCENDING) {
-        ctx.addImport("dev.museframework.file.api.model.SortOrder")
-        appendLine("$indent    order = SortOrder.${subset.order},")
-    }
-    appendLine("$indent)")
-}
-
-private fun StringBuilder.appendLocalFileMatcherArguments(
-    matcher: LocalFileMatcher,
-    ctx: CodegenContext,
-    indent: String,
-) {
+    add("matcher = %T(\n", LocalFileMatcher::class)
+    indent()
     fun instant(name: String, value: Instant?) {
-        if (value == null) return
-        ctx.addImport("java.time.Instant")
-        appendLine("$indent$name = Instant.parse(\"${value}\"),")
+        value?.let { add("%N = %T.parse(%S),\n", name, Instant::class, it.toString()) }
     }
     fun duration(name: String, value: Duration?) {
-        if (value == null) return
-        ctx.addImport("java.time.Duration")
-        appendLine("$indent$name = Duration.ofMillis(${value.toMillis()}),")
+        value?.let { add("%N = %T.ofMillis(%L),\n", name, Duration::class, it.toMillis()) }
     }
     fun policy(name: String, value: FileTypeRequirement) {
-        if (value == FileTypeRequirement.INCLUDE) return
-        ctx.addImport("dev.museframework.file.api.model.FileTypeRequirement")
-        appendLine("$indent$name = FileTypeRequirement.$value,")
+        if (value != FileTypeRequirement.INCLUDE) add("%N = %T.%N,\n", name, FileTypeRequirement::class, value.name)
     }
 
     instant("createdSince", matcher.createdSince)
@@ -196,13 +153,29 @@ private fun StringBuilder.appendLocalFileMatcherArguments(
     instant("accessedUntil", matcher.accessedUntil)
     duration("notUpdatedInTheLast", matcher.notUpdatedInTheLast)
     duration("updatedInTheLast", matcher.updatedInTheLast)
-    matcher.filenamePattern?.let { appendLine("${indent}filenamePattern = \"${ctx.escapeKotlinString(it)}\",") }
-    matcher.pathPattern?.let { appendLine("${indent}pathPattern = \"${ctx.escapeKotlinString(it)}\",") }
+    matcher.filenamePattern?.let { add("filenamePattern = %L,\n", kotlinStringLiteral(it)) }
+    matcher.pathPattern?.let { add("pathPattern = %L,\n", kotlinStringLiteral(it)) }
     policy("directories", matcher.directories)
     policy("regularFiles", matcher.regularFiles)
     policy("symbolicLinks", matcher.symbolicLinks)
-    matcher.minSize?.let { appendLine("${indent}minSize = $it,") }
-    matcher.maxSize?.let { appendLine("${indent}maxSize = $it,") }
+    matcher.minSize?.let { add("minSize = %L,\n", it) }
+    matcher.maxSize?.let { add("maxSize = %L,\n", it) }
+    unindent()
+    add(")\n")
+}
+
+internal fun CodeBlock.Builder.addSubset(subset: LocalSubsetList?) {
+    if (subset == null) return
+    add("subset = %T(\n", LocalSubsetList::class)
+    indent()
+    if (subset.limit != 0) add("limit = %L,\n", subset.limit)
+    if (subset.offset != 0) add("offset = %L,\n", subset.offset)
+    if (subset.criteria != FileListSortCriteria.DATE_MODIFIED) {
+        add("criteria = %T.%N,\n", FileListSortCriteria::class, subset.criteria.name)
+    }
+    if (subset.order != SortOrder.DESCENDING) add("order = %T.%N,\n", SortOrder::class, subset.order.name)
+    unindent()
+    add(")\n")
 }
 
 private fun <T> mergeField(name: String, left: T?, right: T?): T? =
